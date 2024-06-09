@@ -97,6 +97,7 @@
                 - But Twitter scaling challenge is not due to tweet volume, but due to *fan-out* (each user follow many user)
             - Broadly two implementations we can go with 
                 - First
+                    - ![text](./images/ddia_0102.png)
                     - Insert tweet to some global collection of tweet
                     - When a user reqeust 
                         - Get all the tweets to whom I follow, sort and give back to me 
@@ -120,7 +121,6 @@
                         - User post a tweet, look up all people who follow the user
                           and insert the new tweet into each of their home timeline cache
                         - This made read cheap (already in cache)
-                    - ![text](./images/ddia_0102.png)
                     - ![text](./images/ddia_0103.png)
                 - Gains 
                     - Approach second is better than first in term of home timeline reads
@@ -140,10 +140,31 @@
                                 - Junior: Probably Kohli has open his keypad and typing
                             - So does this mean software engineers are existing because of sportsmen/movies-stars/tik-tokers/policians/ ? 
                             - Basically they can break you code any day.
-                            - And you are writing millions of code line just for them :| 
+                            - And you are writing millions of code line just for them 😐
+        - In the above Twitter example, the distribution of followers per user(may be weighted by how often those user tweet) is a key load parameter for discussing scalability, since it determine the *fan-out* load
+
+- Performance
+    - Once load is defined, you can test what happen when the load increases
+        - Increase a load parameter and keep the system resources unchanged
+        - When you increase the load parameter, how much do you need to increase the resource if you want to keep performance unchanged
+    - In batch system throughput weights more. 
+    - In online system(stream) service response time (client receive - client send)
+
+    > Latency Vs Response time : Both are not same. Response time is what client sees (includes network delays, queueing delays). Latency is the duration that a request is waiting to be handled - during which it latent, awaiting service
+    - Think of response time not as a single number, but as a distribution of values 
+        - Percentile is better metric than average
+            - [Percentile](./images/ddia_0104.png)
+        - Average doesn't tell you "typical" response time
+        - Median (sort and then check half point) 
+            - Median also known as 50th percentile (p50)
+    
+    - High percentiles or response time, also know as *tail latencies*
+        - Imp, because they directly affect customers
+        - Ex. Amazon
+            - Describe response time requirement for internal service in term of the 99.9th percentile
+                - Affects only 1 in 1000 request
+            - But customer with the slowest request are often those who have most data on their account because they have made many purchase 
 
 
-                
-            
 - Maintainability
 
