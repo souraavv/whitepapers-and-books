@@ -153,7 +153,7 @@
     > Latency Vs Response time : Both are not same. Response time is what client sees (includes network delays, queueing delays). Latency is the duration that a request is waiting to be handled - during which it latent, awaiting service
     - Think of response time not as a single number, but as a distribution of values 
         - Percentile is better metric than average
-            - [Percentile](./images/ddia_0104.png)
+            - ![Percentile](./images/ddia_0104.png)
         - Average doesn't tell you "typical" response time
         - Median (sort and then check half point) 
             - Median also known as 50th percentile (p50)
