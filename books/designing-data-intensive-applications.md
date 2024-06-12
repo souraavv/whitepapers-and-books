@@ -1,12 +1,13 @@
 ## Designing Data Intensive Applications
 
+### Resources
+
 - Author : Martin Kleppmann
 - 20 hours of reading (600+ pages book)
-
+[Oreilly Link](https://learning.oreilly.com/library/view/designing-data-intensive-applications/)
 
 ### Plethora of buzzwords relating to storage and processing of data
 - NoSQL! Big Data! Web-scale! Sharding! Eventual consistency! ACID! CAP theorem! Cloud services! MapReduce! Real-time!
-
 
 ### Preface
 - Data intensive 
@@ -189,6 +190,33 @@
 - Major cost of software products
 - Pain is to fix other mistakes and maintain legacy code
     -  We should design software in such a way that minimize pain during maintenance, and thus avoid creating legacy sofware ourselves
-    
-    
+
+
+### Chapter 2. Data Models and Query Language
+
+#### Data models
+- Data models decides
+    - your thinking to solve the problem
+    - the way software will be written
+
+- Decide data model for you app wisely
+
+- Layering of data models
+    - All application are built by layering one data model on another
+    - Application developer think in term of objects/entities/data structure eg. people, organizations, goods, actions(API to manipulate)
+    - Store data on disk - General purpose data models - JSON, XML, tables or graph model
+    - Database engineers thinks JSON/XML/Relations/Graph in term of bytes in memory, disk or network
+    - One more lower level - hardware engineers (byte in term of electical current, pulses, pulses of light, etc)
+
+- Each layer hides other layer complexity
+
+
+- Relational Model vs Document Model
+    - Relational model popular for
+        - Transactions (ACID) : Banking, airline, etc.
+
+- The Birth of NoSQL (2010)
+    - Goal: Overthrow the dominance of relational model's dominance
+
+
 
