@@ -85,7 +85,7 @@
         - Good management practices 
 
 #### Scalability
-- Systems ability to cope with increased load.
+- Systems ability to cope with increased load
 - Define load ? 
     - Depends on the system architecture (load parameters)
     - Example
@@ -137,10 +137,10 @@
                 - Approach one is better than second in term of publish tweet
                 - More work at write in second approach
                     - Assumption Land
-                        - Avg: 75 followers
+                        - Avg distribution of follower per user: 75 followers
                         - Tweets rate: 4.6k
                         - Number of writes : 4.6k * 75 = 345k writes/second
-                    - But easily there are people who have more than say 30 Million followers
+                    - But easily there are people who have more than say 30 Million followers (🤴)
                         - 30millions writes 😬
                         - Senior dev to Junior Dev
                             - Senior: Why our disk fans making so much noise ? 
@@ -152,8 +152,8 @@
 
 #### Performance
 - Once load is defined, you can test what happen when the load increases
-    - Increase a load parameter and keep the system resources unchanged
-    - When you increase the load parameter, how much do you need to increase the resource if you want to keep performance unchanged
+    - Increase a load parameter and keep the system resources unchanged, impact on performance ?
+    - When you increase the load parameter, how much do you need to increase the resource if you want to keep performance unchanged ?
 - In batch system throughput weights more. 
 - In online system(stream) service response time (client receive - client send)
 
@@ -161,35 +161,43 @@
 - Think of response time not as a single number, but as a distribution of values 
     - Percentile is better metric than average
         - ![Percentile](./images/ddia_0104.png)
-    - Average doesn't tell you "typical" response time
+    - Average doesn't tell you how long users "typically" have to wait ?
     - Median (sort and then check half point) 
         - Median also known as 50th percentile (p50)
 
-- High percentiles or response time, also know as *tail latencies*
-    - Imp, because they directly affect customers
+- High percentiles of response times, also know as *tail latencies* like p99 (1 in 100), p99.9 (1 in 1000), p99.99 (1 in 10,000)
+    - Imp, because they directly affect customers statisfaction and therefore the sales
     - Ex. Amazon
         - Describe response time requirement for internal service in term of the 99.9th percentile
             - Affects only 1 in 1000 request
-        - But customer with the slowest request are often those who have most data on their account because they have made many purchase 
+        - But customer with the slowest request are often those who have most data on their account because they have made many purchase
+- Head-of-line blocking (Queuing delay)
+  - small number of slow requests hold up the processing of subsequent requests
+  - queueing delay accounts for the large part of response time at high percentiles
+  - client for generating artificial load, should keep on sending requests independently of the response time thereby not keeping queues artifically shorter in the test
 - High percentile becomes more important in backend services that are called multiple times as part of serving a single end-user request
-    - Single service slow == complete sysytem slow
+    - Right way of aggregating response time is to add histograms
+    - Single service slow == complete system slow
     ![Several backend calls](./images/ddia_0105.png)
 
 - Approach for Coping with Load
     - Architecture design for x level of load might not work well for y level of load
-    - People often about **Scaling**  
+    - **Scaling Trade-off**  
         - Scaling up: Vertical or 
         - Scaling out: Horizontal 
     > Distributing load across multiple machine is also known as *shared-nothing* architecture
+    - Good architectures often involves mixture of both the scaling approaches
     - Some system are elastic
         - Automatically add compute resources
         - Good if load is unpredictable
-    - Scale manually
+    - Some systems needs to be scaled manually
         - Human analyze
+        - Fewer operational surprises
     - Stateless services distribution easy across machines
     - Statful services are hard to move from single node to distributed setup
     - There is no such *magic scaling sauce* 
-        - An architecture that scale well for App x is build on assumption set S
+        - An architecture that scale well for App x is build on assumption set S (load factors)
+        - Therefore, architecture of systems that operate at large scale is usually highly specific to the application
     
 #### Maintainability
 
