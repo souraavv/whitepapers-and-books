@@ -218,5 +218,107 @@
 - The Birth of NoSQL (2010)
     - Goal: Overthrow the dominance of relational model's dominance
 
+#### The Object-Relational Mismatch
+
+- Todays app are developed in OOPs languages
+- SQL data models seems highly unrelated with OOPs
+    - An awkward translation b/w two
+    - This disconnect b/w the models is sometime called *impedance mismatch*
+
+- ORM (Object Relational Mapping) frameworks
+    - ex. ActiveRecord, Hibernate
+        - reduce the amount of boilerplate code for translation layer
+        - But can't completely hide the differences
+
+- Example : LinkedIn : Relational vs JSON
+    - Relational
+    ![Bill Gate Resume on a Relational model](./images/ddia_0201.png)
+    - JSON Document 
+        ```json
+        {
+            "user_id":     251,
+            "first_name":  "Bill",
+            "last_name":   "Gates",
+            "summary":     "Co-chair of the Bill & Melinda Gates... Active blogger.",
+            "region_id":   "us:91",
+            "industry_id": 131,
+            "photo_url":   "/p/7/000/253/05b/308dd6e.jpg",
+            "positions": [
+                {"job_title": "Co-chair", "organization": "Bill & Melinda Gates Foundation"},
+                {"job_title": "Co-founder, Chairman", "organization": "Microsoft"}
+            ],
+            "education": [
+                {"school_name": "Harvard University",       "start": 1973, "end": 1975},
+                {"school_name": "Lakeside School, Seattle", "start": null, "end": null}
+            ],
+            "contact_info": {
+                "blog":    "https://www.gatesnotes.com/",
+                "twitter": "https://twitter.com/BillGates"
+            }
+        }
+
+    ```
+
+- Locality is better in JSON 
+    - Fetch a profile in relational - perform multiple queries 
+    - Json representation makes this tree structure explicit
+        ![JSON representation](./images/ddia_0202.png)
+
+#### Many-to-One and Many-To-Many relationships
+- Look at the `region_id` and `industry_id`
+    - They are not plain text, instead they are IDs
+    - Benefits ?
+        - Consistent style/Spell check
+        - Avoiding ambiguity
+        - Ease of updating
+        - ID need not to changed but information it identify can be change
+    - Removing such duplicates is done in the process of *normalization*
+
+- Normalization data requires Many-To-One relations
+    - eg. Many people live in one particular regions
+    - M:1 doesn't fit directly to document model 
+    - If database doesn't supports join, then emulate than in application code by making multiple queries
+        - This shift of code to app might not be good
+
+- More often initial version of application fits well in join-free document model
+    - But data becomes more interconnected as more features are introduced
+
+- Example (Modification to resume)
+    - *Organization and school as entities*
+        - In example : `organization` and `school_name` are just string
+        - Perhaps they should be references to entities instead ?
+            - Each org, school, university HAS own web page(logo, news feed)
+        - Each resume could -link-> org/school
+    - *Recommendations*
+        - Add a new feature
+            - One user can write recommendation to another
+            - Show recommendation on resume of the user, together with name, photo of the user making recommendation
+            - If recommender updates their photo
+                - All recommendation they have made needs change
+                - Therefore recommendation should have reference to the author's profile
+            - ![](./images/ddia_0203.png)
+
+    - Many to Many relation required in above example ?
+        - ![](./images)
+        - Data in dotted rectangle can be group into one document
+        - Requires join when queries
+
+#### Relational Vs Document database Today ?
+- Fault tolerant ? Handling concurrency ? 
+- Document database
+    - Schema flexibility
+    - Better performance due to locality
+    - Closer to datastructure in application
+- Relations database
+    - Support for join
+    - M:1, M:N relationship 
+
+#### Which data model leads to simpler application code?
+
+
+
+
+
+
 
 
