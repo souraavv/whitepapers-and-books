@@ -52,17 +52,24 @@
 #### Reliability
 - Tolerating hardware & software faults
     - Redundant components ? 
-        - Was OK in older system, but in recent when computing demand has increased
-        - More compute demand == More machines == More harware faults
+        - When one component dies, the redundant component can take its place while the broken component is replaced
+        - Was OK in older system, but cannot tolerate loss of entire machine
+        - More data volume & application compute demand == More machines == More harware faults
     - Sofware fault-tolerant 
-        - Can tolerate entire machine loss 
+        - Can tolerate entire machine loss (along with hardware redundancy)
         - Operational advantages
-            - Schedules downtime/patching
+            - Schedules downtime/patching, one node at a time without downtime (rolling upgrade)
+
+- Fault, Failure & Fault Tolerant Systems
+  - Fault is defined as one component of the system is deviating from the spec
+  - Failure is when system as a whole stops providing required service to the user
+  - Fault tolerant systems can anticipate the faults and can cope up with them
+
 - Hardware vs Software
     - We make **assumption** hardware faults are independent and random
         - P(Component A fails | Component B failed) = 0 (or may be ~0 : weak correlations)
     - Another class : Systematic faults
-        - Correlated across nodes
+        - Correlated across nodes, types : 
             - Software bug
             - Runaway process - use up shared resources - CPU, memory, disk or network bandwidth
             - Slow down of some service
@@ -71,11 +78,10 @@
 
 - Human Errors
     - To avoid
-        - Well-designed abstraction
-        - APIs
-        - Admin interface 
-        - Decouple components (high risk, low risk)
-        - Clear monitoring (performance metrics, error rates)
+        - Design system that minimizes opportunities for error : Well-designed abstraction, APIs, Admin interface 
+        - Decouple components (high risk, low risk) : sandbox environment for experimentation
+        - Quick & easy recovery in case of failures (minimize impact)
+        - Clear monitoring (performance metrics, error rates) : tracking what is happening for understanding failures i.e telemetry
         - Good management practices 
 
 #### Scalability

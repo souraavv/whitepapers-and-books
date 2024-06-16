@@ -28,7 +28,6 @@
     ad[abstract_decorator] --extends--> ac;
     cd[concrete_decorators] --extends--> ad;
     cd --composition--> cc
-
 ```
 
 ## Factory Design Pattern
