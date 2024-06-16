@@ -204,7 +204,28 @@
 - Major cost of software products
 - Pain is to fix other mistakes and maintain legacy code
     -  We should design software in such a way that minimize pain during maintenance, and thus avoid creating legacy sofware ourselves
-
+-  Design software to minimize pain during maintenance
+    1. Operability : easy for operations team to keep system running
+    2. Simplicity : easy for new engineer to understand the system
+    3. Evolvability : easy for engineers to make changes to the systems in future
+- Operability
+  - making routine tasks easy, allowing operations team to focus their efforts on high-value activities
+  - having good visibility into system's health & effective ways to manage it
+- Simplicity
+  - large projects => complex & difficult to understand
+    - slows down everyone who need to work on the system
+    - increase cost of maintenance
+    - increase risk of introducing bugs when making a change
+  - **Good abstraction** : avoid **accidental complexity** 
+    - hides implementation detail behind a clean, simple-to-understand façade
+    - Examples :
+      - high-level programming languages are abstractions that hide machine code, CPU registers, and syscalls
+      - SQL is an abstraction that hides complex on-disk and in-memory data structures, concurrent requests from other clients, and inconsistencies after crashes
+    - **reusability** : allows us to extract part of the large systems into well-defined, reusable components
+- Evolvability : agility on the data system level
+  - agile systems : allows making change easier
+  - goal is to find ways of increasing agility of larger data systems
+  - agility of system dependent on its simplicity and its abstractions
 
 ### Chapter 2. Data Models and Query Language
 
