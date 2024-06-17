@@ -291,7 +291,6 @@
                 "twitter": "https://twitter.com/BillGates"
             }
         }
-
     ```
 
 - Locality is better in JSON 
@@ -332,9 +331,8 @@
                 - All recommendation they have made needs change
                 - Therefore recommendation should have reference to the author's profile
             - ![](./images/ddia_0203.png)
-
     - Many to Many relation required in above example ?
-        - ![](./images)
+        ![](./images)
         - Data in dotted rectangle can be group into one document
         - Requires join when queries
 
