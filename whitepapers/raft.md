@@ -4,7 +4,7 @@
 
 ### Introduction
 
-- Consensus algorithm allow 
+- Consensus algorithm allows
     - A collection of machines to work as a coherent group
     - Survive the failures of some members
 
@@ -12,13 +12,13 @@
     - Reliable large-scale software system
 
 - What is RAFT ?
-    - Consensus algorithm for managing a repliacted log
+    - Consensus algorithm for managing a replicated log
     - Much easier to understand compare to classic consensus algo **Paxos** (by Leslie Lamport)
-        - Paxos is complex to understand and also some parts are less intuitive why they works 
+        - Paxos is complex to understand + less intuitive
         - RAFT is easier to understand 
             - Breakdown to smaller problems
 
-- What claims does RAFT make ? 
+- RAFT claims ? 
     - Strong leader
         - Flow of log entry only from leader to other servers
         - Simplified management of log
@@ -26,32 +26,33 @@
         - randomized itmers to resolve conflicts (else indefinite waiting)
     - Membership change 
 
-- RAFT vs PAXOX (Author perspecitve)
-    - Superior for both acads + industry
-    - Simpler 
-
 ### Replicated State Machines
 
 - What is Replicated State Machine ?
     - Implemented using a replicated log
+        ```mermaid
+        graph LR
+            A(State s[i]) --(log[i])--> B(State s[i + 1])
+            B --(log[i + 1])--> C(State s[i + 2])
+        ```
 
 - Logs contains ?
-    - sequence of commands
-    - Every log on every compute contains command in same sequence
+    - Sequence of commands
 
-- Property of State Machine
+- Commands are present in the same sequence in each log present on each compute
+
+- Properties of State Machine
     - Deterministic 
-    - This gurantee if from state s, we apply log, then we will always reach to some state d
+        - Initial State S; apply log L; Final State D
 
-- What is the role of RAFT here ?
+- What is the role of Raft algorithm here ?
     - Keep these logs **consistent**
 
 - Hallucination 
     - RAFT make client believe server as a single, highly reliable state machine
 
-- Consensus algo arise in the context of RSM
-
-- Same state on multiple servers
+- Consensus algorithm arise in the context of Replicated State Machines
+    - Same state on multiple servers
 
 ### Must-have properties of a consensus algorithm 
 
