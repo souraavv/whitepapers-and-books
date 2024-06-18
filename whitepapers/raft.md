@@ -30,11 +30,7 @@
 
 - What is Replicated State Machine ?
     - Implemented using a replicated log
-        ```mermaid
-        graph LR
-            A(State s[i]) --(log[i])--> B(State s[i + 1])
-            B --(log[i + 1])--> C(State s[i + 2])
-        ```
+    - State s[i]; apply log[i]; State s[i + 1]
 
 - Logs contains ?
     - Sequence of commands
