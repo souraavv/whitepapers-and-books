@@ -243,8 +243,7 @@
     - Database engineers thinks JSON/XML/Relations/Graph in term of bytes in memory, disk or network
     - One more lower level - hardware engineers (byte in term of electical current, pulses, pulses of light, etc)
 
-- Each layer hides other layer complexity
-
+- Each layer hides the complexity of the layers below it by providing a clean data model
 
 - Relational Model vs Document Model
     - Relational model popular for
@@ -252,6 +251,11 @@
 
 - The Birth of NoSQL (2010)
     - Goal: Overthrow the dominance of relational model's dominance
+    - Driving forces behind adoption of NoSQL databases
+      1. Greater scalability
+      2. Free & open-source software
+      3. Specialized query operations not supported by relational model
+      4. More dynamic & expressive data model, no restriction with relational schemas
 
 #### The Object-Relational Mismatch
 
@@ -291,11 +295,12 @@
                 "twitter": "https://twitter.com/BillGates"
             }
         }
-    ```
+        ```
 
 - Locality is better in JSON 
-    - Fetch a profile in relational - perform multiple queries 
-    - Json representation makes this tree structure explicit
+    - Fetch a profile in relational - perform multiple queries
+    - Document-oriented databases uses this data model - CouchDB, RethinkDB, MongoDB, Espresso, etc.
+    - Json representation makes this tree (**one-to-many relation**) structure explicit
         ![JSON representation](./images/ddia_0202.png)
 
 #### Many-to-One and Many-To-Many relationships
@@ -315,7 +320,7 @@
         - This shift of code to app might not be good
 
 - More often initial version of application fits well in join-free document model
-    - But data becomes more interconnected as more features are introduced
+    - But data becomes more interconnected as more features are introduced which brings many-to-many or many-to-one relations within the data
 
 - Example (Modification to resume)
     - *Organization and school as entities*
@@ -332,17 +337,18 @@
                 - Therefore recommendation should have reference to the author's profile
             - ![](./images/ddia_0203.png)
     - Many to Many relation required in above example ?
-        ![](./images)
+        - ![](./images/ddia_0204.png)
         - Data in dotted rectangle can be group into one document
-        - Requires join when queries
+        - References to organizations, schools, and other users represented as references
+        - Requires join when queried
 
 #### Relational Vs Document database Today ?
 - Fault tolerant ? Handling concurrency ? 
-- Document database
+- Benefits of using document database
     - Schema flexibility
     - Better performance due to locality
     - Closer to datastructure in application
-- Relations database
+- Benefits of using relational database
     - Support for join
     - M:1, M:N relationship 
 
