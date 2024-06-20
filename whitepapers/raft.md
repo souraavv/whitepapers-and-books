@@ -20,10 +20,9 @@
 
 - RAFT claims ? 
     - Strong leader
-        - Flow of log entry only from leader to other servers
-        - Simplified management of log
+        - Flow of log entry only from leader to other servers (followers) which implifies the management of logs
     - Leader Election
-        - randomized itmers to resolve conflicts (else indefinite waiting)
+        - Randomized timers to resolve conflicts (else indefinite waiting)
     - Membership change 
 
 ### Replicated State Machines
@@ -44,7 +43,8 @@
 - What is the role of Raft algorithm here ?
     - Keep these logs **consistent**
 
-- Hallucination 
+- Hallucination to Client!!
+    - Once commands are properly replicated, each server's state machien processes them in log order, and the outputs are returned to clients
     - RAFT make client believe server as a single, highly reliable state machine
 
 - Consensus algorithm arise in the context of Replicated State Machines
@@ -61,6 +61,8 @@
         - Indepent of timing to ensure the consistency. Why ? 
             - Faulty clocks
             - Extereme message delays 
+- In the common case, a command can complete as soon as a majority of the cluste rhas responded to a single round of RPC
+    - This avoids a minority of slow server to impact the performance
 
 ### Main GOAL of RAFT ?
 - Musts
@@ -97,8 +99,19 @@
 - Safety 
     - State Machine Safety
         - If any server has applied a particular log entry to it state machine, then no other server may apply a different command for the same log index
-    - Ensured through election restrictions
+        - Ensured through election restrictions
 
+### Raft Guarantees - True at all times!
+- **Election Safety**
+    - At most one leader in a given term T
+- **Leader Append-Only**
+    - A leader never overwrites or deletes entries in its own log; it only append new entrie
+- **Log Matching** 
+    - If two logs contains an entry with the same index and term, then the logs are identical in all entries up through the given index
+- **Leader Completeness**
+    - If a log entry is commited in a given term, then that entry will be present in the logs of the leaders for all higher-numbered term
+- **State Machine Safety**
+    - If a server has applied a log entry at a given index to its state machine, no other server will ever apply a different log entry for the same index
 
 ### Raft Basics
 
@@ -219,8 +232,9 @@ Invoked by candidates to gather vote
 
 **Leaders**
 - Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server
-    - Prevent election timeout
+    - Hearbeat prevent election timeout
 - If command received from client: append entry to local log, respond after entry applied to state machine
+
 
 
 
