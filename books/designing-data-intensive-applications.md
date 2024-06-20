@@ -353,7 +353,30 @@
     - M:1, M:N relationship 
 
 #### Which data model leads to simpler application code?
+- If application has document like structure (a tree of 1:M) and tree is loaded at once, then use document 
+    - Major drawback in document : You can't refer directly to a nested item with an document
+    - The drawback become a problem if document are deeply nested
+    - Poor support for join in document databases may or may not be a problem
+        - Problem: If M:N relations exists
+        - !Problem: M:N relationship may never needed in an analytical application
+    - Reduce use of M:N relations by **denormalizing** your data
+        - Denomalization brings more complexity and makes consistency harder
 
+- Infact there is no simple answer to the question; it depends on your application; relationship that exist b/w data items
+- Schema flexibility in the document model
+    - No schema enforced on data by the JSON/document database
+        - Arbitrary key/value can be added
+            - Makes migration easy for document database, on the other hand migration in relational database brings downtime
+        - Can't say these as schema less, because there is some implicity assumption while reading the data
+    
+- **Schema-on-read** : Structure of data is implicit and determine at the time of read
+    - When to use ? 
+        - If data is not homogenous, but heterogeneous.
+- **Schema-on-write**: Schema is explicit 
+    - If data is homogeneous 
+
+
+    
 
 
 
