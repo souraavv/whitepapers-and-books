@@ -294,6 +294,70 @@ Invoked by candidates to gather vote
         - then set `commitIndex = N`
 
 ### Logs Replication
+- Client request contains a command to be executed by the replicated state machine
+- The leader append the command to its log as a new entry, then issue `AppendEntries` RPCs in parallel to each of the other server to replicate
+- When safely replicated, the leader applies the entry to its state machine and returns the result of that execution to the client
+- If followers crash or run slowly, or if network packets are lost, the leader retries AppendEntries RPCs indefinitely (even after it has responded to the client) until all followers eventually store all log entries
+- Each log entry stores (term number, command)
+    - Why term number ? 
+        - Helps to detect inconsistency in the logs
 
+- When does leader feels safe to apply a log entry to its state machine ?
+    > Applied log entry are referred as commited 
+    - A log entry is committed once the leader that created the entry has replicated it on majority of servers
+    - All preceding entries in the leader's log, including entries created the previous leader
 
+- When does followers feels safe to apply a log entry ?
+    - Leader keeps track of the highest index it knows to be committed, and it include that index in future AppendEntries RPCs(including heartbeats) so that the other server eventually find out
+    - Once a follower learn that a log entry is committed, it applies the entry to its local state machine
 
+- Properties maintains by the RAFT
+    - If two entries in different logs have the same index and term, then they store the same command
+    - If two entries in different logs have the same index and term, then the logs are identicla in all preceding entries
+
+- ![alt text](./images/raft/images-4.png)
+
+- Leader handles inconsistencies by forcing the followers' logs to duplicate its own
+    - Conflicting entries will be overwritten with entries from the leader's log
+    - leader maintains `nextIndex` for each follower
+
+- To what value new leader initialize `nextIndex`?
+    - for each follower `f`: `nextIndex[f] = len(leader_log) + 1`
+
+### Safety 
+
+- How to sure that each state machine executes exactly the same commands in the same order ?
+    - Constraints at the Leader election : because we don't want a stale follower to become leader and overwrite entries
+
+#### Election restriction
+- In a leader-based consensus algorithm, the leader must eventually store all of the committed log entries
+- How does Raft gaurantee above ?
+    - Raft use simple approach without the need to transfer those entries to the leader
+    - Log entry only flow in one direction, from leaders to followers
+    
+    - Example:
+        - ![alt text](./images/raft/image-5.png)
+    - Raft uses the voting process to prevent a candidate from winning an election unless its log contains all committed entries
+    - Voter denies its vote if its own log is more up-to-date than that of the candidate
+
+- How does Raft determines which of two logs is more up-to-date ?
+    - Comparing the `index` (len(log)) and `term` of the last entries in the logs 
+    - If the logs have last entries with different terms, then the log with the later term is more up-to-date
+    - If the logs end with the same term, then whichevver log is longer is more up-to-date
+
+#### Committing entries from previous terms
+- Is it ok for the leader to commit all the uncommited entries from its log ? 
+    - A big no!!
+        - Chances are that committed entries may get overwritten by a future leader
+        - Leader doesn't change the term value present in the logs from previous leaders term
+    - Only log entries from the leader's current term are committed by counting replicas;
+    - Once an entry from the current term has committed in this way, then all prior entries are committed indirectly because of the Log Matching Property 
+    > Even when you have replicated on all the server (you are fully sure to commmit), but still Raft takes conservative apporach for simplicity
+
+#### Safety argument
+- Argue on Leader Completeness Property 
+    - Assume it doesn't hold, then we prove a contradiction
+    - Suppose the leader for term T commits a log entry from its term, but that log entry is not store by the leader of some future term. Consider the smallest term U > T whose leader doesn't store the entry
+    1. Committed entry must have been absent from leader U log at the time of its electoin 
+    2. Leader T replicated teh entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leadre U
+        - Voter is key to reaching a contradiction 
