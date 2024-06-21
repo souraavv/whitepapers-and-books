@@ -27,7 +27,7 @@
 
 ### Replicated State Machines
 
-![alt text](image-2.png)
+![alt text](./images/raft/image.png)
 
 - What is Replicated State Machine ?
     - Implemented using a replicated log
@@ -123,7 +123,7 @@
     - Leader
     - Follower
     - Candidate
-    - ![alt text](image.png)
+    - ![alt text](./images/raft/image-1.png)
 - Normal scenario
     - one leader, rest all are followers
 - Client always talks with leader
@@ -132,7 +132,7 @@
 - Raft divides times into *terms* of arbitary length
     - Term acts as *logical clocks*
     - Helps servers to detect obsolete information such as stale leaders
-    - ![alt text](image-1.png)
+    - ![alt text](./images/raft/image-2.png)
 - Terms are numbered with consecutive integers
 - Each term begin with an election, in which one or more candidate attempts to become leader
     - If candidate wins, then leader for the entire term
@@ -145,7 +145,7 @@
     - AppendEntries RPCs (by leader to replicate log entries and to provide a form of heartbeat)
     - RPC for transferrring snapshots between servers
 - Server retry the RPC if do not receivve a response in a timely manner and for performance: parallel RPCs
-- ![alt text](image-3.png)
+- ![alt text](./images/raft/image-3.png)
 
 ### Leader Election
 - All server startup as followers
@@ -292,7 +292,6 @@ Invoked by candidates to gather vote
         - And a majority of `matchIndex[f] >= N`
         - And `log[N].term == currentTerm`
         - then set `commitIndex = N`
-
 
 ### Logs Replication
 
