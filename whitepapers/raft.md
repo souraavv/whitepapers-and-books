@@ -27,6 +27,8 @@
 
 ### Replicated State Machines
 
+![alt text](image-2.png)
+
 - What is Replicated State Machine ?
     - Implemented using a replicated log
     - State s[i]; apply log[i]; State s[i + 1]
@@ -121,6 +123,7 @@
     - Leader
     - Follower
     - Candidate
+    - ![alt text](image.png)
 - Normal scenario
     - one leader, rest all are followers
 - Client always talks with leader
@@ -129,13 +132,46 @@
 - Raft divides times into *terms* of arbitary length
     - Term acts as *logical clocks*
     - Helps servers to detect obsolete information such as stale leaders
+    - ![alt text](image-1.png)
 - Terms are numbered with consecutive integers
 - Each term begin with an election, in which one or more candidate attempts to become leader
     - If candidate wins, then leader for the entire term
     - If Split votes then no leader for the term (term++; election again)
 - Raft ensures that there is at *most one* leader each **term**
 - Transition b/w terms may be observed at different times 
+- Raft server communicate using RPCs
+- Three type of RPCs
+    - RequestVote RPCs (by candidates)
+    - AppendEntries RPCs (by leader to replicate log entries and to provide a form of heartbeat)
+    - RPC for transferrring snapshots between servers
+- Server retry the RPC if do not receivve a response in a timely manner and for performance: parallel RPCs
+- ![alt text](image-3.png)
 
+### Leader Election
+- All server startup as followers
+    - Remains in followers as long as it receives valid RPCs from a leader or candidate
+- Leader send periodic heartbeat (AppendEntries RPCs with no logs)
+- If follower recieves no communication till the *election timeout*, then it assumes there is no viable leader and begins an election to choose a new leader
+
+- To begin an election
+    - Follower increment its current term to `currentTerm + 1`
+    - Vote to itself
+    - Issue RequestVote RPCs in prallel to each of the other servers in the cluster
+    - Loop in same state until
+        - Wins
+            - Got majority of votes
+        - Loose
+            - Another server establishes itself as leader
+        - Draw
+            - No winner 
+- How RAFT descrease the probability of split votes ?
+    - Raft uses *randomized election timeout* to ensure that split votes are rare
+    - Two strategy
+        - First
+            - Set timeout randomly from a fixed range i.e [150-300ms]
+            - This will ensure that not every one will timeout together
+        - Second
+            - Each candidate restrats it randomized election timeout at the start of an election, and it waits for that timeout to elapse before starting a new election
 ### State of a Server
 - **Persisted state on all servers** (before responsing to RPCs)
     - `currentTerm`
@@ -221,20 +257,44 @@ Invoked by candidates to gather vote
 - If election timeout elapses without receiving AppendEntries RPC from current leader or granting vote to candidate: convert to candidate
 
 **Candidates**
-- On conversion to candidate, start election:
-    - Increment `currentTerm`
-    - Vote for Self (self-obsessed)
-    - Reset election timer
-    - Send RequestVote RPCs to all other servers
+- What happen in Candidate state ?
+    - On conversion to candidate, start election:
+        - Increment `currentTerm`
+        - Vote for Self (self-obsessed)
+        - Reset election timer
+        - Send RequestVote RPCs to all other servers
 - If vote from majority (promote to leader)
 - If AppendEntries RPC received from new leader: convert to follower
 - If election timeout elapses: start new election
 
 **Leaders**
-- Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server
-    - Hearbeat prevent election timeout
-- If command received from client: append entry to local log, respond after entry applied to state machine
+- How leader prevents election timeouts ?
+    - Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server
+- When does leader response back to the client ?
+    - If command received from client: append entry to local log, respond after entry applied to state machine
+- What does leader do to bring every followers `logs[]` in sync?
+    - If Leader last log index is greater than `nextIndex` of some follower f i.e. `len(leader_log) > nextIndex[f]`; send AppendEntries RPC with log entries starting at `nextIndex[f]` 
+        - If successful: Update `nextIndex[f]` and `matchIndex[f]` for the follower f
+        - If fails because of log inconsistency then,
+            ```java
+            // Follower:
+            appendEntryRequest(rpcPayload={ni=nextIndex[f], newLog,..}) {
+                if (logOfFollower[ni - 1] != logOfLeader[ni - 1]) {
+                    reply("Prefix of log not maching")
+                } else {
+                    append(logOfFollower, newLog);
+                }
+            }
+            ```
+            - In the above case, leader will decrement nextIndex and retry again
+- When does leader update its `commitIndex` ?
+    - If there exists an `N` such that `N > commitIndex` (consider N as length of log at the leader)
+        - And a majority of `matchIndex[f] >= N`
+        - And `log[N].term == currentTerm`
+        - then set `commitIndex = N`
 
+
+### Logs Replication
 
 
 
