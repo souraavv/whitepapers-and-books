@@ -1,5 +1,7 @@
 # Head First Design Patterns
-## Decorator Pattern
+## Decorator Pattern : Structural Design Pattern
+- attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
+  - a wrapper is an object that can be linked with some target object. The wrapper contains the same set of methods as the target and delegates to it all requests it receives
 - attach responsibilities to an object dynamically, provides flexible alternative to subclassing for extending functionality
 - based on **open-closed principal**
   - class should remain open to extension and closed to modification
@@ -16,17 +18,21 @@
   - complexity of code needed to instantiate the component
 
 ### Inheritance vs Composition
-- through inhertance gets behaviour at compile time, gets whatever behaviour superclass gives us or that we override
+- common : work almost the same way
+  - composition : one object has a reference to another & delegate it some work
+  - inheritance : object itself is able to do that work, inherting behaviour from it's superclass
+- diff : through inhertance gets behaviour at compile time, gets whatever behaviour superclass gives us or that we override
   - compiler analyzes the class hierarchy and determines the methods from the superclass and any overridden methods defined in the subclass
-- through composition we can mix and match decorators at runtime
+- diff : through composition we can mix and match decorators at runtime
   - program creates instances of the composed objects and interacts with their methods based on the specific objects involved
+  - subclasses can have just one parent, in most languages 
 
 ### Diagram
 ```mermaid
   graph TD;
-    cc[concrete_components] --extends--> ac[abstract_components];
+    cc[concrete_components] --implements--> ac[abstract_components];
     ad[abstract_decorator] --extends--> ac;
-    cd[concrete_decorators] --extends--> ad;
+    cd[concrete_decorators] --implements--> ad;
     cd --composition--> cc
 ```
 
