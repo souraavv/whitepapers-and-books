@@ -20,7 +20,7 @@
 
 - RAFT claims ? 
     - Strong leader
-        - Flow of log entry only from leader to other servers (followers) which implifies the management of logs
+        - Flow of log entry only from leader to other servers (followers) which simplifies the management of logs
     - Leader Election
         - Randomized timers to resolve conflicts (else indefinite waiting)
     - Membership change 
@@ -46,7 +46,7 @@
     - Keep these logs **consistent**
 
 - Hallucination to Client!!
-    - Once commands are properly replicated, each server's state machien processes them in log order, and the outputs are returned to clients
+    - Once commands are properly replicated, each server's state machine processes them in log order, and the outputs are returned to clients
     - RAFT make client believe server as a single, highly reliable state machine
 
 - Consensus algorithm arise in the context of Replicated State Machines
@@ -54,16 +54,16 @@
 
 ### Must-have properties of a consensus algorithm 
 
-- What gurantee RAFT provides ?
+- What guarantee RAFT provides ?
     - **Safety**
         - Never return an incorrect result (under all non-Byzantine conditions)
     - **Available**
         - As long as majority is there (n / 2 + 1)
     - **Not depend on Timing**
-        - Indepent of timing to ensure the consistency. Why ? 
+        - Independent of timing to ensure the consistency. Why ? 
             - Faulty clocks
-            - Extereme message delays 
-- In the common case, a command can complete as soon as a majority of the cluste rhas responded to a single round of RPC
+            - Extreme message delays 
+- In the common case, a command can complete as soon as a majority of the cluster has responded to a single round of RPC
     - This avoids a minority of slow server to impact the performance
 
 ### Main GOAL of RAFT ?
@@ -72,18 +72,18 @@
     - Safe under all operating conditions
 
 - Apart from **MUST** the **MAIN** goal of RAFT was *Designing for Understandability*
-    - Paxos is complex, Raft is simpler
+    - PAXOS is complex, Raft is simpler
     - Raft simplify the state space by reducing the number of states to consider
         - Makes system more coherent
     - Eliminating non-determinism wherever possible
-        - At some places it helped (randomization helped Raft leader election algo)
+        - At some places it helped (randomization helped Raft leader election algorithm)
 
 
 ### The Raft Consensus Algorithm
 
 - Raft manages replicated logs
 - Raft implements consensus 
-    - Electing distinguised leader
+    - Electing distinguished leader
     - Information flow is always from leader to followers; client always talks with leader
     - Leader accepts logs from client and replicate then on other server 
     - Leader tells servers when it is safe to apply log entries to their state machines
@@ -107,11 +107,11 @@
 - **Election Safety**
     - At most one leader in a given term T
 - **Leader Append-Only**
-    - A leader never overwrites or deletes entries in its own log; it only append new entrie
+    - A leader never overwrites or deletes entries in its own log; it only append new entire
 - **Log Matching** 
     - If two logs contains an entry with the same index and term, then the logs are identical in all entries up through the given index
 - **Leader Completeness**
-    - If a log entry is commited in a given term, then that entry will be present in the logs of the leaders for all higher-numbered term
+    - If a log entry is committed in a given term, then that entry will be present in the logs of the leaders for all higher-numbered term
 - **State Machine Safety**
     - If a server has applied a log entry at a given index to its state machine, no other server will ever apply a different log entry for the same index
 
@@ -129,7 +129,7 @@
 - Client always talks with leader
     - If client talks with a follower, the follower redirect client to the leader
 
-- Raft divides times into *terms* of arbitary length
+- Raft divides times into *terms* of arbitrary length
     - Term acts as *logical clocks*
     - Helps servers to detect obsolete information such as stale leaders
     - ![alt text](./images/raft/image-2.png)
@@ -143,20 +143,20 @@
 - Three type of RPCs
     - RequestVote RPCs (by candidates)
     - AppendEntries RPCs (by leader to replicate log entries and to provide a form of heartbeat)
-    - RPC for transferrring snapshots between servers
-- Server retry the RPC if do not receivve a response in a timely manner and for performance: parallel RPCs
+    - RPC for transferring snapshots between servers
+- Server retry the RPC if do not receive a response in a timely manner and for performance: parallel RPCs
 - ![alt text](./images/raft/image-3.png)
 
 ### Leader Election
 - All server startup as followers
     - Remains in followers as long as it receives valid RPCs from a leader or candidate
 - Leader send periodic heartbeat (AppendEntries RPCs with no logs)
-- If follower recieves no communication till the *election timeout*, then it assumes there is no viable leader and begins an election to choose a new leader
+- If follower receives no communication till the *election timeout*, then it assumes there is no viable leader and begins an election to choose a new leader
 
 - To begin an election
     - Follower increment its current term to `currentTerm + 1`
     - Vote to itself
-    - Issue RequestVote RPCs in prallel to each of the other servers in the cluster
+    - Issue RequestVote RPCs in parallel to each of the other servers in the cluster
     - Loop in same state until
         - Wins
             - Got majority of votes
@@ -164,16 +164,16 @@
             - Another server establishes itself as leader
         - Draw
             - No winner 
-- How RAFT descrease the probability of split votes ?
+- How RAFT decrease the probability of split votes ?
     - Raft uses *randomized election timeout* to ensure that split votes are rare
     - Two strategy
         - First
             - Set timeout randomly from a fixed range i.e [150-300ms]
             - This will ensure that not every one will timeout together
         - Second
-            - Each candidate restrats it randomized election timeout at the start of an election, and it waits for that timeout to elapse before starting a new election
+            - Each candidate restarts it randomized election timeout at the start of an election, and it waits for that timeout to elapse before starting a new election
 ### State of a Server
-- **Persisted state on all servers** (before responsing to RPCs)
+- **Persisted state on all servers** (before responding to RPCs)
     - `currentTerm`
         - Latest term server has seen
         - Initialize to 0 on first boot, increase monotonically
@@ -181,11 +181,11 @@
         - Candidate that received vote in current term (or null if none)
     - `log[]`
         - Log entries
-        - Each entry contains (command for state machine, term when entry was recieved)
+        - Each entry contains (command for state machine, term when entry was received)
         - one-based indexing
 - **Volatile state on all server**
     - `commitIndex`
-        - Index of highest entry known to be commited (init = 0; increase monotonically)
+        - Index of highest entry known to be committed (init = 0; increase monotonically)
     - `lastApplied`
         - Index of highest log entry applied to the state machine (init = 0; increase monotonically)
 - **Volatile state on leaders**
@@ -241,9 +241,9 @@ Invoked by candidates to gather vote
 | term | `currentTerm`, for the candidate to update itself |
 | voteGranted | `true` means candidate received vote |
 
-**Reciever Implementation**
+**Receiver Implementation**
 1. Reply `false` if `term < currentTerm`
-2. If `votedFor == null` or `candidateId`, and candidate's log is at least as up-to-date as reciever's log, grant vote
+2. If `votedFor == null` or `candidateId`, and candidate's log is at least as up-to-date as receiver's log, grant vote
 
  
 ### Rules for Servers
@@ -280,7 +280,7 @@ Invoked by candidates to gather vote
             // Follower:
             appendEntryRequest(rpcPayload={ni=nextIndex[f], newLog,..}) {
                 if (logOfFollower[ni - 1] != logOfLeader[ni - 1]) {
-                    reply("Prefix of log not maching")
+                    reply("Prefix of log not matching")
                 } else {
                     append(logOfFollower, newLog);
                 }
@@ -303,7 +303,7 @@ Invoked by candidates to gather vote
         - Helps to detect inconsistency in the logs
 
 - When does leader feels safe to apply a log entry to its state machine ?
-    > Applied log entry are referred as commited 
+    > Applied log entry are referred as committed 
     - A log entry is committed once the leader that created the entry has replicated it on majority of servers
     - All preceding entries in the leader's log, including entries created the previous leader
 
@@ -313,7 +313,7 @@ Invoked by candidates to gather vote
 
 - Properties maintains by the RAFT
     - If two entries in different logs have the same index and term, then they store the same command
-    - If two entries in different logs have the same index and term, then the logs are identicla in all preceding entries
+    - If two entries in different logs have the same index and term, then the logs are identical in all preceding entries
 
 - ![alt text](./images/raft/images-4.png)
 
@@ -331,7 +331,7 @@ Invoked by candidates to gather vote
 
 #### Election restriction
 - In a leader-based consensus algorithm, the leader must eventually store all of the committed log entries
-- How does Raft gaurantee above ?
+- How does Raft guarantee above ?
     - Raft use simple approach without the need to transfer those entries to the leader
     - Log entry only flow in one direction, from leaders to followers
     
@@ -343,21 +343,21 @@ Invoked by candidates to gather vote
 - How does Raft determines which of two logs is more up-to-date ?
     - Comparing the `index` (len(log)) and `term` of the last entries in the logs 
     - If the logs have last entries with different terms, then the log with the later term is more up-to-date
-    - If the logs end with the same term, then whichevver log is longer is more up-to-date
+    - If the logs end with the same term, then whichever log is longer is more up-to-date
 
 #### Committing entries from previous terms
-- Is it ok for the leader to commit all the uncommited entries from its log ? 
+- Is it ok for the leader to commit all the uncommitted entries from its log ? 
     - A big no!!
         - Chances are that committed entries may get overwritten by a future leader
         - Leader doesn't change the term value present in the logs from previous leaders term
     - Only log entries from the leader's current term are committed by counting replicas;
     - Once an entry from the current term has committed in this way, then all prior entries are committed indirectly because of the Log Matching Property 
-    > Even when you have replicated on all the server (you are fully sure to commmit), but still Raft takes conservative apporach for simplicity
+    > Even when you have replicated on all the server (you are fully sure to commit), but still Raft takes conservative approach for simplicity
 
 #### Safety argument
 - Argue on Leader Completeness Property 
     - Assume it doesn't hold, then we prove a contradiction
     - Suppose the leader for term T commits a log entry from its term, but that log entry is not store by the leader of some future term. Consider the smallest term U > T whose leader doesn't store the entry
-    1. Committed entry must have been absent from leader U log at the time of its electoin 
-    2. Leader T replicated teh entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leadre U
+    1. Committed entry must have been absent from leader U log at the time of its election 
+    2. Leader T replicated teh entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leader U
         - Voter is key to reaching a contradiction 
