@@ -177,12 +177,15 @@
     - `currentTerm`
         - Latest term server has seen
         - Initialize to 0 on first boot, increase monotonically
+        - This information is used by machine, to detect stale information (logical clock)
     - `votedFor`
         - Candidate that received vote in current term (or null if none)
+        - If it didn't store to whom it voted for current term, then there is a possibility of submitting vote twice in same term
     - `log[]`
         - Log entries
         - Each entry contains (command for state machine, term when entry was received)
         - one-based indexing
+        - This information will be used to derive state in replicated state machine
 - **Volatile state on all server**
     - `commitIndex`
         - Index of highest entry known to be committed (init = 0; increase monotonically)
