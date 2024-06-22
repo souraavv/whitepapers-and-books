@@ -1,8 +1,8 @@
 
-## RAFT: In search of an Understandable Consensus Algorithm
+# RAFT: In search of an Understandable Consensus Algorithm
 - Diego Ongaro and John Ousterhout (Standford University) : May 20, 2014
 
-### Introduction
+## Introduction
 
 - Consensus algorithm allows
     - A collection of machines to work as a coherent group
@@ -25,7 +25,7 @@
         - Randomized timers to resolve conflicts (else indefinite waiting)
     - Membership change 
 
-### Replicated State Machines
+## Replicated State Machines
 
 ![alt text](./images/raft/image.png)
 
@@ -52,7 +52,7 @@
 - Consensus algorithm arise in the context of Replicated State Machines
     - Same state on multiple servers
 
-### Must-have properties of a consensus algorithm 
+## Must-have properties of a consensus algorithm 
 
 - What guarantee RAFT provides ?
     - **Safety**
@@ -66,7 +66,7 @@
 - In the common case, a command can complete as soon as a majority of the cluster has responded to a single round of RPC
     - This avoids a minority of slow server to impact the performance
 
-### Main GOAL of RAFT ?
+## Main GOAL of RAFT ?
 - Musts
     - Provide complete and practical foundation for system building
     - Safe under all operating conditions
@@ -79,7 +79,7 @@
         - At some places it helped (randomization helped Raft leader election algorithm)
 
 
-### The Raft Consensus Algorithm
+## The Raft Consensus Algorithm
 
 - Raft manages replicated logs
 - Raft implements consensus 
@@ -91,7 +91,7 @@
 - Leaders simplify the data flow
 - If leader gets disconnected/fails; then a new leader got elected 
 
-#### Decomposition of Consensus Problem 
+### Decomposition of Consensus Problem 
 
 - Leader Election
     - A new leader must be chosen when an existing leader fails
@@ -103,7 +103,7 @@
         - If any server has applied a particular log entry to it state machine, then no other server may apply a different command for the same log index
         - Ensured through election restrictions
 
-### Raft Guarantees - True at all times!
+## Raft Guarantees - True at all times!
 - **Election Safety**
     - At most one leader in a given term T
 - **Leader Append-Only**
@@ -115,7 +115,7 @@
 - **State Machine Safety**
     - If a server has applied a log entry at a given index to its state machine, no other server will ever apply a different log entry for the same index
 
-### Raft Basics
+## Raft Basics
 
 - Raft cluster consists of servers (typically 5 servers)
     - Survive two server failures
@@ -147,7 +147,7 @@
 - Server retry the RPC if do not receive a response in a timely manner and for performance: parallel RPCs
 - ![alt text](./images/raft/image-3.png)
 
-### Leader Election
+## Leader Election
 - All server startup as followers
     - Remains in followers as long as it receives valid RPCs from a leader or candidate
 - Leader send periodic heartbeat (AppendEntries RPCs with no logs)
@@ -172,7 +172,7 @@
             - This will ensure that not every one will timeout together
         - Second
             - Each candidate restarts it randomized election timeout at the start of an election, and it waits for that timeout to elapse before starting a new election
-### State of a Server
+## State of a Server
 - **Persisted state on all servers** (before responding to RPCs)
     - `currentTerm`
         - Latest term server has seen
@@ -198,7 +198,7 @@
             - Index of highest log entry known to be replicated on server
             - init = 0; increase monotonically
 
-### AppendEntries RPC
+## AppendEntries RPC
 Invoked by leader to replicate log entries + heart beats
 
 | **Arguments** | Meaning | 
@@ -226,7 +226,7 @@ Invoked by leader to replicate log entries + heart beats
 - If `leaderCommit > commitIndex`, set `commitIndex` to `min(leaderCommit, index of the last new entry)`.
     - Why safe ? 
 
-### RequestVote RPC
+## RequestVote RPC
 Invoked by candidates to gather vote
 
 | **Argument** | Meaning | 
@@ -246,7 +246,7 @@ Invoked by candidates to gather vote
 2. If `votedFor == null` or `candidateId`, and candidate's log is at least as up-to-date as receiver's log, grant vote
 
  
-### Rules for Servers
+## Rules for Servers
     
 **All servers**
 - If `commitIndex > lastApplied`, then increment `lastApplied`, apply `log[lastApplied]` to state machine
@@ -293,7 +293,7 @@ Invoked by candidates to gather vote
         - And `log[N].term == currentTerm`
         - then set `commitIndex = N`
 
-### Logs Replication
+## Logs Replication
 - Client request contains a command to be executed by the replicated state machine
 - The leader append the command to its log as a new entry, then issue `AppendEntries` RPCs in parallel to each of the other server to replicate
 - When safely replicated, the leader applies the entry to its state machine and returns the result of that execution to the client
@@ -314,8 +314,7 @@ Invoked by candidates to gather vote
 - Properties maintains by the RAFT
     - If two entries in different logs have the same index and term, then they store the same command
     - If two entries in different logs have the same index and term, then the logs are identical in all preceding entries
-
-- ![alt text](./images/raft/images-4.png)
+    - ![alt text](./images/raft/images-4.png)
 
 - Leader handles inconsistencies by forcing the followers' logs to duplicate its own
     - Conflicting entries will be overwritten with entries from the leader's log
@@ -324,12 +323,12 @@ Invoked by candidates to gather vote
 - To what value new leader initialize `nextIndex`?
     - for each follower `f`: `nextIndex[f] = len(leader_log) + 1`
 
-### Safety 
+## Safety 
 
 - How to sure that each state machine executes exactly the same commands in the same order ?
     - Constraints at the Leader election : because we don't want a stale follower to become leader and overwrite entries
 
-#### Election restriction
+### Election restriction
 - In a leader-based consensus algorithm, the leader must eventually store all of the committed log entries
 - How does Raft guarantee above ?
     - Raft use simple approach without the need to transfer those entries to the leader
@@ -345,7 +344,7 @@ Invoked by candidates to gather vote
     - If the logs have last entries with different terms, then the log with the later term is more up-to-date
     - If the logs end with the same term, then whichever log is longer is more up-to-date
 
-#### Committing entries from previous terms
+### Committing entries from previous terms
 - Is it ok for the leader to commit all the uncommitted entries from its log ? 
     - A big no!!
         - Chances are that committed entries may get overwritten by a future leader
@@ -354,10 +353,34 @@ Invoked by candidates to gather vote
     - Once an entry from the current term has committed in this way, then all prior entries are committed indirectly because of the Log Matching Property 
     > Even when you have replicated on all the server (you are fully sure to commit), but still Raft takes conservative approach for simplicity
 
-#### Safety argument
+### Safety argument
 - Argue on Leader Completeness Property 
     - Assume it doesn't hold, then we prove a contradiction
     - Suppose the leader for term T commits a log entry from its term, but that log entry is not store by the leader of some future term. Consider the smallest term U > T whose leader doesn't store the entry
-    1. Committed entry must have been absent from leader U log at the time of its election 
-    2. Leader T replicated teh entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leader U
-        - Voter is key to reaching a contradiction 
+1. Committed entry must have been absent from leader U log at the time of its election 
+2. Leader T replicated the entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leader U
+    - Voter is key to reaching a contradiction 
+    - ![alt text](image.png)
+3. The voter must have accepted the committed entry from leader_t before voting leader_u; other wise this server have rejected the AppendEntries RPC request from the leader_t 
+4. The voter granted its vote to leader_u, so leader_u's log must have been as up-to-date as the voter. This leads to one of two contradiction 
+5. First, the voter and U must shared the same last log term and U logs length is at least as long as voters
+    - Contradiction to our assumption i.e U doesn't contains committed entry 
+6. Otherwise, leader's U last log term must have been larger than voter 
+    - precise : It should be larger than T
+    - Remember Leader completeness property : it means logs of U must contains T committed entry, which is a contradiction
+
+
+## Failure Scenarios
+
+### Follower and candidate Crash
+
+### Timing and availability 
+
+
+## Cluster membership change
+
+## Log compaction 
+
+## Client Interaction
+
+## Conclusion 
