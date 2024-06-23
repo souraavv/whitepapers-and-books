@@ -375,8 +375,87 @@
 - **Schema-on-write**: Schema is explicit 
     - If data is homogeneous 
 
+#### Graph-Like Data Models
+- Usecase : 
+  - many-to-many relationships and 
+  - complex connections between data
+- Consists of two kind of objects
+  1. Vertices / Nodes / Entities
+  2. Edges / Relationships / Arcs
+- Examples
+  - Social Graphs
+  - The Web Graph
+  - Road & Railway Network
+- Following figure shows two people, Lucy from Idaho and Alain from Beaune, France. They are married and living in London.
+  ![](./images/ddia_0205.png)
+- Provides consistent way of storing completely different types of object in a single datastore
+- Different ways of structuring data in graphs
+  - Property Graph Model
+  - Triple-store Model
+- Different ways of querying data in graphs : Declarative languages
+  - Cypher
+  - SPARQL
+  - Datalog
+  
+##### Property Graphs
+- vertex consists of 
+  - unique identifier
+  - set of outgoing edges
+  - set of incoming edges
+  - collection of properties (key-value pairs)
+- edge consists of 
+  - unique identifier
+  - label to identify kind of relationship between two vertices
+  - vertex at which edge starts (tail vertex)
+  - vertex at which edge ends (head vertex)
+  - collection of properties (key-value pairs)
+- mapped to graphstore with two relational tables, one for vertices & one for edges
+```sql
+CREATE TABLE vertices (
+    vertex_id   integer PRIMARY KEY,
+    properties  json
+);
 
-    
+CREATE TABLE edges (
+    edge_id     integer PRIMARY KEY,
+    tail_vertex integer REFERENCES vertices (vertex_id),
+    head_vertex integer REFERENCES vertices (vertex_id),
+    label       text,
+    properties  json
+);
+
+CREATE INDEX edges_tails ON edges (tail_vertex);
+CREATE INDEX edges_heads ON edges (head_vertex);
+```
+- important aspects of this data model
+  - any vertex can have an edge connecting it with any other vertex
+  - efficiently find both incoming and outgoing edges for a given vertex (indexes is maintained on tail_vertex and head_vertex), can traverse the graph both forward & backward
+  - different labels can be used for storing different relationships, different information can be stored in a single graph
+- graphs are good for evolvability, as we add new features to application graph can easily be extended to accomodate changes in application's data structures
+
+#### Cypher Query Language
+- declarative query language for property graphs
+- subset of data from figure 2.5 can be represented as Cypher query
+```sql
+CREATE
+  (NAmerica:Location {name:'North America', type:'continent'}),
+  (USA:Location      {name:'United States', type:'country'  }),
+  (Idaho:Location    {name:'Idaho',         type:'state'    }),
+  (Lucy:Person       {name:'Lucy' }),
+  (Idaho) -[:WITHIN]->  (USA)  -[:WITHIN]-> (NAmerica),
+  (Lucy)  -[:BORN_IN]-> (Idaho)
+```
+    - Each vertex is given a symbolic name like USA or Idaho
+    - Arrow notation `(Idaho) -[:WITHIN]-> (USA)` used to create edge labelled with `WITHIN`
+- Example query _find the names of all the people who emigrated from the United States to Europe_
+  - Cypher query
+  ```sql
+  MATCH
+  (person) -[:BORN_IN]->  () -[:WITHIN*0..]-> (us:Location {name:'United States'}),
+  (person) -[:LIVES_IN]-> () -[:WITHIN*0..]-> (eu:Location {name:'Europe'})
+  RETURN person.name
+  ```
+- there are several ways for executing query, and it's upto query optimizer to select most efficient strategy
 
 
 
