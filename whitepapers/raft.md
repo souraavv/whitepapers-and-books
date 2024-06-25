@@ -4,53 +4,44 @@
 
 ## Introduction
 
-- Consensus algorithm allows
-    - A collection of machines to work as a coherent group
-    - Survive the failures of some members
+- Rise of Algorithm 
+  - Consensus algorithm arise in the context of Replicated State Machines; when Same state on multiple servers
 
-- Gains?
-    - Reliable large-scale software system
+- Consensus algorithm allows
+  - A collection of machines to work as a coherent/logic (सुसंगठित) group
+  - Allows system to survive the failures of some members
+
+- What are gains from such algorithm ?
+  - Reliable large-scale software system
+  - Hardware fault becomes invisible to the client
 
 - What is RAFT ?
-    - Consensus algorithm for managing a replicated log
-    - Much easier to understand compare to classic consensus algo **Paxos** (by Leslie Lamport)
-        - Paxos is complex to understand + less intuitive
-        - RAFT is easier to understand 
-            - Breakdown to smaller problems
+  - I'm a consensus algorithm for managing consistent replication of logs across servers
+  - Much easier to understand compare to classic consensus algo **Paxos** (by Leslie Lamport)
+      - Paxos is complex to understand + less intuitive; RAFT is easier to understand (Breakdown to smaller problems)
 
-- RAFT claims ? 
-    - Strong leader
-        - Flow of log entry only from leader to other servers (followers) which simplifies the management of logs
-    - Leader Election
-        - Randomized timers to resolve conflicts (else indefinite waiting)
-    - Membership change 
 
 ## Replicated State Machines
 
 ![alt text](./images/raft/image.png)
 
 - What is Replicated State Machine ?
-    - Implemented using a replicated log
-    - State s[i]; apply log[i]; State s[i + 1]
+  - Some initial state *S*
+  - Log (or command)
+  - Apply log on state
+    -  `s[i]`:`log[i]` -> `s[i + 1]`
 
-- Logs contains ?
-    - Sequence of commands
-
-- Commands are present in the same sequence in each log present on each compute
+- What does logs contains ?
+  - Sequence of commands
+  - Each compute/server contains commands in the same sequence order
 
 - Properties of State Machine
-    - Deterministic 
-        - Initial State S; apply log L; Final State D
-
-- What is the role of Raft algorithm here ?
-    - Keep these logs **consistent**
+  - Deterministic 
+      - Initial State S; apply log L; Final State D
 
 - Hallucination to Client!!
     - Once commands are properly replicated, each server's state machine processes them in log order, and the outputs are returned to clients
     - RAFT make client believe server as a single, highly reliable state machine
-
-- Consensus algorithm arise in the context of Replicated State Machines
-    - Same state on multiple servers
 
 ## Must-have properties of a consensus algorithm 
 
@@ -67,7 +58,7 @@
     - This avoids a minority of slow server to impact the performance
 
 ## Main GOAL of RAFT ?
-- Musts
+- MUST
     - Provide complete and practical foundation for system building
     - Safe under all operating conditions
 
@@ -78,34 +69,44 @@
     - Eliminating non-determinism wherever possible
         - At some places it helped (randomization helped Raft leader election algorithm)
 
+- What are the claims by RAFT ? 
+    - Strong leader
+        - Flow of log entry only from leader to other servers (followers) which simplifies the management of logs
+    - Leader Election
+        - Randomized timers to resolve conflicts (else indefinite waiting)
+    - Membership change 
 
 ## The Raft Consensus Algorithm
 
-- Raft manages replicated logs
-- Raft implements consensus 
-    - Electing distinguished leader
-    - Information flow is always from leader to followers; client always talks with leader
-    - Leader accepts logs from client and replicate then on other server 
-    - Leader tells servers when it is safe to apply log entries to their state machines
+- To implement consensus what does Raft do ? 
+  - Electing distinguished leader (two leader for same *term* can't exists)
+  - Information flow is always from leader to followers; client always talks with leader
+  - Leader accepts logs from client and replicate them on other server 
+  - Leader tells servers when it is safe to apply log entries to their state machines
 
-- Leaders simplify the data flow
-- If leader gets disconnected/fails; then a new leader got elected 
+- Benefits from leader-follower concept ?
+  - Leaders simplify the data flow
+  - What if leader goes down? 
+    - If leader gets disconnected/fails; then a new leader got elected 
 
 ### Decomposition of Consensus Problem 
+> Think you self ? - You always need a leader, and that leader should always replicate the log. Also, the leader will become angry if some other leader from the future changes its committed entries.
 
 - Leader Election
-    - A new leader must be chosen when an existing leader fails
+  - Leader keeps the Raft alive; if leader goes down, we need to pick a new leader
 - Log replication
-    - Leader must accept log entries from client and replicate them across the cluster
-    - Force other logs to agree with its own 
-- Safety 
-    - State Machine Safety
-        - If any server has applied a particular log entry to it state machine, then no other server may apply a different command for the same log index
-        - Ensured through election restrictions
+  - Replication save you from sudden failures in your system e.g. hard disk crash, network goes down, somebody plug out the cables 
+  - Leader must accept log entries from client and replicate them across the cluster
+  - Force other logs to agree with its own 
+  
+- Safety (Once it’s served, it’s served. No taking back)
+  - State Machine Safety
+      - If any server has applied a particular log entry to it state machine, then no other server may apply a different command for the same log index
+      - Ensured through election restrictions
 
 ## Raft Guarantees - True at all times!
 - **Election Safety**
-    - At most one leader in a given term T
+    - At most one leader in a given term *T*
 - **Leader Append-Only**
     - A leader never overwrites or deletes entries in its own log; it only append new entire
 - **Log Matching** 
@@ -155,8 +156,8 @@
 
 - To begin an election
     - Follower increment its current term to `currentTerm + 1`
-    - Vote to itself
-    - Issue RequestVote RPCs in parallel to each of the other servers in the cluster
+    - Vote to itself (self obsessed)
+    - Issue RequestVote RPCs in **parallel** to each of the other servers in the cluster
     - Loop in same state until
         - Wins
             - Got majority of votes
@@ -164,13 +165,14 @@
             - Another server establishes itself as leader
         - Draw
             - No winner 
-- How RAFT decrease the probability of split votes ?
+- How RAFT decrease the probability of split votes(विभाजित मत) ?
     - Raft uses *randomized election timeout* to ensure that split votes are rare
+      - In later section we will see a bounded range for this *randomized election timeout*. If not selected carefully it can affect the liveness/performance of the Raft
     - Two strategy
         - First
             - Set timeout randomly from a fixed range i.e [150-300ms]
             - This will ensure that not every one will timeout together
-        - Second
+        - Second (candidate side)
             - Each candidate restarts it randomized election timeout at the start of an election, and it waits for that timeout to elapse before starting a new election
 ## State of a Server
 - **Persisted state on all servers** (before responding to RPCs)
@@ -385,7 +387,7 @@ Invoked by candidates to gather vote
   - Scenarios: If server crashes after completing an RPC but before responding
   
 ### Timing and availability 
-- Initial requirment: Safety must not depend on the timing; 
+- Initial requirement: Safety must not depend on the timing; 
 - The system must not produce incorrect results, just because some event happens more quickly or slowly than expected
 - However, availability (the ability of a system to respond to client in timely manner) must inevitably depend on timing
   - Raft rely on a steady leader to progress
@@ -393,13 +395,14 @@ Invoked by candidates to gather vote
   - Leader election is the aspect in Raft where timing is important
   - Raft will be able to elect and maintain steady leader as long as system satisfies the below timing requirements
     - `broadcastTime << electionTimeout << MTBF`
-    - `braoadcaseTime`: Avg time it takes server to send RPCs in parallel to every server in the cluster and receive there response
+    - `broadcastTime`: Avg time it takes server to send RPCs in parallel to every server in the cluster and receive there response
     - `MTBF`: Mean Time Between Failures
     - If `electionTimeout < broadcastTime`; then no body will win the election;
     - If `electionTimeout > MTBF`; then progress will halt, as there is no election happen even after leader crashed
 - Typical `electionTimeout` Raft set is `[10, 500]ms`
 
 ## Cluster membership change
+
 
 ## Log compaction 
 
