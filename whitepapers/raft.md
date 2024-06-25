@@ -1,3 +1,30 @@
+- [RAFT: In search of an Understandable Consensus Algorithm](#raft-in-search-of-an-understandable-consensus-algorithm)
+  - [Introduction](#introduction)
+  - [Replicated State Machines](#replicated-state-machines)
+  - [Must-have properties of a consensus algorithm](#must-have-properties-of-a-consensus-algorithm)
+  - [Main GOAL of RAFT ?](#main-goal-of-raft-)
+  - [The Raft Consensus Algorithm](#the-raft-consensus-algorithm)
+    - [Decomposition of Consensus Problem](#decomposition-of-consensus-problem)
+  - [Raft Guarantees - True at all times!](#raft-guarantees---true-at-all-times)
+  - [Raft Basics](#raft-basics)
+  - [Leader Election](#leader-election)
+  - [State of a Server](#state-of-a-server)
+  - [AppendEntries RPC](#appendentries-rpc)
+  - [RequestVote RPC](#requestvote-rpc)
+  - [Rules for Servers](#rules-for-servers)
+  - [Logs Replication](#logs-replication)
+  - [Safety](#safety)
+    - [Election restriction](#election-restriction)
+    - [Committing entries from previous terms](#committing-entries-from-previous-terms)
+    - [Safety argument](#safety-argument)
+  - [Failure Scenarios](#failure-scenarios)
+    - [Follower and candidate Crash](#follower-and-candidate-crash)
+    - [Timing and availability](#timing-and-availability)
+  - [Cluster membership change](#cluster-membership-change)
+  - [Log compaction](#log-compaction)
+  - [Client Interaction](#client-interaction)
+  - [Conclusion](#conclusion)
+
 
 # RAFT: In search of an Understandable Consensus Algorithm
 - Diego Ongaro and John Ousterhout (Stanford University) : May 20, 2014
@@ -93,7 +120,7 @@
     - If leader gets disconnected/fails; then a new leader got elected 
 
 ### Decomposition of Consensus Problem 
-> Think you self ? - You always need a leader, and that leader should always replicate the log. Also, the leader will become angry if some other leader from the future changes its committed entries.
+> Think your self ? - You always need a leader, and that leader should always replicate the log. Also, the leader will become angry if some other leader from the future changes its committed entries.
 
 - Leader Election
   - Leader keeps the Raft alive; if leader goes down, we need to pick a new leader
