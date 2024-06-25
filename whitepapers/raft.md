@@ -1,6 +1,6 @@
 
 # RAFT: In search of an Understandable Consensus Algorithm
-- Diego Ongaro and John Ousterhout (Standford University) : May 20, 2014
+- Diego Ongaro and John Ousterhout (Stanford University) : May 20, 2014
 
 ## Introduction
 
@@ -363,7 +363,7 @@ Invoked by candidates to gather vote
 1. Committed entry must have been absent from leader U log at the time of its election 
 2. Leader T replicated the entry on a majority of the cluster, and the leader U received votes from a majority of the cluster. Thus, at least one server ("the voter") both accepted the entry from leader T and voted for Leader U
     - Voter is key to reaching a contradiction 
-    - ![alt text](image.png)
+    - ![alt text](./images/raft/image-6.png)
 3. The voter must have accepted the committed entry from leader_t before voting leader_u; other wise this server have rejected the AppendEntries RPC request from the leader_t 
 4. The voter granted its vote to leader_u, so leader_u's log must have been as up-to-date as the voter. This leads to one of two contradiction 
 5. First, the voter and U must shared the same last log term and U logs length is at least as long as voters

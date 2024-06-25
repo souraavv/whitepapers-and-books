@@ -11,7 +11,7 @@
 
 ### Preface
 - Data intensive 
-    - Data as primary challenged - quanity/complexity/changing-nature
+    - Data as primary challenged - quantity/complexity/changing-nature
     - Store data : Database
     - Expensive opr results : Cache
     - Search by keywords : Search indexes
@@ -54,8 +54,8 @@
     - Redundant components ? 
         - When one component dies, the redundant component can take its place while the broken component is replaced
         - Was OK in older system, but cannot tolerate loss of entire machine
-        - More data volume & application compute demand == More machines == More harware faults
-    - Sofware fault-tolerant 
+        - More data volume & application compute demand == More machines == More hardware faults
+    - Software fault-tolerant 
         - Can tolerate entire machine loss (along with hardware redundancy)
         - Operational advantages
             - Schedules downtime/patching, one node at a time without downtime (rolling upgrade)
@@ -106,7 +106,7 @@
             - First
                 - ![text](./images/ddia_0102.png)
                 - Insert tweet to some global collection of tweet
-                - When a user reqeust 
+                - When a user request 
                     - Get all the tweets to whom I follow, sort and give back to me 
                     - Query may look like below 
                     ```sql
@@ -166,7 +166,7 @@
         - Median also known as 50th percentile (p50)
 
 - High percentiles of response times, also know as *tail latencies* like p99 (1 in 100), p99.9 (1 in 1000), p99.99 (1 in 10,000)
-    - Imp, because they directly affect customers statisfaction and therefore the sales
+    - Imp, because they directly affect customers satisfaction and therefore the sales
     - Ex. Amazon
         - Describe response time requirement for internal service in term of the 99.9th percentile
             - Affects only 1 in 1000 request
@@ -174,7 +174,7 @@
 - Head-of-line blocking (Queuing delay)
   - small number of slow requests hold up the processing of subsequent requests
   - queueing delay accounts for the large part of response time at high percentiles
-  - client for generating artificial load, should keep on sending requests independently of the response time thereby not keeping queues artifically shorter in the test
+  - client for generating artificial load, should keep on sending requests independently of the response time thereby not keeping queues artificially shorter in the test
 - High percentile becomes more important in backend services that are called multiple times as part of serving a single end-user request
     - Right way of aggregating response time is to add histograms
     - Single service slow == complete system slow
@@ -194,7 +194,7 @@
         - Human analyze
         - Fewer operational surprises
     - Stateless services distribution easy across machines
-    - Statful services are hard to move from single node to distributed setup
+    - Stateful services are hard to move from single node to distributed setup
     - There is no such *magic scaling sauce* 
         - An architecture that scale well for App x is build on assumption set S (load factors)
         - Therefore, architecture of systems that operate at large scale is usually highly specific to the application
@@ -347,7 +347,7 @@
 - Benefits of using document database
     - Schema flexibility
     - Better performance due to locality
-    - Closer to datastructure in application
+    - Closer to data structure in application
 - Benefits of using relational database
     - Support for join
     - M:1, M:N relationship 
@@ -360,9 +360,9 @@
         - Problem: If M:N relations exists
         - !Problem: M:N relationship may never needed in an analytical application
     - Reduce use of M:N relations by **denormalizing** your data
-        - Denomalization brings more complexity and makes consistency harder
+        - Denormalization brings more complexity and makes consistency harder
 
-- Infact there is no simple answer to the question; it depends on your application; relationship that exist b/w data items
+- In fact there is no simple answer to the question; it depends on your application; relationship that exist b/w data items
 - Schema flexibility in the document model
     - No schema enforced on data by the JSON/document database
         - Arbitrary key/value can be added
