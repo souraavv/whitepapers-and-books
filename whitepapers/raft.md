@@ -376,9 +376,28 @@ Invoked by candidates to gather vote
 ## Failure Scenarios
 
 ### Follower and candidate Crash
-
+- Much easier to handle compare to leader crashes
+- Failure for both are handled in the same way
+- All RequestVote and AppendEntries RPC will be sent to it will fail 
+- Raft handles these failures by retrying indefinitely 
+- Raft RPCs are idempotent, so this case no harm
+  - Follower just ignore 
+  - Scenarios: If server crashes after completing an RPC but before responding
+  
 ### Timing and availability 
-
+- Initial requirment: Safety must not depend on the timing; 
+- The system must not produce incorrect results, just because some event happens more quickly or slowly than expected
+- However, availability (the ability of a system to respond to client in timely manner) must inevitably depend on timing
+  - Raft rely on a steady leader to progress
+  - If message exchanges take longer than the typical time between server crashes, candidate will not stay up long enough to win an election
+  - Leader election is the aspect in Raft where timing is important
+  - Raft will be able to elect and maintain steady leader as long as system satisfies the below timing requirements
+    - `broadcastTime << electionTimeout << MTBF`
+    - `braoadcaseTime`: Avg time it takes server to send RPCs in parallel to every server in the cluster and receive there response
+    - `MTBF`: Mean Time Between Failures
+    - If `electionTimeout < broadcastTime`; then no body will win the election;
+    - If `electionTimeout > MTBF`; then progress will halt, as there is no election happen even after leader crashed
+- Typical `electionTimeout` Raft set is `[10, 500]ms`
 
 ## Cluster membership change
 
