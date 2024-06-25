@@ -5,11 +5,15 @@
 ## Introduction
 
 - Rise of Algorithm 
-  - Consensus algorithm arise in the context of Replicated State Machines; when Same state on multiple servers
+  - Consensus algorithm arise in the context of Replicated State Machines; when we need to maintain same state on multiple servers
 
-- Consensus algorithm allows
-  - A collection of machines to work as a coherent/logic (सुसंगठित) group
-  - Allows system to survive the failures of some members
+- Consensus algorithm helps
+  - A collection of machines to work as a coherent(सुसंगठित) or a single logical group
+
+- Algorithm brings 
+  - Consistency: Ensuring that all machines in the system agree on the same state despite failures
+  - Availability: Allowing the system to remain operational despite failures of individual servers.
+  - Partition Tolerance: Handling network partitions gracefully without compromising the system's operation. 
 
 - What are gains from such algorithm ?
   - Reliable large-scale software system
@@ -19,7 +23,6 @@
   - I'm a consensus algorithm for managing consistent replication of logs across servers
   - Much easier to understand compare to classic consensus algo **Paxos** (by Leslie Lamport)
       - Paxos is complex to understand + less intuitive; RAFT is easier to understand (Breakdown to smaller problems)
-
 
 ## Replicated State Machines
 
