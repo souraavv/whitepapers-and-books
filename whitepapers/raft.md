@@ -457,13 +457,21 @@ Invoked by candidates to gather vote
   - 
 - ![alt text](./images/raft/image-7.png)
 
-
 ## Log compaction 
+- Remove obsolete information with time to avoid
+- Snap shotting is the simplest technique for compaction
+  - Entire system state is written on a stable storage, then entire log up that point is discarded (as well as older snapshots)
+  - ![alt text](./images/raft/image-8.png)
+- In raft each server takes snapshot independently, covering just the committed entries in its logs
+- Raft also include small metadata into its snapshot 
+- Although server must takes snapshot independently, the leader must occasionally send snapshots to followers that lag behind
+- ![alt text](./images/raft/image-9.png)
+- Snapshotting approach departs from Raft's strong leader principle, since followers can take snapshots without the knowledge of the leader
+- Consensus has already been reached when snapshotting, so no decision conflicts.
 
 ## Client Interaction
 
 ## Conclusion (Author of paper)
-
 
 ## What I learned from this paper ? 
 
@@ -480,6 +488,7 @@ Invoked by candidates to gather vote
   - Only keep state wherever necessity; stateless systems are more tolerant to fault because there recovery is simple. 
 - How to maintain consistency in distributed system, where we have replication
 - How to ensure availability of system ?
-
+- Share state if a server is lagging / new server added
+  - Tradeoff b/w Independent snapshots at each server Vs Leader instructed logs
 </details>
 
