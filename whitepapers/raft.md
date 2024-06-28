@@ -1,4 +1,8 @@
+# RAFT: In search of an Understandable Consensus Algorithm
+
+## Table of Content
 - [RAFT: In search of an Understandable Consensus Algorithm](#raft-in-search-of-an-understandable-consensus-algorithm)
+  - [Table of Content](#table-of-content)
   - [Introduction](#introduction)
   - [Replicated State Machines](#replicated-state-machines)
   - [Must-have properties of a consensus algorithm](#must-have-properties-of-a-consensus-algorithm)
@@ -23,11 +27,8 @@
   - [Cluster membership change](#cluster-membership-change)
   - [Log compaction](#log-compaction)
   - [Client Interaction](#client-interaction)
-  - [Conclusion](#conclusion)
-
-
-# RAFT: In search of an Understandable Consensus Algorithm
-- Diego Ongaro and John Ousterhout (Stanford University) : May 20, 2014
+  - [Conclusion (Author of paper)](#conclusion-author-of-paper)
+  - [What I learned from this paper ?](#what-i-learned-from-this-paper-)
 
 ## Introduction
 
@@ -432,10 +433,53 @@ Invoked by candidates to gather vote
 - Typical `electionTimeout` Raft set is `[10, 500]ms`
 
 ## Cluster membership change
+- Above discussion was on assumption that cluster configuration is fixed
+- In practice, it is not the case and cluster configuration change over time
+  - Replace server when they fail or change the degree of replication 
+- We want to do above without the requirement of restart 
+- For the configuration change mechanism to be safe,
+  - No point in transition where it is possible for two leaders to be elected
+  - Unfortunately, any approach where server switch directly from the old configuration to the new configuration is unsafe
+- It isn't possible to **atomically** switch all server at once (which means chances are that cluster can potentially split into two independent majorities during the transition)
+- In order to ensure safety, configuration changes must use a two-phase approach
+  - In Raft the cluster first switches to a transitional configuration we call *joint consensus*; once the joint consensus has been committed, the system then transition to the new configuration 
+- The joint consensus combines both new and old configurations:
+  - Log entries are replicated to all servers in both configuration
+  - Any server from either configuration may serve as leader
+  - Agreement (for election and entry commitment) requires separate majorities from both the new and old configuration 
+- Join consensus allows servers
+  - Transition between configuration at different time without compromising safety 
+  - Keeps system alive i.e client request are served even when configuration changes are in transitions
+- Cluster configuration are stored and communicated using special entries in the replicated log
+  - When a leader receives the configuration change request to change from $C_{old}$ to $C_{new}$ it stores the configuration for the joint consensus ($C_{old, new}$) as a log entry and replicate that 
+  - Once a server adds a new configuration to its log, then it uses the same for all future decisions (regardless of that is committed or not, **but why it is safe to use that?**)
+  - 
+  - 
+- ![alt text](./images/raft/image-7.png)
 
 
 ## Log compaction 
 
 ## Client Interaction
 
-## Conclusion 
+## Conclusion (Author of paper)
+
+
+## What I learned from this paper ? 
+
+<details>
+<summary> Vague points </summary>
+
+- Centralized (leader/master) vs decentralized tradeoffs
+  - If centralized, then how to handle the crash of leader/master
+  - If decentralized, then how to make sure every one has consistent information or every one is in sync about the overall state of the system ?
+- Network partitions - No communication possible ? sacrifice either availability or consistency  
+- Stragglers - One slow machine should not effect system
+- Keep system least dependent on timings of event (events are non-deterministic)
+- State (persist) vs Stateless (only in-memory) [ not truly stateless ]
+  - Only keep state wherever necessity; stateless systems are more tolerant to fault because there recovery is simple. 
+- How to maintain consistency in distributed system, where we have replication
+- How to ensure availability of system ?
+
+</details>
+
