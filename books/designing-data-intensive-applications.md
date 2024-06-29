@@ -137,7 +137,7 @@
             - But Twitter scaling challenge is not due to tweet volume, but due to *fan-out* (each user follow many user)
         - Broadly two implementations we can go with 
             - First
-                - ![text](./images/ddia_0102.png)
+                - ![text](./images/ddia/ddia_0102.png)
                 - Insert tweet to some global collection of tweet
                 - When a user request 
                     - Get all the tweets to whom I follow, sort and give back to me 
@@ -161,7 +161,7 @@
                     - User post a tweet, look up all people who follow the user
                         and insert the new tweet into each of their home timeline cache
                     - This made read cheap (already in cache)
-                - ![text](./images/ddia_0103.png)
+                - ![text](./images/ddia/ddia_0103.png)
             - Gains 
                 - Approach second is better than first in term of home timeline reads
                 - Less work during read
@@ -193,7 +193,7 @@
 > Latency Vs Response time : Both are not same. Response time is what client sees (includes network delays, queueing delays). Latency is the duration that a request is waiting to be handled - during which it latent, awaiting service
 - Think of response time not as a single number, but as a distribution of values 
     - Percentile is better metric than average
-        - ![Percentile](./images/ddia_0104.png)
+        - ![Percentile](./images/ddia/ddia_0104.png)
     - Average doesn't tell you how long users "typically" have to wait ?
     - Median (sort and then check half point) 
         - Median also known as 50th percentile (p50)
@@ -211,7 +211,7 @@
 - High percentile becomes more important in backend services that are called multiple times as part of serving a single end-user request
     - Right way of aggregating response time is to add histograms
     - Single service slow == complete system slow
-    ![Several backend calls](./images/ddia_0105.png)
+    ![Several backend calls](./images/ddia/ddia_0105.png)
 
 - Approach for Coping with Load
     - Architecture design for x level of load might not work well for y level of load
@@ -304,7 +304,7 @@
 
 - Example : LinkedIn : Relational vs JSON
     - Relational
-    ![Bill Gate Resume on a Relational model](./images/ddia_0201.png)
+    ![Bill Gate Resume on a Relational model](./images/ddia/ddia_0201.png)
     - JSON Document 
         ```json
         {
@@ -334,7 +334,7 @@
     - Fetch a profile in relational - perform multiple queries
     - Document-oriented databases uses this data model - CouchDB, RethinkDB, MongoDB, Espresso, etc.
     - Json representation makes this tree (**one-to-many relation**) structure explicit
-        ![JSON representation](./images/ddia_0202.png)
+        ![JSON representation](./images/ddia/ddia_0202.png)
 
 ### Many-to-One and Many-To-Many relationships
 - Look at the `region_id` and `industry_id`
@@ -368,9 +368,9 @@
             - If recommender updates their photo
                 - All recommendation they have made needs change
                 - Therefore recommendation should have reference to the author's profile
-            - ![](./images/ddia_0203.png)
+            - ![](./images/ddia/ddia_0203.png)
     - Many to Many relation required in above example ?
-        - ![](./images/ddia_0204.png)
+        - ![](./images/ddia/ddia_0204.png)
         - Data in dotted rectangle can be group into one document
         - References to organizations, schools, and other users represented as references
         - Requires join when queried
@@ -420,7 +420,7 @@
   - The Web Graph
   - Road & Railway Network
 - Following figure shows two people, Lucy from Idaho and Alain from Beaune, France. They are married and living in London.
-  ![](./images/ddia_0205.png)
+  ![](./images/ddia/ddia_0205.png)
 - Provides consistent way of storing completely different types of object in a single datastore
 - Different ways of structuring data in graphs
   - Property Graph Model
@@ -573,10 +573,10 @@ CREATE
 
 ## Chapter 8. The Trouble with Distributed Systems 
 *Hey I just met you*
-*They network's laggy*
+*The network's laggy*
 *But here's my data*
 *So store it maybe*
-![alt text](./images/ch08-map-ebook.png)
+![alt text](./images/ddia/ch08-map-ebook.png)
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
 
 
