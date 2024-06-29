@@ -458,7 +458,7 @@ Invoked by candidates to gather vote
 - ![alt text](./images/raft/image-7.png)
 
 ## Log compaction 
-- Remove obsolete information with time to avoid
+- Remove obsolete information with time to avoid space wastage
 - Snap shotting is the simplest technique for compaction
   - Entire system state is written on a stable storage, then entire log up that point is discarded (as well as older snapshots)
   - ![alt text](./images/raft/image-8.png)
