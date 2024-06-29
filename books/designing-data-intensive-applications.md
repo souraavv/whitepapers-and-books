@@ -23,18 +23,18 @@
   - [Chapter 3. Storage and Retrievals](#chapter-3-storage-and-retrievals)
     - [Hash Indexes](#hash-indexes)
 
-## Designing Data Intensive Applications
+# Designing Data Intensive Applications
 
-### Resources
+## Resources
 
 - Author : Martin Kleppmann
 - 20 hours of reading (600+ pages book)
 [Oreilly Link](https://learning.oreilly.com/library/view/designing-data-intensive-applications/)
 
-### Plethora of buzzwords relating to storage and processing of data
+## Plethora of buzzwords relating to storage and processing of data
 - NoSQL! Big Data! Web-scale! Sharding! Eventual consistency! ACID! CAP theorem! Cloud services! MapReduce! Real-time!
 
-### Preface
+## Preface
 - Data intensive 
     - Data as primary challenged - quantity/complexity/changing-nature
     - Store data : Database
@@ -70,11 +70,11 @@
     - Basic Network/OS
     - Basic relational database
 
-## Part 1. Foundation of Data Systems [Chapter 1 - Chapter 4]
+# Part 1. Foundation of Data Systems [Chapter 1 - Chapter 4]
 
-### Chapter 1 : Reliable, Scalable, and Maintainable Applications
+## Chapter 1 : Reliable, Scalable, and Maintainable Applications
 > No such hard boundary b/w databases, queues, caches, etc. because now most tools are coming up with multiple features. Thus we will keep these three under single umbrella
-#### Reliability
+### Reliability
 - Tolerating hardware & software faults
     - Redundant components ? 
         - When one component dies, the redundant component can take its place while the broken component is replaced
@@ -109,7 +109,7 @@
         - Clear monitoring (performance metrics, error rates) : tracking what is happening for understanding failures i.e telemetry
         - Good management practices 
 
-#### Scalability
+### Scalability
 - Systems ability to cope with increased load
 - Define load ? 
     - Depends on the system architecture (load parameters)
@@ -175,7 +175,7 @@
                         - And you are writing millions of code line just for them 😐
     - In the above Twitter example, the distribution of followers per user(may be weighted by how often those user tweet) is a key load parameter for discussing scalability, since it determine the *fan-out* load
 
-#### Performance
+### Performance
 - Once load is defined, you can test what happen when the load increases
     - Increase a load parameter and keep the system resources unchanged, impact on performance ?
     - When you increase the load parameter, how much do you need to increase the resource if you want to keep performance unchanged ?
@@ -224,7 +224,7 @@
         - An architecture that scale well for App x is build on assumption set S (load factors)
         - Therefore, architecture of systems that operate at large scale is usually highly specific to the application
     
-#### Maintainability
+### Maintainability
 
 - Major cost of software products
 - Pain is to fix other mistakes and maintain legacy code
@@ -252,9 +252,9 @@
   - goal is to find ways of increasing agility of larger data systems
   - agility of system dependent on its simplicity and its abstractions
 
-### Chapter 2. Data Models and Query Language
+## Chapter 2. Data Models and Query Language
 
-#### Data models
+### Data models
 - Data models decides
     - your thinking to solve the problem
     - the way software will be written
@@ -282,7 +282,7 @@
       3. Specialized query operations not supported by relational model
       4. More dynamic & expressive data model, no restriction with relational schemas
 
-#### The Object-Relational Mismatch
+### The Object-Relational Mismatch
 
 - Todays app are developed in OOPs languages
 - SQL data models seems highly unrelated with OOPs
@@ -328,7 +328,7 @@
     - Json representation makes this tree (**one-to-many relation**) structure explicit
         ![JSON representation](./images/ddia_0202.png)
 
-#### Many-to-One and Many-To-Many relationships
+### Many-to-One and Many-To-Many relationships
 - Look at the `region_id` and `industry_id`
     - They are not plain text, instead they are IDs
     - Benefits ?
@@ -367,7 +367,7 @@
         - References to organizations, schools, and other users represented as references
         - Requires join when queried
 
-#### Relational Vs Document database Today ?
+### Relational Vs Document database Today ?
 - Fault tolerant ? Handling concurrency ? 
 - Benefits of using document database
     - Schema flexibility
@@ -377,7 +377,7 @@
     - Support for join
     - M:1, M:N relationship 
 
-#### Which data model leads to simpler application code?
+### Which data model leads to simpler application code?
 - If application has document like structure (a tree of 1:M) and tree is loaded at once, then use document 
     - Major drawback in document : You can't refer directly to a nested item with an document
     - The drawback become a problem if document are deeply nested
@@ -400,7 +400,7 @@
 - **Schema-on-write**: Schema is explicit 
     - If data is homogeneous 
 
-#### Graph-Like Data Models
+### Graph-Like Data Models
 - Usecase : 
   - many-to-many relationships and 
   - complex connections between data
@@ -422,7 +422,7 @@
   - SPARQL
   - Datalog
   
-##### Property Graphs
+#### Property Graphs
 - vertex consists of 
   - unique identifier
   - set of outgoing edges
@@ -458,7 +458,7 @@ CREATE INDEX edges_heads ON edges (head_vertex);
   - different labels can be used for storing different relationships, different information can be stored in a single graph
 - graphs are good for evolvability, as we add new features to application graph can easily be extended to accommodate changes in application's data structures
 
-#### Cypher Query Language
+### Cypher Query Language
 - declarative query language for property graphs (create for Neo4j graph database)
   - Fact: The name it take from a character in Matrix Movie
 - subset of data from figure 2.5 can be represented as Cypher query
@@ -484,13 +484,13 @@ CREATE
 - there are several ways for executing query, and it's up to query optimizer to select most efficient strategy
 
 
-#### Graph Queries in SQL
+### Graph Queries in SQL
 - Graph data can be represented in the relational database + you can query it using sql
   - But query writing comes with pain
 - Unlike simple joins where you know what to join in advance, here in case of graph you may have to traverse a variable number of edges before reaching the vertex you are looking for
 > Read more on recursion in SQL 
 
-#### Triple-Store and SPARQL
+### Triple-Store and SPARQL
 - Equivalent to property graph model (same idea)
 - Three part statement (subject, predicate, object) 
   - Example: (lucy, marriedTo, Alan)
@@ -513,7 +513,7 @@ CREATE
     _:namerica a :Location; :name "North America"; :type "continent".
     ```
 
-#### Summary 
+### Summary 
 - All its started with tree (hierarchical data 1:M)
 - Hierarchical data was bad for N:M relations, so Relational data model appeared 
 - Then relational didn't fit every where, so document model came(when relationship is rare, and self-contained data)
@@ -527,7 +527,7 @@ CREATE
   - Full-text search
 
 
-### Chapter 3. Storage and Retrievals
+## Chapter 3. Storage and Retrievals
 
 - One of the most fundamental 
   - A database do 2 things - when you give it data, it store; when you ask, it give the data back to you
@@ -546,13 +546,12 @@ CREATE
 - How to make search fast ?
   - Indexes ? - true they makes read fast, but what about writes, your writes are slow now.
 
+### Hash Indexes
 
-#### Hash Indexes
-
-- Simplest Model for index: f:key -> value
+- Simplest Model for index: `f:key -> value`
 - Keep this data structure in-memory (faster access)
 - For the simplest database example in prev section
-  - If we are just appending data to the file, for each key we can keep the byte offset in the data file
+  - If we are just appending data to the file, for each key we can keep the `f:key -> (byte offset in the data file)`
 
 
 
