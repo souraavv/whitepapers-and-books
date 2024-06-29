@@ -1,3 +1,28 @@
+- [Designing Data Intensive Applications](#designing-data-intensive-applications)
+  - [Resources](#resources)
+  - [Plethora of buzzwords relating to storage and processing of data](#plethora-of-buzzwords-relating-to-storage-and-processing-of-data)
+  - [Preface](#preface)
+- [Part 1. Foundation of Data Systems \[Chapter 1 - Chapter 4\]](#part-1-foundation-of-data-systems-chapter-1---chapter-4)
+  - [Chapter 1 : Reliable, Scalable, and Maintainable Applications](#chapter-1--reliable-scalable-and-maintainable-applications)
+    - [Reliability](#reliability)
+    - [Scalability](#scalability)
+    - [Performance](#performance)
+    - [Maintainability](#maintainability)
+  - [Chapter 2. Data Models and Query Language](#chapter-2-data-models-and-query-language)
+    - [Data models](#data-models)
+    - [The Object-Relational Mismatch](#the-object-relational-mismatch)
+    - [Many-to-One and Many-To-Many relationships](#many-to-one-and-many-to-many-relationships)
+    - [Relational Vs Document database Today ?](#relational-vs-document-database-today-)
+    - [Which data model leads to simpler application code?](#which-data-model-leads-to-simpler-application-code)
+    - [Graph-Like Data Models](#graph-like-data-models)
+      - [Property Graphs](#property-graphs)
+    - [Cypher Query Language](#cypher-query-language)
+    - [Graph Queries in SQL](#graph-queries-in-sql)
+    - [Triple-Store and SPARQL](#triple-store-and-sparql)
+    - [Summary](#summary)
+  - [Chapter 3. Storage and Retrievals](#chapter-3-storage-and-retrievals)
+    - [Hash Indexes](#hash-indexes)
+
 ## Designing Data Intensive Applications
 
 ### Resources
@@ -431,10 +456,11 @@ CREATE INDEX edges_heads ON edges (head_vertex);
   - any vertex can have an edge connecting it with any other vertex
   - efficiently find both incoming and outgoing edges for a given vertex (indexes is maintained on tail_vertex and head_vertex), can traverse the graph both forward & backward
   - different labels can be used for storing different relationships, different information can be stored in a single graph
-- graphs are good for evolvability, as we add new features to application graph can easily be extended to accomodate changes in application's data structures
+- graphs are good for evolvability, as we add new features to application graph can easily be extended to accommodate changes in application's data structures
 
 #### Cypher Query Language
-- declarative query language for property graphs
+- declarative query language for property graphs (create for Neo4j graph database)
+  - Fact: The name it take from a character in Matrix Movie
 - subset of data from figure 2.5 can be represented as Cypher query
 ```sql
 CREATE
@@ -455,8 +481,78 @@ CREATE
   (person) -[:LIVES_IN]-> () -[:WITHIN*0..]-> (eu:Location {name:'Europe'})
   RETURN person.name
   ```
-- there are several ways for executing query, and it's upto query optimizer to select most efficient strategy
+- there are several ways for executing query, and it's up to query optimizer to select most efficient strategy
 
+
+#### Graph Queries in SQL
+- Graph data can be represented in the relational database + you can query it using sql
+  - But query writing comes with pain
+- Unlike simple joins where you know what to join in advance, here in case of graph you may have to traverse a variable number of edges before reaching the vertex you are looking for
+> Read more on recursion in SQL 
+
+#### Triple-Store and SPARQL
+- Equivalent to property graph model (same idea)
+- Three part statement (subject, predicate, object) 
+  - Example: (lucy, marriedTo, Alan)
+  - ```sql
+    @prefix : <urn:example:>.
+    _:lucy     a       :Person.
+    _:lucy     :name   "Lucy".
+    _:lucy     :bornIn _:idaho.
+    ```
+- When predicate is property eg. `_:lucy :name "Lucy"` then the object becomes `String` 
+- When predicate represents an edge e.g `_:idaho :within _:usa` then the object become vertex
+- `_:someName` doesn't means anything outside this file
+  - This only helps us to tag each triplet with a vertex (or all these triplets belongs to same vertex)
+- More concise Example:
+  - ```sql
+    @prefix : <urn:example:>.
+    _:lucy     a :Person;   :name "Lucy";          :bornIn _:idaho.
+    _:idaho    a :Location; :name "Idaho";         :type "state";   :within _:usa.
+    _:usa      a :Location; :name "United States"; :type "country"; :within _:namerica.
+    _:namerica a :Location; :name "North America"; :type "continent".
+    ```
+
+#### Summary 
+- All its started with tree (hierarchical data 1:M)
+- Hierarchical data was bad for N:M relations, so Relational data model appeared 
+- Then relational didn't fit every where, so document model came(when relationship is rare, and self-contained data)
+- Graph database on the other targets the use case where every one can related every other
+- All three (document, graph and relational) are widely used today
+- Each data model comes with it's own query language or framework
+  - SQL, MapReduce, MongoDB's, Cypher, SPARQL, and Datalog
+- Future<Research> of data models
+  - LHC (Large Hadron Collision - to identify God particle) requires to work with Petabytes of data in seconds
+  - Genome data (DNA matching)
+  - Full-text search
+
+
+### Chapter 3. Storage and Retrievals
+
+- One of the most fundamental 
+  - A database do 2 things - when you give it data, it store; when you ask, it give the data back to you
+- This chapter is written in POV of database
+  - But why ? As a developer why does this matter to me ?
+    - Right, you will be rarely writing your own storage engine, but you do need to select a storage engine appropriate for your application
+    - Even having rough idea will work for you
+- We will discuss two family of storage engines
+  - *Log-structured*, and
+  - *page-oriented* such as B-tree
+
+- A simplest database would be just writing to a file and reading
+  - But with a simple file you can't handle concurrency, partial writes, error handlings
+  - Apart from correctness, there are performance issues also, your search are slow as file size increases
+
+- How to make search fast ?
+  - Indexes ? - true they makes read fast, but what about writes, your writes are slow now.
+
+
+#### Hash Indexes
+
+- Simplest Model for index: f:key -> value
+- Keep this data structure in-memory (faster access)
+- For the simplest database example in prev section
+  - If we are just appending data to the file, for each key we can keep the byte offset in the data file
 
 
 
