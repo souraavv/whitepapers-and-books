@@ -22,6 +22,14 @@
     - [Summary](#summary)
   - [Chapter 3. Storage and Retrievals](#chapter-3-storage-and-retrievals)
     - [Hash Indexes](#hash-indexes)
+  - [Chapter 4. Encoding and Evolution](#chapter-4-encoding-and-evolution)
+  - [Chapter 5. Replication](#chapter-5-replication)
+  - [Chapter 6. Partitioning](#chapter-6-partitioning)
+  - [Chapter 7. Transaction](#chapter-7-transaction)
+  - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
+  - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
+  - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
+  - [Chapter 11. Stream Processing](#chapter-11-stream-processing)
 
 # Designing Data Intensive Applications
 
@@ -554,7 +562,29 @@ CREATE
   - If we are just appending data to the file, for each key we can keep the `f:key -> (byte offset in the data file)`
 
 
+## Chapter 4. Encoding and Evolution 
+
+
+## Chapter 5. Replication
+
+## Chapter 6. Partitioning
+
+## Chapter 7. Transaction 
+
+## Chapter 8. The Trouble with Distributed Systems 
+*Hey I just met you*
+*They network's laggy*
+*But here's my data*
+*So store it maybe*
+![alt text](./images/ch08-map-ebook.png)
+- In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
+
+
+## Chapter 9. Consistency and Consensus 
 
 
 
+## Chapter 10. Batch Processing
+
+## Chapter 11. Stream Processing
 
