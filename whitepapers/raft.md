@@ -210,15 +210,15 @@
     - `currentTerm`
         - Latest term server has seen
         - Initialize to 0 on first boot, increase monotonically
-        - This information is used by machine, to detect stale information (logical clock)
+        - Used to ensure that terms only increase, & to detect RPCs from stale leaders & candidates(logical clock)
     - `votedFor`
         - Candidate that received vote in current term (or null if none)
-        - If it didn't store to whom it voted for current term, then there is a possibility of submitting vote twice in same term
+        - If it didn't store to whom it voted for current term, then there is a possibility of submitting vote twice in same term. This could lead to two leaders in the same term(breaks election safety).
     - `log[]`
         - Log entries
         - Each entry contains (command for state machine, term when entry was received)
-        - one-based indexing
-        - This information will be used to derive state in replicated state machine
+        - One-based indexing
+        - If the server is in leader's majority for committing an entry, must remember entry despite reboot, so that any future leader is guaranteed to see committed log entry (ensure leader completeness property). Moreover, logs play a crucial role in electing leader for a given term.
 - **Volatile state on all server**
     - `commitIndex`
         - Index of highest entry known to be committed (init = 0; increase monotonically)
