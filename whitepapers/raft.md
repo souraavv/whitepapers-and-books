@@ -222,8 +222,10 @@
 - **Volatile state on all server**
     - `commitIndex`
         - Index of highest entry known to be committed (init = 0; increase monotonically)
+        - why not persist ? Supplied from the leader
     - `lastApplied`
         - Index of highest log entry applied to the state machine (init = 0; increase monotonically)
+        - why not persist ? Computed locally, equals to the index till which logs are applied to state machine (<=commitIndex)
 - **Volatile state on leaders**
     - `nextIndex[]`
         - For each server
@@ -233,7 +235,10 @@
         - For each server 
             - Index of highest log entry known to be replicated on server
             - init = 0; increase monotonically
-
+    - why not persist ? computed based on responses received for AppendRPCs sent to the followers
+    - why different `nextIndex` & `matchIndex` ?
+      - they have a different usecase nextIndex is used for sending log entries to the follower
+      - whereas matchIndex is used by the leader for committing log entries 
 ## AppendEntries RPC
 Invoked by leader to replicate log entries + heart beats
 
@@ -477,7 +482,6 @@ Invoked by candidates to gather vote
 
 <details>
 <summary> Vague points </summary>
-
 - Centralized (leader/master) vs decentralized tradeoffs
   - If centralized, then how to handle the crash of leader/master
   - If decentralized, then how to make sure every one has consistent information or every one is in sync about the overall state of the system ?
