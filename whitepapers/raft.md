@@ -479,9 +479,6 @@ Invoked by candidates to gather vote
 ## Conclusion (Author of paper)
 
 ## What I learned from this paper ? 
-
-<details>
-<summary> Vague points </summary>
 - Centralized (leader/master) vs decentralized tradeoffs
   - If centralized, then how to handle the crash of leader/master
   - If decentralized, then how to make sure every one has consistent information or every one is in sync about the overall state of the system ?
@@ -494,5 +491,4 @@ Invoked by candidates to gather vote
 - How to ensure availability of system ?
 - Share state if a server is lagging / new server added
   - Tradeoff b/w Independent snapshots at each server Vs Leader instructed logs
-</details>
 
