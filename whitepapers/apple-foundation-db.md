@@ -3,6 +3,9 @@
     - [Hey FoundationDB, Introduce yourself](#hey-foundationdb-introduce-yourself)
     - [Why should we read this paper ?](#why-should-we-read-this-paper-)
   - [Introduction](#introduction)
+  - [Contribution of this paper](#contribution-of-this-paper)
+  - [Design](#design)
+    - [Design Principle](#design-principle)
 
 # FoundationDB: A distributed Key-Value Store
 Author: J Zhou, Published @ SIGMOD'21
@@ -42,5 +45,60 @@ Author: J Zhou, Published @ SIGMOD'21
   - FDB is try to balance and avoid this tradeoff
     - By providing serializable transactions 
     - More advanced features like - consistent secondary indices and referential integrity check
-- Unlike most database where they bundle storage engine, data model and query language, forcing users to choose all three or none. FDB takes modular approach 
+- Unlike most database where they bundle storage engine, data model and query language, forcing users to choose all three or none. 
+  - FDB takes modular approach (unbundled architecture: control plane + data plane)
+  - Control plane: Manages metadata of the cluster 
+  - Data plane: consists of transactional management system
 - FDB defaults to strict serializable transactions, it allows these semantics for application that don't require them with flexible, fine-grained control over conflicts
+  - Strict serializability through a combination of OSS(Optimistic concurrency control) and MVCC (Multi-version concurrency control)
+- Lock free architecture
+- FDB can tolerate f faults in f + 1 replicas (rather than 2f + 1)
+- FDB doesn't relies on quorums to mask failures, but rather tries to proactively detect and recover from them
+
+## Contribution of this paper 
+- Open source distributed storage system
+- Deterministic simulation framework 
+- Careful chosen feature set
+- Unique approach to transaction processing
+  
+## Design 
+- A production database needs to solve many problem 
+  - Data persistence
+  - Data partitioning
+  - Load balancing
+  - Membership 
+  - Failure detection
+  - Failure recovery
+  - Replica placement
+  - Synchronization
+  - Overload control
+  - Scaling
+  - Concurrency 
+  - Job Scheduling
+  - System monitoring
+  - Alerting
+  - Backup
+  - System upgrade
+  - Deployment 
+  - Configuration management
+  - Bas bhai
+
+### Design Principle
+- *Divide-and-Conquer* (or separation of concerns)
+  - FDB decouples write path (transaction management system) from read path (distributed storage)
+  - This allow scape them independently 
+  - Within transaction management system, processes are assigned various roles representing different aspects of transaction management
+    - Timestamp management
+    - Accepting commits
+    - Conflict detection
+    - logging
+    - Cluster-wide orchestration 
+      - Over load control
+      - Load balancing 
+      - Failure recovery 
+  
+- *Make failure a common case*
+  - For distributed system, failure is a norm rather than an exception
+- *Fast fail and recover fast*
+  - Minimize Mean Time to Recover (MTTR)
+- *Simulation testing*
