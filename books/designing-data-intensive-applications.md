@@ -614,7 +614,7 @@ CREATE
   
 ### Leader and Followers
 - *Active/passive* or *master-slave* or *primary-secondary* replication
-- [](./images/ddia/ddia_0501.png)
+- ![active-passive](./images/ddia/ddia_0501.png)
 - The feature of replication is built-in feature of many relational database
   - PostgreSQL, MySQL, Oracle Data Guard
 
