@@ -23,7 +23,9 @@
   - [Chapter 3. Storage and Retrievals](#chapter-3-storage-and-retrievals)
     - [Hash Indexes](#hash-indexes)
   - [Chapter 4. Encoding and Evolution](#chapter-4-encoding-and-evolution)
+- [Part 2. Distributed Data](#part-2-distributed-data)
   - [Chapter 5. Replication](#chapter-5-replication)
+    - [Leader and Followers](#leader-and-followers)
   - [Chapter 6. Partitioning](#chapter-6-partitioning)
   - [Chapter 7. Transaction](#chapter-7-transaction)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
@@ -562,10 +564,60 @@ CREATE
   - If we are just appending data to the file, for each key we can keep the `f:key -> (byte offset in the data file)`
 
 
+
 ## Chapter 4. Encoding and Evolution 
 
 
+# Part 2. Distributed Data
+- In Part 2 we will discuss:
+  - What happen when you start storing data on multiple machine for *scalability*, *fault tolerance*, *latency*, *load*?
+
+- Scaling to Higher Load
+  - Simplest approach will be vertical scaling or scaling up 
+    - many CPU, many RAM, interconnected memory/disk
+    - It is also refer as *shared-memory architecture*, all component can be treated as single component
+    - But making hardware 2x powerful, generally cost you >= 2x in term of money, and also gain in performance is < 2x (because of overheads)
+  - **Share Nothing Architecture**
+    - Horizontal scaling or scaling out
+    - Each node has it's own hardware component
+      - Nodes talk through n/w 
+    - No special hardware required by a shared-nothing system
+    - Allows you to pick best price/performance ratio
+
+- Replication Vs Partitioning 
+  - Two commons ways
+    - Replication (keep a copy on several machine)
+    - Partitioning (Split big database into small)
+  
+- In part2 we will mostly discuss *Share Nothing Architecture* 
+  
 ## Chapter 5. Replication
+
+- Why replication ?
+  - Latency - Keep you data geographically closer to your users
+  - Availability - Allow system to work even if few goes down
+  - Throughput - Scale out the number of machine that can server read queries
+
+- For now we will make some assumptions
+  - Data is small enough to fit completely on single machine (not sharding)
+- We will further discuss how to dealt with the various kind of fault that can occurs in a replicated data system
+
+- If your data never changes, then stop reading further (end of book)
+- Difficulty comes when your data is changing 
+- We will discuss three popular algorithms for replicating changes between nodes
+  - Single-leader
+  - Multi-leader
+  - Leaderless replication
+- Other tradeoffs in replication
+  - Sync vs Async
+  - Eventual consistent vs Strict 
+  
+### Leader and Followers
+- *Active/passive* or *master-slave* or *primary-secondary* replication
+- [](./images/ddia/ddia_0501.png)
+- The feature of replication is built-in feature of many relational database
+  - PostgreSQL, MySQL, Oracle Data Guard
+
 
 ## Chapter 6. Partitioning
 
