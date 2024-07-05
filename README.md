@@ -1,2 +1,2 @@
-# whitepapers-and-books
-Notes from whitepapers and books.
+# Whitepapers-and-books
+- Refer to list of whitepapers
