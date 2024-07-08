@@ -6,6 +6,8 @@
   - [Contribution of this paper](#contribution-of-this-paper)
   - [Design](#design)
     - [Design Principle](#design-principle)
+    - [System Interface](#system-interface)
+    - [Architecture](#architecture)
 
 # FoundationDB: A distributed Key-Value Store
 Author: J Zhou, Published @ SIGMOD'21
@@ -102,3 +104,55 @@ Author: J Zhou, Published @ SIGMOD'21
 - *Fast fail and recover fast*
   - Minimize Mean Time to Recover (MTTR)
 - *Simulation testing*
+
+### System Interface 
+- The `get()`, `set()` operations for read and write single key-value pair 
+- `getRange()` returns a sorted list of keys-value pairs
+- `clear()` deletes all key-value pair within a range or starting with a certain key prefix 
+- A FDB transaction 
+  - Modifies a snapshot of the database at a certain version (in-memory instance)
+    - A transaction's write (i.e., `set()` and `clear()` calls) are buffered by FDB client until final `commit` is called
+  - Only write to the persistent storage when transaction commits; 
+- For performance
+  - Key size <= 10KB, value size <= 100KB and transaction size <= 10MB
+
+### Architecture 
+
+![Architecture of Foundation DB](./images/foundation-db/foundationdb-architecture.jpg)
+
+- **Control Plane**
+  - Responsibility 
+    - Persisting critical system metadata 
+      - e.g. Configuration of transaction systems on *Coodinators*
+      - These Coodinators forms a disk Paxos group and selects a singleton 
+        *ClusterController* 
+      - ClusterController monitors all servers in the cluster and recruits three singleton processes 
+        - *Sequencer* 
+          - Assign read & commmit version to the transactions 
+        - *DataDistributor*
+          - Monitoring failures and balancing data among StorageServers 
+        - *RateKeeper*
+          - Overload protection to the cluster 
+      - In case of crash re-recruited if they fail or crash 
+- **Data Plane**
+  - Handles OLTP workloads (read-mostly, read and write a small set of keys, 
+    low contention and requires scalability)
+  - Maintains 
+    - A *log system* (LS) for Write-AHead-Log (WAL) for TS
+      - Log system contains a set of *LogServers*
+      - LogServers act as replicated, shared, distributed persistent queue, where 
+        each queue store WAL data for a StorageServer
+    - *Distributed Storage System* (SS) for storing data and servicing reads 
+      - Contains number of *StorageServers* for serving client reads, where each storage server let the 
+        data shard i.e., contiguous key ranges 
+      - StorageServers are the majority of the processes in the system, and together they form a distribute B tree 
+      - FDB uses modified version of SQLite as the storage engine on each server (with enh which add supports to async programming, defer deletion to a background task)
+  - TS provides transaction processing and consists of 
+    - *Sequencer*
+      - Assigns read & commit version to the transaction 
+    - *Proxies* 
+      - Offers MVCC(MultiVersion Concurrency Control) read version to the client 
+        orchestrate transaction commits 
+    - *Resolvers* 
+      - Checks for conflict b/w transactions 
+  - All of the three are stateless processes (cool!!)
