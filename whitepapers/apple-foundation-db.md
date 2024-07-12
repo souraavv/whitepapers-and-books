@@ -8,6 +8,9 @@
     - [Design Principle](#design-principle)
     - [System Interface](#system-interface)
     - [Architecture](#architecture)
+      - [Control Plane (CP)](#control-plane-cp)
+      - [Data Plane (DP)](#data-plane-dp)
+      - [Read-Write Separation and Scaling FDB design is decoupled](#read-write-separation-and-scaling-fdb-design-is-decoupled)
 
 # FoundationDB: A distributed Key-Value Store
 Author: J Zhou, Published @ SIGMOD'21
@@ -23,14 +26,16 @@ Author: J Zhou, Published @ SIGMOD'21
 - I'm the underpinning(आधार/नींव) of cloud Infra @Apple, @Snowflake
   
 ### Why should we read this paper ? 
-- FDB adopts an unbundled architecture that decouples 
-  - In-memory transactional management system
-  - Distributed storage system
+- FDB adopts an unbundled architecture that *decouples* (basically Apple's didn't like the name **microservice**)
+  - In-memory transactional management system (TS)
+  - Distributed storage system (SS)
   - Built-in distributed configuration system 
 - Each sub-system can be independently provision and configured to achieve
   - Scalability
   - High-availability
   - Fault tolerant property 
+- FDB is strict serializable and lock-free
+- FDB can tolerate *f* failures with only *f + 1* replicas 
 - Integrates a deterministic simulation framework
   - Used to test every new features
   - Rigorous testing makes FoundationDB extremely stable
@@ -120,21 +125,22 @@ Author: J Zhou, Published @ SIGMOD'21
 
 ![Architecture of Foundation DB](./images/foundation-db/foundationdb-architecture.jpg)
 
-- **Control Plane**
+#### Control Plane (CP)
   - Responsibility 
-    - Persisting critical system metadata 
-      - e.g. Configuration of transaction systems on *Coodinators*
+    - *Coordinators* (heart of CP)
+      - Persisting critical system metadata about the entire FDB deployment/configuration
       - These Coodinators forms a disk Paxos group and selects a singleton 
         *ClusterController* 
-      - ClusterController monitors all servers in the cluster and recruits three singleton processes 
-        - *Sequencer* 
-          - Assign read & commmit version to the transactions 
-        - *DataDistributor*
-          - Monitoring failures and balancing data among StorageServers 
-        - *RateKeeper*
-          - Overload protection to the cluster 
-      - In case of crash re-recruited if they fail or crash 
-- **Data Plane**
+    - ClusterController monitors the health of all the servers in the cluster and recruits three singleton processes 
+      - *Sequencer* 
+        - Assign read & commmit version to the transactions 
+      - *DataDistributor*
+        - Monitoring failures and balancing data among StorageServers 
+      - *RateKeeper*
+        - Overload protection to the cluster 
+    - In case of crash re-recruited if they fail or crash 
+  
+#### Data Plane (DP)
   - Handles OLTP workloads (read-mostly, read and write a small set of keys, 
     low contention and requires scalability)
   - Maintains 
@@ -146,8 +152,9 @@ Author: J Zhou, Published @ SIGMOD'21
       - Contains number of *StorageServers* for serving client reads, where each storage server let the 
         data shard i.e., contiguous key ranges 
       - StorageServers are the majority of the processes in the system, and together they form a distribute B tree 
-      - FDB uses modified version of SQLite as the storage engine on each server (with enh which add supports to async programming, defer deletion to a background task)
-  - TS provides transaction processing and consists of 
+      - FDB uses modified version of SQLite as the storage engine on each server 
+        (with enh which add supports to async programming, defer deletion to a background task)
+  - TS provides transaction processing and consists of (all the following are roles)
     - *Sequencer*
       - Assigns read & commit version to the transaction 
     - *Proxies* 
@@ -156,3 +163,11 @@ Author: J Zhou, Published @ SIGMOD'21
     - *Resolvers* 
       - Checks for conflict b/w transactions 
   - All of the three are stateless processes (cool!!)
+  - Storage servers serves the client read
+    - Data is sharded over SS i.e., contiguous key ranges)
+    - Together all these forms 
+  
+#### Read-Write Separation and Scaling FDB design is decoupled
+
+
+
