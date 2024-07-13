@@ -10,7 +10,11 @@
     - [Architecture](#architecture)
       - [Control Plane (CP)](#control-plane-cp)
       - [Data Plane (DP)](#data-plane-dp)
-      - [Read-Write Separation and Scaling FDB design is decoupled](#read-write-separation-and-scaling-fdb-design-is-decoupled)
+      - [Read-Write Separation and Scaling](#read-write-separation-and-scaling)
+      - [Bootstrapping FDB has no external dependency on other services](#bootstrapping-fdb-has-no-external-dependency-on-other-services)
+      - [Reconfiguration](#reconfiguration)
+    - [Transaction Management](#transaction-management)
+      - [End-To-End Transaction Processing](#end-to-end-transaction-processing)
 
 # FoundationDB: A distributed Key-Value Store
 Author: J Zhou, Published @ SIGMOD'21
@@ -166,8 +170,63 @@ Author: J Zhou, Published @ SIGMOD'21
   - Storage servers serves the client read
     - Data is sharded over SS i.e., contiguous key ranges)
     - Together all these forms 
-  
-#### Read-Write Separation and Scaling FDB design is decoupled
 
+> Multiversion concurrency control (MVCC) is a database optimization technique 
+> that allows multiple transactions to read and write to a database 
+> simultaneously without interfering with each other
+
+> MVCC (Multi-Version Concurrency Control): This is a method for managing 
+> multiple versions of data, allowing the system to handle concurrent operations 
+> without conflicts.
+
+#### Read-Write Separation and Scaling
+- Each process can scale individual
+- Scaling for read is separated from scaling for writes
+- Read scales linearly with the SS 
+- To scales write add more processes to Proxies, Resolvers, and Log-Servers
+- Apple opts for storing MVCC data in the SS, unlike Deuteronomy which store in TS (yes, because they are apple - no norm will be followed)
+  - Q:What is the difference/tradeoffs b/w storing SS and TS ?
+
+#### Bootstrapping FDB has no external dependency on other services
+- All user data and most system metadata is store in SS 
+  - Keys start with `0xFF` prefix (stored in SS)
+- The metadata about SS is stored in LogServers
+- Configuration of LS is stored in Coordinators 
+- When there is no ClusterController ?
+  - A servers try to become the new ClusterController by using a method called Disk Paxos, which is a way of achieving consensus among servers.
+- Once a new ClusterController is elected, it recruits a new Sequencer. 
+- The Sequencer is responsible for organizing the order of operations
+- New Sequencer reads the configuration information of the old LS from the coordinators
+- Sequencer then spawns new LS and TS 
+- Sequneces waits until new TS finishes recovery (sourav: details to recovery ?) 
+- Once new TS finished recovery then write the new LS configuration to all the coordinators
+- Finally TS ready to serve client transactions
+
+#### Reconfiguration 
+- Whenever TS or LS fails, or a db configuration change, 
+  - The reconfiguration process brings the TMS to a new configuration i.e., a clean state
+- Sequencer process monitors the health of Proxies, Resolver, and Log Servers
+- If any of the monitored process fails, or db configuration changes
+  - Sequencer terminates itself
+- Now ClusterController will detect that we have no Sequencer (failure event), then recruit the new Sequencer, which follow the Bootstrapping process to spawn new TS and LS instance 
+- Transactional Processing is divided into epochs 
+  - Epoch = (Generation of TMS with its unique Sequencer process)
+
+### Transaction Management 
+- Topics: Strict Serializable, Transaction Logging & Recovery
+
+#### End-To-End Transaction Processing 
+- Txn Flow
+  - Love at first sight for client starts with the Proxies
+  - Proxies have to send the read version (i.e., timestamp) to the client 
+    - Proxy ask his friend Sequencer for the help
+    - Sequencer is the honest friend and guaranteed Proxy that it will always provide the version which is no less than any previously issued transaction commit version 
+    - Proxy sends the read version is send to client
+    - After getting read version, Client breakups with Proxy and start talking with the SS ~~Sourav Sharma~~ storage servers
+    - Client writes are buffered locally. Only at commit time, the client sends the transaction data, including read/write set (key ranges), to one of the Proxies and wait for a commit or abort response from the Proxy
+    - If txn fails to commit, client may choose to restart the txn from the beginning again
+- Proxy commits a client txn in three steps
+  - First proxy contacts the Sequencer to obtain the commit version 
+    - The version is > existing read version or commit version 
 
 
