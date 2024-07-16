@@ -15,6 +15,7 @@
       - [Reconfiguration](#reconfiguration)
     - [Transaction Management](#transaction-management)
       - [End-To-End Transaction Processing](#end-to-end-transaction-processing)
+      - [Strict Serializability](#strict-serializability)
 
 # FoundationDB: A distributed Key-Value Store
 Author: J Zhou, Published @ SIGMOD'21
@@ -240,7 +241,7 @@ Author: J Zhou, Published @ SIGMOD'21
     - transaction data includes read & write set (i.e key ranges)
     - proxy commits transaction in three steps :
       1. proxy contacts sequencer to obtain a commit version which is guaranteed to be no less than previously issued read versions or commit versions
-      2. proxy sends the transaction information to range-partitioned resolvers (why range partitioned ?), which implements OCC by checking for read-write conflicts. If resolvers return with no conflict, we proceed with final commit stage. Otherwise, proxy marks the transaction as aborted and client may choose to restart the transaction
+      2. proxy sends the transaction information to range-partitioned Resolvers (why range partitioned & which algo?), which implements OCC by checking for read-write conflicts. If Resolvers return with no conflict, we proceed with final commit stage. Otherwise, proxy marks the transaction as aborted and client may choose to restart the transaction
       3. committed transactions are sent to LogServers for persistence. 
         - Q. When transaction can be considered committed by LogServers ?
           - when all designated LogServers have replied to the proxy
@@ -252,3 +253,14 @@ Author: J Zhou, Published @ SIGMOD'21
   - **serializable** : read version provided by sequencer is no less than previously issued commit versions, thereby reads can be preformed from snapshots without raising any conflicts with concurrent writes
   - **performant** : client can commit these transactions locally without contacting the database
 
+#### Strict Serializability
+- commit version defines the serial history for transactions & serves as Log Sequence Number (LSN)
+- sequencer returns previous commit version along with the commit version to proxy
+- proxy sends both LSN & previous LSN to the Resolvers & LogServers so that they can serially process transactions
+  - Q. imagine a scenario 
+    - there exists one transaction commit, let say C1
+    - two transactions parallely issued request for read version they got R2 & R3 versions respectively such that C1 < R1  & C1 < R2
+    - transaction issued commit request parallely with commit version C2 & C3, where C1 < (R1, R2) < C2 < C3 
+    - for commit we will sent previous LSN with LSN i.e (C1, C2) & (C2, C3)
+    - now C2 will be committed before C3 to ensure serial history then C3 should fail as it's read version R3 < C2, and should be restarted ?
+- lock free conflict detection algorithm on resolvers 
