@@ -229,4 +229,26 @@ Author: J Zhou, Published @ SIGMOD'21
   - First proxy contacts the Sequencer to obtain the commit version 
     - The version is > existing read version or commit version 
 
+- read-write transactions
+  - read
+    - client asks one of the proxies to obtain read version (i.e timestamp)
+    - proxy asks sequencer for the read version that is is guaranteed to be no less than any previously issued transaction commit version (what about previously issue read version ?)
+    - client issue multiple reads to the StorageServers & obtain value at that specific read version
+    - client writes are buffered locally without contacting the cluster (client being optimistic about no other commit would take place between it's read & commit)
+  - commit
+    - client sends the transaction data to proxy & waits for commit / abort response from the proxy
+    - transaction data includes read & write set (i.e key ranges)
+    - proxy commits transaction in three steps :
+      1. proxy contacts sequencer to obtain a commit version which is guaranteed to be no less than previously issued read versions or commit versions
+      2. proxy sends the transaction information to range-partitioned resolvers (why range partitioned ?), which implements OCC by checking for read-write conflicts. If resolvers return with no conflict, we proceed with final commit stage. Otherwise, proxy marks the transaction as aborted and client may choose to restart the transaction
+      3. committed transactions are sent to LogServers for persistence. 
+        - Q. When transaction can be considered committed by LogServers ?
+          - when all designated LogServers have replied to the proxy
+          - proxy then reports the committed version to the sequencer (to ensure that later transactions read versions are after this commit, is this known commit version ?) & then replies to the client
+        - Q. What about StorageServers, are they not involved in committing a transaction ?
+          - StorageServers async pull the mutation logs from LogServers and apply committed updates to the disk
+- read-only transactions & snapshot reads
+  - read-only transactions are both serializable & performant
+  - **serializable** : read version provided by sequencer is no less than previously issued commit versions, thereby reads can be preformed from snapshots without raising any conflicts with concurrent writes
+  - **performant** : client can commit these transactions locally without contacting the database
 
