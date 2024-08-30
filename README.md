@@ -1,2 +1,2 @@
 # Whitepapers-and-books
-- Refer to list of whitepapers
+- Please raise an issue or PR if there are any mistakes.
