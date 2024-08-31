@@ -37,25 +37,33 @@
 ```
 
 ## Factory Design Pattern
+- encapsulate object creation and allows us to decouple our code from concrete types 
 - encapsulate behaviour of instantiations, area of frequent change -> client depend only on abstraction / interface
-- `new` culprit : real culprit is **CHANGE**, and how change impacts our use of `new`
-  - coding to an interface, insulate ourselves from lot of changes that happens to a system down the road (lower level implementations)
-- identify the aspects that vary and separates them from what stays the same
-  - creation code is moved out into another object (varies in future) that is going to be concerned with only creation of objects 
-  - replace concrete instantiations with factory methods
-- static factory
-  - pros, don't have to instantiate an object to make use of create method
-  - cons, we can't subclass and change **behaviour** of the create method
-1. **simple factory**
+- `new` culprit : real culprit is our old friend **CHANGE**, and how change impacts our use of `new`
+  - instantiation is an activity that shouldn't always be done in public and can often leads to coupling problems
+  - coupling problems : when time comes for changes / extensions we have to reopen the code (instantiation) & examine what needs to be added (or deleted)
+  - moreover it voilates design principal which states that our code should be __**closed for modification**__
+  - coding to an interface, insulate ourselves from lot of changes that happens to a system down the road (decoupling high level components i.e abstract creator classes from the concrete implementations of lower level components i.e concrete products)
+- another design principal for the resque : __**identify the aspects that vary and separates them from what stays the same**__
+  1. creation code is moved out into another object (varies in future) that is going to be concerned with only creation of objects (i.e factory)
+  2. replace concrete instantiations with factory methods
+
+1. **simple factory** : not a design pattern but a programming idiom (reusable code snippets that solves common problems in an elegant and efficient ways)
   - class which contain single method that is going to be concerned with only creation of objects (encapsulate all creation code in one object)
-  - not gives you flexibility to vary the products that you are creating
-2. **factory method pattern**
-  - lets class defer instantions to its subclasses (encapsulate all creation code in one method)
-  - **the creator classes :** abstract factory method that the subclasses implements to produce products
-  - **the product classes :** factories produces products and product itself is an interface
-  - both creator and product classes both have abstract classes that are extended by concrete classes which knows specific implementation
-- dependency inversion principal
-  - depend on abstractions & do not depend on concrete classes
+  - not gives you flexibility to vary the products that you are creating (extending behaviour via inheritance or composition)
+  - **static factory** : simple factory + static method
+    - pros, don't have to instantiate an object to make use of create method
+    - cons, we can't subclass and change **behaviour** of the create method
+2. **factory method pattern** : allowing the subclasses to decide
+  > **decide :** creation of actual products is not decided by the subclasses at runtime but by the decision of the subclass that is used
+  - handles object creation & encapsulates it in a subclass (encapsulation)
+  - decouples the client code in the superclass from the object creation code in the subclass (decoupling)
+  a. **the creator classes :** abstract factory method that the subclasses implements to produce products
+  b. **the product classes :** factories produces products and product itself is an interface
+  - another perspective i.e factory method is a framework that encapsulates product knowledge into each creator
+  - both product and creator classes have parallel heirarchies where the abstract classes of both are extended by the concrete classes which knew about specific implementation
+- **dependency inversion principal :** __**depend on abstractions & do not depend on concrete classes**__
+  - helps in avoiding dependencies on concrete types and to strive for abstractions
   - high level components should not depend on low level components rather they should **both** depend on abstractions
     - high level component is a class with behaviour defined in terms of other low-level components
     ```mermaid
@@ -63,31 +71,19 @@
     high-level-components --> abstraction;
     low-level-components --> abstraction;
     ```
-  - inversion : top down dependency chart from high-level-components to low-level-components inverted itself
-  - factory method technique for adhering to dependency inversion principal
+  - inversion : 
+    - top down dependency chart from high-level components to low-level components inverted itself, with both high-level & low-level modules now depending upon the abstractions
+    - inversion in thinking : both high-level components and low-level coomponents depend upon an abstraction
   - rules for following dependency inversion principal :
-    - no variable should hold reference to concrete class
-    - no class should derive from a concrete class
-    - no method should override an implemented method of any of its base classes
+    - no variable should hold reference to concrete class, use factory is we are using `new`
+    - no class should derive from a concrete class, as it means that we are dependent on a concrete class
+    - no method should override an implemented method of any of its base classes, as it means our base class wasn't really an abstraction to start with
+  > **every single java program ever written voilates these guidelines** but they have a good reason for doing so. Eg : if a class is never suppose to be change like `String` then it might be ok to init it always, but on other hand if you class change, you have some good technique like Factory Method to encapsulate the change
 3. **abstract factory pattern**
-  - interface for creating families of related or dependent objects without specifying their concrete classes
+  - interface for creating families of related or dependent objects without having to depend on their concrete classes
   - each method in an abstract factory looks like a factory method i.e subclasses override it to create some object
-- factory method and abstract factory pattern both encapsulate object creation and allows you to decouple your code from concrete types
 - factory method relied on inheritance whereas abstract factory relies on object composition
-
-### Dependency Inversion Principle (OO Principle)
-> Depend upon abstractions. Do not depend upon concrete classes.
-- Reduce dependency on the concrete classes
-- This principle is even stronger than *Program to an interface, not an implementation* 
-- A few guidelines can help you avoid OO designs that **violate** the DIP 
-  - NO variable should hold a reference to a concrete class
-    - If you are using `new` then use the *factory* to get around that!
-  - NO class should derive from concrete class 
-    - Always derive from interface or abstract class
-  - NO method should override an implemented method of any of its base class
-    - If you override, then your base class wasn't really an abstraction 
-
-> If a class is never suppose to be change like `String` then it might be ok to init it always, but on other hand if you class change, you have some good technique like Factory Method to encapsulate the change 
+- all factory patterns promotes loose coupling by reducing dependency of our application on concrete classes
 
 ## Singleton Design Pattern
 - Ensures : 
