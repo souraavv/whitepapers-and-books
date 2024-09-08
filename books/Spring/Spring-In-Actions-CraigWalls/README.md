@@ -1,6 +1,6 @@
 
 - [Spring in Actions By Craig Walls](#spring-in-actions-by-craig-walls)
-  - [Getting Started with Spring](#getting-started-with-spring)
+  - [Chapter 1. Getting Started with Spring](#chapter-1-getting-started-with-spring)
     - [What is Spring ?](#what-is-spring-)
     - [History](#history)
     - [Init a Spring application](#init-a-spring-application)
@@ -17,14 +17,22 @@
       - [Spring Security](#spring-security)
       - [Spring cloud](#spring-cloud)
       - [Spring Native](#spring-native)
+  - [Chapter 2. Developing web applications](#chapter-2-developing-web-applications)
+    - [Topics to cover](#topics-to-cover)
+    - [Displaying information](#displaying-information)
+      - [Domain](#domain)
 
 # Spring in Actions By Craig Walls
 
-![Pink Spring in Japan](images/spring-in-japan.webp)
-Cherry blossoms bloom, a pink sky's embrace,
-Spring whispers in Japan, a fleeting grace
+## Chapter 1. Getting Started with Spring 
+<p align="left">
+  <img src="./images/spring-in-japan.webp" alt="Pink spring in Japan" width="800"/>
+  <br>
+  <i>Cherry blossoms bloom, a pink sky's embrace,
+Spring whispers in Japan, a fleeting grace</i>
+</p>
 
-## Getting Started with Spring 
+
 ### What is Spring ?
 - Application comprises of many components
 - Each component owns some functionality and coordinate with the other components to get the job done
@@ -163,8 +171,192 @@ public class HomeControllerTest {
 
 ### Spring landscape 
 #### Core Spring framework
+- Provides foundation for container/context and DI framework
+- Spring MVC (Spring web framework)
+  - Controller class (to handle web requests)
+  - Also you can used to create REST APIs that produce non-HTML output
+- Reactive style programming
+- Spring WebFlux (Chapter 3)
 #### Spring Boot
+- Starter dependencies + autoconfiguration
+- Actuator - provides runtime insights into the inner working
+  - Metrics
+  - Thread dumping 
+  - Application health
+  - Application properties
 #### Spring Data
+- Spring data is capable of working with several kinds of databases, including Mongo, JPA, Neo4j
 #### Spring Security 
+- Authentication, Authorization and API security 
 #### Spring cloud
 #### Spring Native 
+
+
+## Chapter 2. Developing web applications
+
+<p align="left">
+  <img src="./images/apple-during-spring.webp" alt="Apple tree during spring" width="800"/>
+  <br>
+  <i>In Shimla's spring, where apple blossoms bloom so bright,
+I long for those days, lost in petals' gentle light.</i>
+</p>
+
+### Topics to cover
+In this chapter
+- Presenting model data in the browser
+- Processing and validating form input
+- Choosing a view template library
+
+
+### Displaying information
+- In Spring web applications, 
+  - It's a controller job to fetch and process the data
+  - View's job is to render the data into the HTML 
+- An example of Taco Cloud application
+  - A domain class that defines the properties of Taco ingredient
+  - A Spring MVC controller class that fetch and pass it to the view
+  - A view template that renders a list of ingridients in the user's browser
+
+#### Domain
+![Domain](./images/02-02.png)
+
+<details>
+<summary>Defining taco ingredients</summary>
+
+```java
+
+import lombok.Data;
+
+@Data
+public class Ingredient {
+    private final String id;
+    private final String name;
+    private final Type type;
+
+    public enum Type {
+        WRAP, PROTEIN, VEGGIES, CHEESE
+    }
+}
+
+```
+
+</details>
+
+<details>
+<summary>Defining Taco Design</summary>
+
+```java
+
+import lombok.Data;
+
+@Data
+public class Taco {
+    private String name;
+    private List<Ingridient> ingredients;
+}
+
+```
+
+</details>
+
+
+<details>
+<summary>Defining Taco order </summary>
+
+```java
+
+@Data
+public class TacoOrder {
+    private String deliveryName;
+    private String deliveryStreet;
+    private String deliveryCity;
+    private String deliveryState;
+    private String deliveryZip;
+    private String ccNumber;
+    private String ccExpiration;
+    private String ccCVV;
+    private List<Taco> tacos = new ArrayList<>();
+    
+    public void addTaco(Taco taco) {
+        tacos.add(taco);
+    }
+}
+
+```
+
+</details>
+
+
+<details>
+<summary>Spring controller class </summary>
+
+```java
+
+
+@Slf4j
+@Controller
+@RequestMapping("/design")
+@SessionAttributes("tacoOrder") 
+public class DesignTacoController {
+    @ModelAttributes
+    public void addIngredientsToModel(Model model) {
+        List<Ingredient> ingredients = Arrays.asList(
+            new Ingredient("FLTO", "Flour Tortilla", Type.WRAP),
+            new Ingredient("COTO", "Corn Tortilla", Type.WRAP),
+            new Ingredient("GRBF", "Ground Beef", Type.PROTEIN),
+            new Ingredient("CARN", "Carnitas", Type.PROTEIN),
+            new Ingredient("TMTO", "Diced Tomatoes", Type.VEGGIES),
+            new Ingredient("LETC", "Lettuce", Type.VEGGIES),
+            new Ingredient("CHED", "Cheddar", Type.CHEESE),
+            new Ingredient("JACK", "Monterrey Jack", Type.CHEESE),
+            new Ingredient("SLSA", "Salsa", Type.SAUCE),
+            new Ingredient("SRCR", "Sour Cream", Type.SAUCE)
+        );
+    
+        Type[] types = Ingredient.Type.values();
+        for (Type type : types) {
+            model.addAttribute(type.toString().toLowerCase(),
+                    filterByType(ingredients, type));
+        }
+    }
+
+    @ModelAttribute(name = "tacoOrder")
+    public TacoOrder order() {
+        return new TacoOrder();
+    }
+
+    @ModelAttribute(name = "taco")
+    public Taco taco() {
+        return new Taco();
+    }
+
+    @GetMapping 
+    public String showDesignForm() {
+        return "design"; // <--  this is the logical name of view which will be rendered
+    }
+
+    private Iterable<Ingredient> filterByType(List<Ingredient> ingredients, 
+            Type type) {
+        return ingredients.stream()
+                .filter(x -> x.getType()
+                .equals(type))
+                .collect(Collectors.toList());
+    }
+}
+```
+
+- `@Controller` marks this class as candidate for component scanning, so that Spring will discover it as bean
+- `@ModelAttribute` 
+  - Model is an object that convey the between controller and view 
+- `@RequestMapping` when applied at the class level, tells what kind of request this controller will handle
+- `@SessionAttributes("tacoOrder")` Maintain the tacoOrder object in the session
+  - This allow to keep data consistent across pages
+    - Say page 1.  Selected type of taco
+    - page 2. Add protien 
+    - page 3. Cheese toppings
+    - page 4. Review order 
+  - If this annotation is not used then model is local to the page (current)
+- `@GetMapping` the class level `@RequestMapping` is refined with the `@GetMapping` annotation that adorns the `showDesignForm` method 
+</details>
+
+
