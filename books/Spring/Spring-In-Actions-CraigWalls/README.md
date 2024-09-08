@@ -55,7 +55,9 @@ Spring whispers in Japan, a fleeting grace</i>
 ### History
 - How would you guide Spring application context (container) to wire beans together ? 
   - By providing configuration through xml files 
-  - The xml files defines the relationship between beans. An example below, where `productService` depends on `inventoryService`
+    <details> 
+    <summary> The xml files defines the relationship between beans. An example below, where `productService` depends on `inventoryService` </summary>
+
     ```xml
     <bean id="inventoryService"
       class="com.example.InventoryService" />
@@ -65,7 +67,11 @@ Spring whispers in Japan, a fleeting grace</i>
     <constructor-arg ref="inventoryService" />
     </bean>
     ```
-  - Apart from xml file, Java-based configuration is more common. An example below (equivalent to the xml)
+    </details>
+
+    <details>
+    <summary>Apart from xml file, Java-based configuration is more common. An example (equivalent to the xml)</summary>
+
     ```java
     @Configuration      // <--- indicates that this a configuration file 
     public class ServiceConfiguration {
@@ -79,6 +85,7 @@ Spring whispers in Japan, a fleeting grace</i>
         }
     }
     ```
+    </details>
   - There are pros and cons of both the approaches
   - Although Spring also offers *autowiring* and *component scaning* for automatic configuration 
     - With component scanning Spring can automatically discover components from the application classpath and create them as beans
@@ -118,23 +125,30 @@ Spring whispers in Japan, a fleeting grace</i>
   - In case of browser facing application, a controller responds by optionally populating model data and passing the request on to a view to produce HTML that returned to the browser
 
 #### Defining the view
-- Under `/resources/template/<view_name>.html`
-    ```html
-    <!DOCTYPE html>
-    <html xmlns="http://www.w3.org/1999/xhtml"
-        xmlns:th="http://www.thymeleaf.org">
-    <head>
-        <title>Taco Cloud</title>
-    </head>
-    
-    <body>
-        <h1>Welcome to...</h1>
-        <img th:src="@{/images/spring-in-japan.webp}"/>
-    </body>
-    </html>
-    ```
+<details>
+<summary>Under `/resources/template/<view_name>.html`</summary>
+
+```html
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Taco Cloud</title>
+</head>
+
+<body>
+    <h1>Welcome to...</h1>
+    <img th:src="@{/images/spring-in-japan.webp}"/>
+</body>
+</html>
+```
+</details>
 
 #### Testing the controller
+
+<details>
+<summary> Home Controller testing </summary>
+
 ```java
 
 @WebMvcTest(HomeController.class)
@@ -153,6 +167,8 @@ public class HomeControllerTest {
 }
 
 ```
+
+</details>
 
 #### Building and running the application
 ```bash
@@ -347,7 +363,7 @@ public class DesignTacoController {
 
 - `@Controller` marks this class as candidate for component scanning, so that Spring will discover it as bean
 - `@ModelAttribute` 
-  - Model is an object that convey the between controller and view 
+  - Model is an object that convey the message between controller and view 
 - `@RequestMapping` when applied at the class level, tells what kind of request this controller will handle
 - `@SessionAttributes("tacoOrder")` Maintain the tacoOrder object in the session
   - This allow to keep data consistent across pages
