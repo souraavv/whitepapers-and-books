@@ -21,6 +21,8 @@
     - [Topics to cover](#topics-to-cover)
     - [Displaying information](#displaying-information)
       - [Domain](#domain)
+    - [Designing the View](#designing-the-view)
+    - [Processing form submission](#processing-form-submission)
 
 # Spring in Actions By Craig Walls
 
@@ -348,7 +350,8 @@ public class DesignTacoController {
 
     @GetMapping 
     public String showDesignForm() {
-        return "design"; // <--  this is the logical name of view which will be rendered
+        return "design"; // <--  this is the logical name of view which 
+                        // will be rendered (/resources/template/design.html)
     }
 
     private Iterable<Ingredient> filterByType(List<Ingredient> ingredients, 
@@ -374,5 +377,23 @@ public class DesignTacoController {
   - If this annotation is not used then model is local to the page (current)
 - `@GetMapping` the class level `@RequestMapping` is refined with the `@GetMapping` annotation that adorns the `showDesignForm` method 
 </details>
+
+### Designing the View 
+- Controller after processing pass the control to the view
+- View libraries such as
+  - JavaServerPages (JSP)
+  - Thymeleaf 
+  - FreeMarker
+  - Moustache
+  - Groovy based templates
+- Most of the view libraries are designed to be decoupled from any type of web framework
+  - This mean view libraries are unware of the webframework
+  - This adds up the requirement of converter which can make webframwork talk with view library in the language which they understands.
+    - E.g. Thymeleaf can work with servlet request attributes 
+    - Therefore before Spring handover the request over to a view, it copies the model data into request attributes that Thymeleaf and other view-templating options have ready access to
+- Spring autoconfiguration when sees a view libray it creates the beans that support Thymeleaf view for Spring MVC
+
+
+### Processing form submission 
 
 
