@@ -298,3 +298,38 @@ Technically we are not limited to only run guest OS after using isolation provid
 - This is achieved by using control groups
 - Cgroups works on the concept of the cgroup controllers and are represented by a file system ***cgroupfs*** in the Linux kernel
 - First we need to mount the cgroup file system at /sys/fs/cgroups
+
+### Difference between QEmu and KVM ?
+
+- Qemu (Quick Emulator)
+  - Complete standalone software of its own, used to emulate machines
+  - Flexible and portable 
+  - Works with a special 'recompiler' that transforms binary code written for a given processor into another one 
+  - Emualates
+    - Processors
+    - A long list of peripheral devices
+      - Disk
+      - Network
+      - VGA
+      - PCI 
+      - USB
+      - serial/parallel ports 
+  - Qemu team focuses on hardware emulation and portability
+    
+- KQemu 
+  - In special case when source and target are same architecture (like x86 on x86)
+  - It still has to parse the code and remove any 'priviledge instruction' and replace them with the context switches 
+  
+- KVM (kernel Virtual Machine)
+  - Linux kernel module 
+  - This switches the processor into a new **guest** state
+  - The guest state has its own set of ring states, but privileded ring0 instruction fall back to the hypervisor code
+  - Since it is a new processor mode of execution, the code does't have to modify in any way 
+  - Apart from processor state switching, the kernel module also handle a few low-level parts of emulation like the MMU registers 
+  - KVM is fork of the Qemu executable (Goal is Qemu should work every where, but if there is KVM module available then it could automatically used that)
+  - The kvm-qemu executable works like normal Qemu: allocates RAM, loads the code, and instead of recompiling it, or calling KQemu, it spawns a thread (this is important). 
+  - The thread calls the KVM kernel module to switch to guest mode and proceeds to execute the VM code.
+  - On a privileged instruction, it switches back to the KVM kernel module, which, if necessary, signals the Qemu thread to handle most of the hardware emulation.
+  
+> When working together, KVM arbitrates access to the CPU and memory, and QEMU emulates the hardware resources (hard disk, video, USB, etc.). When working alone, QEMU emulates both CPU and hardware. KVM is to accelerate it if the CPU has VT enabled. Libvirt provides a daemon and client to manipulate VMs for convenience.
+- Ref: [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
