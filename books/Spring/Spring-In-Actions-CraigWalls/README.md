@@ -21,6 +21,7 @@
     - [Topics to cover](#topics-to-cover)
     - [Displaying information](#displaying-information)
       - [Domain](#domain)
+    - [Annotations Used](#annotations-used)
     - [Designing the View](#designing-the-view)
     - [Processing form submission](#processing-form-submission)
 
@@ -363,20 +364,67 @@ public class DesignTacoController {
     }
 }
 ```
-
-- `@Controller` marks this class as candidate for component scanning, so that Spring will discover it as bean
-- `@ModelAttribute` 
-  - Model is an object that convey the message between controller and view 
-- `@RequestMapping` when applied at the class level, tells what kind of request this controller will handle
-- `@SessionAttributes("tacoOrder")` Maintain the tacoOrder object in the session
-  - This allow to keep data consistent across pages
-    - Say page 1.  Selected type of taco
-    - page 2. Add protien 
-    - page 3. Cheese toppings
-    - page 4. Review order 
-  - If this annotation is not used then model is local to the page (current)
-- `@GetMapping` the class level `@RequestMapping` is refined with the `@GetMapping` annotation that adorns the `showDesignForm` method 
 </details>
+
+### Annotations Used
+
+- `@Controller` 
+  - Marks this class as candidate for component scanning, so that Spring will discover it as bean
+  - This class is now a MVC controller, which intercept HTTP request
+- `@ModelAttribute` 
+  - What is Model ? 
+    - An object that convey the message between controller and view 
+  - What does annotation do and where to use ? 
+    - Provides the access to the `model`. Thus, you can add attributes to the `model` which then are accessible to the views or other methods in the controller
+        ```java
+        // Example 1. Method level 
+
+        // Any object added to the Model will be accessible in all the view 
+        // templates that are handled by the controller.
+        @ModelAttribute
+        public void addAttributes(Model model) {
+            model.addAttribute("attributeName", attributeValue);
+        }
+
+        // Example 2. Parameter level 
+        // binds form data from the request to the method parameters
+        @PostMapping
+        public String submitForm(@ModelAttribute User user) {
+
+        }
+        ```
+- `@RequestMapping` 
+  - When applied at the class level, tells what kind of HTTP request this controller will handle
+- `@SessionAttributes("tacoOrder")` 
+  - Extends the lifecycle of an object till the end of **session** (instead end of request)
+  - Annotation tells Spring MVC that `TacoOrder` object should be stored in the session 
+  - This ensure that object is persisted across requests, instead of being recreated with every request
+  - E.g. When a user starts designing tacos, the `TacoOrder` is created and stored in the session. 
+  - This allows the `TacoOrder` object to be available for all subsequent requests (within the same session), such as when the user adds multiple tacos to their order.
+  - If this annotation is not used then any object added to the `model` will be local to the current request 
+    - Lifecycle of objec is limit by the current request. Once view is sent and rendered, the model attribute is discarded
+- `@GetMapping` the class level `@RequestMapping` is refined with the `@GetMapping` annotation that adorns the `showDesignForm` method 
+- `@Valid` 
+   - Constraint defined on the `Taco` object
+        ```java
+        @Data
+        public class Taco {
+            @NotNull
+            @Size(min=5, message="Name must be atleast 5 character long")
+            private String name;
+            
+            @NotNull
+            @Size(min=1, message="Must choose on ingredient")
+            private List<Ingredient> ingredient;
+        }
+        ```
+    - When you use `@Valid`, then `Taco` object is checked against all those constraints
+        ```java
+        public String processTaco(@Valid Taco taco, Errors errors, 
+                @ModelAttribute TacoOrder tacoOrder) {
+        ```
+    - Error handling - If the object fails validation, an `Errors` or `BindingResult` (if included) object will contain the validation errors 
+
 
 ### Designing the View 
 - Controller after processing pass the control to the view
@@ -389,8 +437,12 @@ public class DesignTacoController {
 - Most of the view libraries are designed to be decoupled from any type of web framework
   - This mean view libraries are unware of the webframework
   - This adds up the requirement of converter which can make webframwork talk with view library in the language which they understands.
-    - E.g. Thymeleaf can work with servlet request attributes 
-    - Therefore before Spring handover the request over to a view, it copies the model data into request attributes that Thymeleaf and other view-templating options have ready access to
+  - Controller adds the data into the model and Spring MVC transfer that data into request attribute 
+    - Eg. if Spring MVC puts a user object into the model, it will be copied to a request attribute. In a Thymeleaf template, you might access it like this:
+        ```html
+        <p th:text="${user.name}"> User's name will go here </p>
+        ```
+    - Therefore, before Spring handover the request over to a view, it copies the model data into request attributes that Thymeleaf and other view-templating options have ready access to
 - Spring autoconfiguration when sees a view libray it creates the beans that support Thymeleaf view for Spring MVC
 
 
