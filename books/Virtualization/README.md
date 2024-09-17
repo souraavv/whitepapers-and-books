@@ -1,11 +1,16 @@
 - [Virtualization](#virtualization)
-  - [Hypervisors](#hypervisors)
+  - [VM Based Virtualization](#vm-based-virtualization)
+  - [Container Based Virtualization](#container-based-virtualization)
+- [Hypervisors](#hypervisors)
+  - [Virtual Machine Monitor (VMM)](#virtual-machine-monitor-vmm)
   - [Memory Virtualization](#memory-virtualization)
   - [CPU Virtualization](#cpu-virtualization)
   - [IO Virtualization](#io-virtualization)
+    - [Full virtualization](#full-virtualization)
+    - [Para virtualization](#para-virtualization)
   - [More Details on Hypervisors](#more-details-on-hypervisors)
   - [The Intel Vt-x Instruction Set](#the-intel-vt-x-instruction-set)
-  - [The Quick Emulator](#the-quick-emulator)
+  - [The Quick Emulator (QEmu)](#the-quick-emulator-qemu)
   - [Creating a VM using KVM module](#creating-a-vm-using-kvm-module)
   - [Vhost-Based Data communication](#vhost-based-data-communication)
   - [Alternative Virtualization Mechanism](#alternative-virtualization-mechanism)
@@ -13,48 +18,42 @@
   - [Project Dune - Get rid of OS interface and run process in Ring 0](#project-dune---get-rid-of-os-interface-and-run-process-in-ring-0)
   - [NOVM - Optimizing booting aspect](#novm---optimizing-booting-aspect)
   - [HotPlug Module](#hotplug-module)
-  - [Namespaces](#namespaces)
+- [Namespaces](#namespaces)
   - [Namespace Types](#namespace-types)
   - [CGroups](#cgroups)
+- [General](#general)
   - [What is KVM(Kernel Virtual Machine), QEmu(Quick Emulator), libvirt, virtio, virtqueues ?](#what-is-kvmkernel-virtual-machine-qemuquick-emulator-libvirt-virtio-virtqueues-)
+- [References](#references)
 
 
 ## Virtualization
+- An abstraction on top of the actual resource we want to virtualize
+- There are two class of virtualization
 
-<aside>
-📌 An abstraction on top of the actual resource we want to virtualize
-</aside>
+### VM Based Virtualization
+- Virtualize the complete OS
+- The abstraction it present is in the form of virtual devices like virtual disk, virtual CPUs, and virtual NICs
+- This virtualize the complete ISA
+### Container Based Virtualization
+- This form don’t abstract the hardware, but uses techniques within Linux kernel to isolate access paths from different resources
+- Logical boundary within in the same OS
+- A separate root file system, a separate process tree, a separate network subsystem, and so on
 
-There are two class of virtualization
 
-- **VM Based Virtualization**
-    - Virtualize the complete OS
-    - The abstraction it present is in the form of virtual devices like virtual disk, virtual CPUs, and virtual NICs
-    - This virtualize the complete ISA
-- **Container Based Virtualization**
-    - This form don’t abstract the hardware, but uses techniques within Linux kernel to isolate access paths from different resources
-    - Logical boundary within in the same OS
-    - A separate root file system, a separate process tree, a separate network subsystem, and so on
+## Hypervisors
 
-### Hypervisors
+- Software which virtualize OS, called as the hypervisor
 
-<aside>
-💡 Software which virtualize OS, called as the hypervisor
-
-</aside>
-
-Two parts
-
-- **Virtual Machine Monitor (VMM)**
-    - Used for trap-and-emulate the privileged instruction set
-    - This traps all privileged access; interrupts; network calls;
-    - The VMM has to satisfy three properties by Popek and Goldberg (1973)
-        - **Isolation**
-            - Should isolate guests (VMs) from each other
-        - **Equivalency**
-            - Should behave same with or without virtualization
-        - **Performance**
-            - Reduce the overhead of using VM.
+### Virtual Machine Monitor (VMM)
+- Used for trap-and-emulate the privileged instruction set
+- This traps all privileged access; interrupts; network calls;
+- The VMM has to satisfy three properties by Popek and Goldberg (1973)
+    - **Isolation**
+        - Should isolate guests (VMs) from each other
+    - **Equivalency**
+        - Should behave same with or without virtualization
+    - **Performance**
+        - Reduce the overhead of using VM.
 - **Device Model**
     - Used for virtualizing the I/O devices
 
@@ -81,11 +80,7 @@ Two parts
         - So all translation now happen through the hardware, there is no need to maintain shadow page table
         - Guest page table are maintained by guest OS, and other page table are maintained by VMM (hypervisor)
         
-        <aside>
-        📌 Main issue is the flush of cache or TLB (translation look-aside buffer) [part of MMU], cache need to be flushed on a context switch, this is bringing up another VM. But in EPT, the hardware introduces a VM identifier via the address space identifier, which means the TLB cache can have mapping for different VMs at the same time, which is performance booster
-        
-        </aside>
-        
+        > Main issue is the flush of cache or TLB (translation look-aside buffer) [part of MMU], cache need to be flushed on a context switch, this is bringing up another VM. But in EPT, the hardware introduces a VM identifier via the address space identifier, which means the TLB cache can have mapping for different VMs at the same time, which is performance booster
 
 ### CPU Virtualization
 
@@ -112,12 +107,7 @@ Two parts
         - The guest and host drivers now communicate over ring buffers
         - Ring buffer is allocated from the guest memory
         - Now guest can accumulate data into the ring buffer and make one *hypercall* (also called as kick) to signal that the data is ready to drained. This avoid excessive traps from the guest to the host and is a performance win
-    
-    <aside>
-    📌 In 2005, x86 finally became virtualizable. Intel introduces one more ring, called Ring-1, which is also called VMX root mode (Virtual Machine Extension). The VMM runs in VMX mode and the guest run in non-root mode
-    
-    </aside>
-    
+    > In 2005, x86 finally became virtualizable. Intel introduces one more ring, called Ring-1, which is also called VMX root mode (Virtual Machine Extension). The VMM runs in VMX mode and the guest run in non-root mode
     - This means now guest can run in Ring 0 of VMX mode and, for the majority of the instruction there is no trap.
     - Privilege and sensitive instruction that guests need are executed by the VMM in root mode via the trap
     - These switches are called VM Exists (i.e., the VMM takes over instruction execution from the guest) and VM Entries
@@ -135,19 +125,18 @@ Two parts
 
 There are two mode of IO virtualization
 
-- Full virtualization
-    - Guest OS is unaware of virtualization
-    - Each I/O get trap to hypervisor and hypervisor perform I/O on the physical device
-- Para virtualization
-    - In this case guest OS is made aware of that it is virtualized
-    - Special drivers are loaded in guest OS for I/O. The **system calls** for I/O are replaced by **hyper calls** 
-      - This replacement is important so that optimization on I/O can be performed
-    - Guest side drivers are called as the *front-end drivers* and host side drivers are called as the *back-end drivers*
-    - Front-end is designed based on virtio standards. Virtio is the virtualization standard for implementing para-virtualization 
-      - Virtio-net, vertio-block are some of the devices which QEmu supports
+#### Full virtualization
+- Guest OS is unaware of virtualization
+- Each I/O get trap to hypervisor and hypervisor perform I/O on the physical device
+#### Para virtualization
+- In this case guest OS is made aware of that it is virtualized
+- Special drivers are loaded in guest OS for I/O. The **system calls** for I/O are replaced by **hyper calls** 
+  - This replacement is important so that optimization on I/O can be performed
+- Guest side drivers are called as the *front-end drivers* and host side drivers are called as the *back-end drivers*
+- Front-end is designed based on virtio standards. Virtio is the virtualization standard for implementing para-virtualization 
+  - Virtio-net, vertio-block are some of the devices which QEmu supports
 
 > Virtio is the virtualization standard for implementing para-virtualization
-
 
 - The back-end drivers can work in two ways
     - They can use QEMU emulation, QEMU emulates the system calls. This means that the hypervisor lets the user-space QEMU program make the actual device calls
@@ -155,13 +144,10 @@ There are two mode of IO virtualization
 - The communication between front-end and back-end is done by virtqueue abstraction. The virtqueue presents an API to interact with, which allows it to enqueue and dequeue buffer. Depending on driver type, the driver can use zero or more queues. In case of network virtqueue on queue is for request and other to receive the packets
 - Guest Initiate network packet write via guest kernel → virtio device in the guest take those buffer and put in virtqueue → back end of the virtqueue is the worker thread, receive the buffer (or guest can use `eventfd` for telling back-end) → Buffer are then written to the tap device file descriptor. The tap device is connected via software bridge (Linux Bridge) → other side of bridge is physical interface
 
-<aside>
-📌 So hardware industry is catching up with the virtualization, CPU with more rings and instruction with vt-x or be it memory - Extended Page Table
-
-</aside>
+> So hardware industry is catching up with the virtualization, CPU with more rings and instruction with vt-x or be it memory - Extended Page Table
 
 - IO are virtualized using IO-MMU
-- SRIOV - Single root I/O virtualization - allows SRIOV compatible devices to be broken into multiple virtual functions
+- SRIOV - Single root I/O virtualization - allows SRIOV compatible devices to be broken into multiple virtual functions (physical function and virtual function)
 
 ### More Details on Hypervisors
 
@@ -182,7 +168,7 @@ Intel’s virtualization technology
 - Also the sensitive instruction which earlier were not trapped, now can be configured to get trap to the VMM which is running Ring-1
 - The guest OS itself can’t handle I/O calls, so it delegates them to the VMM(Ring -1)
 
-### The Quick Emulator
+### The Quick Emulator (QEmu)
 
 - QEMU runs in Ring 3(user process). It uses vt-x to provide guest with an isolated environment
 - QEMU owns the Guest RAM
@@ -191,8 +177,6 @@ Intel’s virtualization technology
 - **Virtio-blk** for block devices and **virtio-net** for network devices
 - QEMU dedicates separate thread for the I/O. This thread runs an event loop, which means they are non-blocking
 - For I/O it registered file descriptor
-
-![Untitled](images/Untitled.png)
 
 ### Creating a VM using KVM module
 
@@ -203,9 +187,6 @@ Intel’s virtualization technology
 - When vhost is used for data communication then QEMU is out of data plane
 - Direct communication between guest and host
 - The QEMU stays in the control plane, where it setup the vhost devices on the kernel using ioctl commands
-
-![Untitled](images/Untitled%201.png)
-
 - When the device /net/vhost-net is initialized, a kernel thread is allocated
 - The thread handle IO from a specific guest
 - The thread listens to the event on the host side, on the virtqueue
@@ -222,20 +203,16 @@ Intel’s virtualization technology
 - An interrupt is generated to the guest when rx buffer is full via `irqfd` . From the host the thread which are associated with the tap devices redirect this data to the right buffers.
 
 ### Alternative Virtualization Mechanism
-
-Namespace and c-group based mechanism that Docker uses
-
+- Namespace and c-group based mechanism that Docker uses
 - This reduces the interface exposed by different software layer like VMM and reduces attack vectors - through memory exploitation and getting higher privileges
 - Use hardware isolation to isolate different component
-
-But this class is weaker as compared to VMM (or VM based approach)
+- But this class is weaker as compared to VMM (or VM based approach)
 
 We want to bring these two worlds closer
 
 ### Uni-kernels - Minimal OS Interface
 
-Art of making a minimalistic OS (or library OS)
-
+- Art of making a minimalistic OS (or library OS)
 - This means that if an application only require network API, why to bundle keyboard, mouse devices ?
 
 ### Project Dune - Get rid of OS interface and run process in Ring 0
@@ -248,8 +225,6 @@ Technically we are not limited to only run guest OS after using isolation provid
     - Running the untrusted code in Ring 3
 - To bootstrap the process, Dune creates an operating environment, which entails setting up the page table (CR3). Setup IDT
 
-![Untitled](images/Untitled%202.png)
-
 ### NOVM - Optimizing booting aspect
 
 - Type of hardware container (an alternative form of virtualization)
@@ -257,8 +232,7 @@ Technically we are not limited to only run guest OS after using isolation provid
 - Instead of presenting a disk interface to the VM, no vm present a file system (9p) interface to VM
 - No BIOS, VMM simply put into 32 bit protected mode directly, thus save time
 
-<aside>
-💡 Web Assembly (Wasm) is leading innovation in this space. Wasm module, within the same process (the WASM runtime). Each module is isolated from other module, so we get sandboxing per tenant. This will prevent cold start and leading forward towards serverless computer paradigm
+> Web Assembly (Wasm) is leading innovation in this space. Wasm module, within the same process (the WASM runtime). Each module is isolated from other module, so we get sandboxing per tenant. This will prevent cold start and leading forward towards serverless computer paradigm
 
 </aside>
 
@@ -266,7 +240,7 @@ Technically we are not limited to only run guest OS after using isolation provid
 
 - Dynamically resize block devices and RAM allocated to the Guest without restarting the guest
 
-### Namespaces
+## Namespaces
 
 - Linux container or also called as Linux Namespaces
 - Allow kernel to isolate - mount points, network subsystem among processes scoped for different namespaces
@@ -275,20 +249,16 @@ Technically we are not limited to only run guest OS after using isolation provid
 - VM based emulates the hardware and provides an OS as the abstraction. Bulk of OS code and the device drivers are loaded as part of provisioning
 - But container virtualize the OS itself
 
-<aside>
-💡 Linux container are made of Linux kernel primitives
-
-- Linux namespaces
-- Cgroups
-- Layered File System
-</aside>
+- Linux container are made of Linux kernel primitives
+  - Linux namespaces
+  - Cgroups
+  - Layered File System
 
 - A namespace is a *data structure* which provides *logical isolation* within in the Linux Kernel
 - A namespace controls the visibility
 - Sandboxing is achieved using namespaces
 
 ### Namespace Types
-
 - **UTS** - Allow a process to see different hostname than global
 - **PID** - Separate process tree, but as a subtree of host processes
 - **Mount**
@@ -321,6 +291,10 @@ Technically we are not limited to only run guest OS after using isolation provid
 - This is achieved by using control groups
 - Cgroups works on the concept of the cgroup controllers and are represented by a file system ***cgroupfs*** in the Linux kernel
 - First we need to mount the cgroup file system at /sys/fs/cgroups
+
+
+
+## General 
 
 ### What is KVM(Kernel Virtual Machine), QEmu(Quick Emulator), libvirt, virtio, virtqueues ? 
 
@@ -371,5 +345,8 @@ Technically we are not limited to only run guest OS after using isolation provid
   - On a privileged instruction, it switches back to the KVM kernel module, which, if necessary, signals the Qemu thread to handle most of the hardware emulation.
   
 > When working together, KVM arbitrates access to the CPU and memory, and QEMU emulates the hardware resources (hard disk, video, USB, etc.). When working alone, QEMU emulates both CPU and hardware. KVM is to accelerate it if the CPU has VT enabled. Libvirt provides a daemon and client to manipulate VMs for convenience.
+
+
+## References
 
 - Ref: [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
