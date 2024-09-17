@@ -16,7 +16,7 @@
   - [Namespaces](#namespaces)
   - [Namespace Types](#namespace-types)
   - [CGroups](#cgroups)
-  - [Difference between QEmu and KVM ?](#difference-between-qemu-and-kvm-)
+  - [What is KVM(Kernel Virtual Machine), QEmu(Quick Emulator), libvirt, virtio, virtqueues ?](#what-is-kvmkernel-virtual-machine-qemuquick-emulator-libvirt-virtio-virtqueues-)
 
 
 ## Virtualization
@@ -131,6 +131,8 @@ Two parts
 
 ### IO Virtualization
 
+[Notes IITB - Prof. Mythilli](https://www.cse.iitb.ac.in/~mythili/teaching/cs695_spring2021/slides_pdf/07-iovirt.pdf)
+
 There are two mode of IO virtualization
 
 - Full virtualization
@@ -138,15 +140,15 @@ There are two mode of IO virtualization
     - Each I/O get trap to hypervisor and hypervisor perform I/O on the physical device
 - Para virtualization
     - In this case guest OS is made aware of that it is virtualized
-    - Special drivers are loaded in guest OS for I/O. The **system calls** for I/O are replaced by **hyper calls**
-    - Guest side drivers are called as the front-end drivers and host side drivers are called as the back-end drivers
-    
-    <aside>
-    📌 Virtio is the virtualization standard for implementing para-virtualization
-    
-    </aside>
-    
-    - Front-end is designed based on virtio standards
+    - Special drivers are loaded in guest OS for I/O. The **system calls** for I/O are replaced by **hyper calls** 
+      - This replacement is important so that optimization on I/O can be performed
+    - Guest side drivers are called as the *front-end drivers* and host side drivers are called as the *back-end drivers*
+    - Front-end is designed based on virtio standards. Virtio is the virtualization standard for implementing para-virtualization 
+      - Virtio-net, vertio-block are some of the devices which QEmu supports
+
+> Virtio is the virtualization standard for implementing para-virtualization
+
+
 - The back-end drivers can work in two ways
     - They can use QEMU emulation, QEMU emulates the system calls. This means that the hypervisor lets the user-space QEMU program make the actual device calls
     - They can use mechanism like vhost, where QEMU emulation is avoided and the hypervisor kernel make the actual device call
@@ -320,22 +322,38 @@ Technically we are not limited to only run guest OS after using isolation provid
 - Cgroups works on the concept of the cgroup controllers and are represented by a file system ***cgroupfs*** in the Linux kernel
 - First we need to mount the cgroup file system at /sys/fs/cgroups
 
-### Difference between QEmu and KVM ?
+### What is KVM(Kernel Virtual Machine), QEmu(Quick Emulator), libvirt, virtio, virtqueues ? 
 
-- Qemu (Quick Emulator)
-  - Complete standalone software of its own, used to emulate machines
-  - Flexible and portable 
-  - Works with a special 'recompiler' that transforms binary code written for a given processor into another one 
-  - Emualates
-    - Processors
-    - A long list of peripheral devices
-      - Disk
-      - Network
-      - VGA
-      - PCI 
-      - USB
-      - serial/parallel ports 
-  - Qemu team focuses on hardware emulation and portability
+- Both KVM and QEmu are hypervisors (or VMM)
+  - KVM is Type-1 hypervisor (kernel space)
+  - QEmu is Type-2 hypervisor (user space)
+- Qemu is designed to work as standalone 
+  - Qemu provides supports to fully emulate peripheral devices, memory and cpu.
+  - Qemu works on the principle of binary-translation (if no h/w support)
+- KVM on the other hand provide hardware-assisted virtualization (helping hand to the virtualization software like QEmu)
+  - Build-in CPU virtualization(VT-x, AMDv) to reduce overhead like cache, I/O, memory 
+- How do KVM and QEmu talks ? 
+  - KVM exposes a dummy device to the QEmu (/dev/kvm)
+- Qemu with KVM can be leveraged to run virtual machines near native speed by leveraging hardware extension like VT-x by Intel, AMDv by AMD
+  - With KVM, Qemu can just create a VM with vCPUs that the processor is aware of, that runs native-speed instructions
+  - When a special instruction is reached by KVM, like device interaction/memory touch, vCPU pauses and inform QEMU of the cause of the pause, allowing hypervisor to react on that event 
+
+- Libvirt is an interface which translate XML-formatted configuration to qemu CLI calls 
+  - Command line tool - virsh
+
+- The Virtio Specification: devices and drivers
+  - Consider it as an interface(or protocol), which every OS/environment should agree; 
+  - Devices and Drivers
+    - Hypervisor expose the virtio devices to the guest (through transport method)
+      - Most common transport method is PCI or PCIe bus 
+      - Or in some case devices can be available at some predefined guest's memory addresses (MMIO). 
+      - These devices can be fully virtual (which mean no physical device at all)
+    - By design these devices looks like a physical device to the guest
+  - Control plane (front end)
+    - Negotiation b/w host and guest for establishing and terminating the data plane (setup for backend)
+  - Data plane (back end) 
+    - Used to send actual data (packets) b/w host and guest
+  
     
 - KQemu 
   - In special case when source and target are same architecture (like x86 on x86)
@@ -353,4 +371,5 @@ Technically we are not limited to only run guest OS after using isolation provid
   - On a privileged instruction, it switches back to the KVM kernel module, which, if necessary, signals the Qemu thread to handle most of the hardware emulation.
   
 > When working together, KVM arbitrates access to the CPU and memory, and QEMU emulates the hardware resources (hard disk, video, USB, etc.). When working alone, QEMU emulates both CPU and hardware. KVM is to accelerate it if the CPU has VT enabled. Libvirt provides a daemon and client to manipulate VMs for convenience.
+
 - Ref: [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
