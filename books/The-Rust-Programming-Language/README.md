@@ -1,3 +1,28 @@
+- [Programming in Rust](#programming-in-rust)
+  - [Chapter 1-2 Introduction to Rust 🦀](#chapter-1-2-introduction-to-rust-)
+    - [Rustup, Rustc and Cargo - package manager](#rustup-rustc-and-cargo---package-manager)
+  - [Chapter 3 - Common Programming Concepts](#chapter-3---common-programming-concepts)
+    - [Chapter 3.1: Variables and Mutability](#chapter-31-variables-and-mutability)
+    - [Chapter 3.2: Data Types in Rust](#chapter-32-data-types-in-rust)
+    - [Chapter 3.3 - Functions in Rust](#chapter-33---functions-in-rust)
+    - [Chapter 3.5 Control Flow](#chapter-35-control-flow)
+  - [Chapter 4 Understanding ownerships](#chapter-4-understanding-ownerships)
+    - [Chapter 4.1 What is ownerships ?](#chapter-41-what-is-ownerships-)
+    - [Chapter 4.2 References and Borrowing](#chapter-42-references-and-borrowing)
+    - [Chapter 4.3 The Slice Type](#chapter-43-the-slice-type)
+  - [Chapter 5. Using Struct to Structure Related Data](#chapter-5-using-struct-to-structure-related-data)
+    - [Chapter 5.1 Defining and Instantiating structs](#chapter-51-defining-and-instantiating-structs)
+    - [Chapter 5.2 An example program using structs](#chapter-52-an-example-program-using-structs)
+    - [Chapter 5.3 Method syntax](#chapter-53-method-syntax)
+  - [Chapter 6 - Enums and Pattern Matching](#chapter-6---enums-and-pattern-matching)
+    - [Chapter 6.1 Defining an Enum](#chapter-61-defining-an-enum)
+    - [Chapter 6.2 - The match control flow construct](#chapter-62---the-match-control-flow-construct)
+    - [Chapter 6.3 - Concise Control flow with `if let`](#chapter-63---concise-control-flow-with-if-let)
+  - [Chapter 7 - Managing Growing Projects with Packages, Crates, and Modules](#chapter-7---managing-growing-projects-with-packages-crates-and-modules)
+  - [Chapter 8 Common Collections](#chapter-8-common-collections)
+  - [Chapter 9 Error Handling](#chapter-9-error-handling)
+  - [Chapter 10 Generic Types, Traits, and Lifetime](#chapter-10-generic-types-traits-and-lifetime)
+
 # Programming in Rust
 
 Short notes on Rust - System Programming Language 
