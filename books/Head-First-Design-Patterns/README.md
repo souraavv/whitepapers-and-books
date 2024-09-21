@@ -1,3 +1,21 @@
+- [Head First Design Patterns](#head-first-design-patterns)
+  - [Decorator Pattern : Structural Design Pattern](#decorator-pattern--structural-design-pattern)
+    - [Inheritance vs Composition](#inheritance-vs-composition)
+    - [Diagram](#diagram)
+  - [Factory Design Pattern](#factory-design-pattern)
+  - [Singleton Design Pattern](#singleton-design-pattern)
+  - [Command Pattern](#command-pattern)
+  - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
+    - [Adaptor Pattern](#adaptor-pattern)
+    - [Object Adaptor and Class Adaptor](#object-adaptor-and-class-adaptor)
+    - [Real-world Adaptors](#real-world-adaptors)
+      - [New world Iterators](#new-world-iterators)
+      - [Old world Enumerator](#old-world-enumerator)
+    - [Comparision b/w similar looking pattern](#comparision-bw-similar-looking-pattern)
+    - [Facade Pattern](#facade-pattern)
+      - [The Principle of Least Knowledge](#the-principle-of-least-knowledge)
+
+
 # Head First Design Patterns
 ## Decorator Pattern : Structural Design Pattern
 - attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
@@ -153,3 +171,241 @@
   - threads run the following script: they remove a command from the queue, call its execute() method, wait for the call to finish, then discard the command object and retrieve a new one.
 
 
+
+## Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern
+
+### Adaptor Pattern
+
+- Let say if you project is using an interface A from some vendor X; Now you are planning to shift to a vendor Y. But vendor Y has designed their interfaces different from vendor X
+- Now you are not willing to change your code (and you can't change the vendors code)
+- Here Adaptor comes into picture as a middleman
+  - (Your code) -- request -- (Adaptor) - translated request -- (Vendor class)
+  <details>
+   <summary> Example in Java </summary>
+
+    ```java
+
+
+    public interface Duck {
+        public void quack();
+        public void fly();
+    }
+
+    public class MallardDuck implements Duck {
+        public void quack() {
+            log.info("Quack");
+        }
+        public void fly() {
+            log.info("fly");
+        }
+    }
+
+
+    public interface Turkey {
+        public void gobble();
+        public void fly();
+    }
+
+    public class WildTurkey implements Turkey {
+        public void gobble() {
+            log.info("gobble");
+        }
+        public void fly() {
+            log.info("fly");
+        }
+    }
+    ```
+
+    - Implements the interface you're adapting to 
+    
+    ```java
+    public class TurkeyAdaptor implements Duck {
+        Turkey turkey;
+
+        public TurkeyAdaptor(Turkey turkey) {
+            this.turkey = turkey;
+        }
+
+        public void quack() {
+            turkey.gobble();
+        }
+
+        public void fly() {
+            for (int i = 0; i < 5; ++i) {
+                turkey.fly();   
+            }
+        }
+    }
+    ```
+
+    - Test 
+    ```java
+    public class DuckTestDrive {
+        public static void main(String[] args) {
+            MallardDuck duck = new MallardDuck();
+            WildTurkey turkey = new WildTurkey();
+
+            Duck turkeyInDressOfDuck = new TurkeyAdaptor(turkey);
+            
+            turkey.gobble();
+            turkey.fly();
+
+            testDuck(duck);
+            testDuck(turkeyInDressOfDuck);
+        }
+
+        static void testDuck(Duck duck) {
+            duck.quack();
+            duck.fly();
+        }
+    }
+    ```
+
+  </details>
+
+
+    > Definition: The Adapter Pattern converts the interface of a class into another interface the clients expect. Adapter lets classes work together that couldn’t otherwise because of incompatible interfaces.
+
+- Adaptor is composed with the Adaptee 
+- All request are delegated to the Adaptee
+- Adaptor is full of good OO design principle; Uses object composition to wrap the adaptee with an altered interface. This allows us to use adaptor with any of the subclass of the adaptee 
+
+### Object Adaptor and Class Adaptor 
+- Class adaptor are not feasible in Java, because this needs multiple inheritance
+- Object adaptor are based on the composition 
+- The diff b/w two is 
+  - In class adaptor you are commited to a one specific adaptee class; where as with object composition you can adapt any subclass of the adaptee because of composition(more flexible)
+  - Btw what will happen in case of object adaptor, if subclass add some new behavior ? 
+
+### Real-world Adaptors
+
+#### New world Iterators
+
+```java
+public interface Iterator {
+    hasNext()
+    next()
+    remove()
+}
+```
+
+#### Old world Enumerator 
+
+```java
+public interface Enumeration {
+    hasMoreElement();
+    nextElement();
+}
+```
+
+- Legacy code contains Enumeration 
+- Goal; Target Interface: `Iterator`, Adaptor interface `Enumeration` 
+    ```java
+    public EnumerationIterator implements Iterator<Object> {
+
+        Enumeration<?> enumeration;
+
+        public EnumerationIterator(Enumeration<?> enumeration) {
+            this.enumeration = enumeration;
+        }
+
+        public boolean hasNext() {
+            return enumeration.hasMoreElements();
+        }
+
+        public Object next() {
+            return enumeration.nextElement();
+        }
+
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+    ```
+
+
+### Comparision b/w similar looking pattern
+
+| Pattern | Intent |
+|----|---|
+Decorator | Convert one interface into another
+Adaptor | Doesn't alter interface, but adds resposibility 
+Facade | Makes an interface simpler
+
+### Facade Pattern
+- Purpose is to simplifies an interface and decouple a client from a subsystem of components
+  - (Complex subsystem) wrapped by an easy looking interface and simplify the interaction to the subsystem
+- Facade Pattern allows you to decouple your client implementation from any one subsystem.
+- Facade intent is to simplify, while an adaptor's is to convert the interface to something different
+  <details>
+  <summary> An HomeTheaterFacade </summary>
+
+    ```java
+    public class HomeTheaterFacade {
+        Ampifier amp;
+        Tuner tuner;
+        DvdPlayer dvd;
+        CdPlayer cd;
+        Projector projector;
+        TheaterLights lights;
+        Screen screen;
+        PopcornPopper popper;
+
+        public HomeTheaterFacade(Ampifier amp,
+                Tuner tuner,
+                DvdPlayer dvd,
+                CdPlayer cd,
+                Projector projector,
+                TheaterLights lights,
+                Screen screen,
+                PopcornPopper popper) {
+            this.amp = amp;
+            ...
+        }
+
+
+        public watchMovie(String movie) {
+            log.info("Get ready..");
+            popper.on();
+            popper.pop();
+            lights.dim(10);
+            screen.down();
+            projecter.on();
+            projector.wideScreenMode();
+            amp.on();
+            amp.setDvd(dvd);
+            ...
+            dvd.play(movie);
+        }
+
+        public void endMovie() {
+            *.off();
+        }
+    }
+    ```
+  - Time to watch movie 
+    ```java
+    public class HomeTheatherTestDrive {
+        public static void main(String[] args) {
+            HomeTheaterFacade homeTheater = new HomeTheaterFacade(amp, tuner, 
+                    dvd, cd, projector, screen, lights, popper);
+            homeTheater.watchMovie("");
+            homeTheater.endMovie();
+        }
+    }
+
+    ```
+
+  </details>
+
+
+    > The Facade Pattern provides a unified interface to a set of interfaces in a subsystem. Facade defines a higher-level interface that makes the subsystem easier to use.
+
+- Facade is fairly straightforward; there are no mind-bending abstractions to get your head around. 
+  - But that doesn’t make it any less powerful: the Facade Pattern allows us to avoid tight coupling between clients and subsystems
+
+#### The Principle of Least Knowledge 
+- Reduce the interactions b/w objects to just few close "friends"
+    > Design Principle: Principle of Least Knowledge: talk only to your immediate friends.
+- This principle prevents us from creating designs that have a large number of classes coupled together so that changes in one part of the system cascade to other parts
+- When you build a lot of dependencies between many classes, you are building a fragile system that will be costly to maintain and complex for others to understand.
