@@ -4,7 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
+    <!--~~(org.springframework.boot:spring-boot-starter-parent failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.3.3</version>
@@ -57,19 +58,23 @@
         </dependency>
 
         <!-- Spring Boot dependencies -->
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-starter-web failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-starter-thymeleaf failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-starter-data-jpa failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-starter-validation failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
             <exclusions>
@@ -102,7 +107,8 @@
         </dependency>
 
         <!-- DevTools for live reload -->
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-devtools failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
@@ -110,7 +116,8 @@
         </dependency>
 
         <!-- Test dependencies -->
-        <dependency>
+        <!--~~(org.springframework.boot:spring-boot-starter-test failed. Unable to download metadata. Tried repositories:
+https://repo.maven.apache.org/maven2: Connect timed out)~~>--><dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
