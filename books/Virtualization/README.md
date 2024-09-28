@@ -356,4 +356,6 @@ Technically we are not limited to only run guest OS after using isolation provid
 
 ## References
 
-- Ref: [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
+- [Prof. Abhilash Jindal - IIT Delhi](https://abhilash-jindal.com/teaching/2022-1-col-732/)
+- [Prof. Mythilli Vutukuru - IIT Bombay](https://www.cse.iitb.ac.in/~mythili/virtcc/)
+- [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
