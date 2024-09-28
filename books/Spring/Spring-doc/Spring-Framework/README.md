@@ -87,7 +87,6 @@
     }
 
     ```
-    - In the above example `NotifactionService` is tightly coupled with the `EmailService` 
     </details> 
   - In case of DI object defines their dependency only through **constructor arguments**, **arguments to a factory method**, or **properties that are set on the object instance after it is constructed**
 
@@ -98,6 +97,275 @@
   - `ApplicationContext` adds more enterprise-specific functionality 
   - `ApplicationContext` is a superset of `BeanFactory` 
 
-- In Spring, the objects which are backbone of your application and that are managed by Spring IoC contianers are called as beans
+- In Spring, the objects which are backbone of your application and that are managed by Spring IoC contianers are called as __beans__
 - A bean is an object that is instantiated, assembled, and managed by Spring IoC container 
 
+
+### Container Overview 
+
+- The `org.springframework.context.ApplicationContext` interface represents the Spring IoC container and is responsible for the instantiating, configuring, and assembling the beans
+  - Several implementation of this interfaces are part of Spring. In stand-alone application it is common to create `AnnotationConfigApplicationContext` or `ClassPathXmlApplicationContext` 
+  - Spring IoC containes consumes a form of configuration
+    - __Annotation-based configuration__ 
+      - `@Autowired`
+    - __Java-based configuration__ 
+      - `@Configuration`, `@Bean`, `@DependsOn`, and `@Import` 
+      - In a configuration class use bean annotated method 
+  
+#### XML as an External Configuration 
+- Why called external ? Becuase not a part of the code, unlike others i.e., `Annotation` and `Java` based configurations
+- 
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="..." class="...">  
+            <!-- collaborators and configuration for this bean go here -->
+    </bean>
+```
+
+- The `id` attribute is a string that identifies the individual bean definition.
+  - This can be refer to collaborating objects
+- The `class` attribute defines the type of the bean and uses the fully qualified class name.
+
+```java
+ApplicationContext context = new ClassPathXmlApplicationContext("services.xml", "daos.xml");
+```
+
+<details>
+<summary> Sample: services.xml & daos.xml  </summary>
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+	<!-- services -->
+
+	<bean id="petStore" class="org.springframework.samples.jpetstore.services.PetStoreServiceImpl">
+		<property name="accountDao" ref="accountDao"/>
+		<property name="itemDao" ref="itemDao"/>
+		<!-- additional collaborators and configuration for this bean go here -->
+	</bean>
+
+	<!-- more bean definitions for services go here -->
+
+</beans>
+
+```
+
+- `ref`: Refers to the bean ID in the Spring container that will be injected as a dependency.
+  - These references are also called __collaborators__ or __dependencies__.
+- `name`: Refers to the property name of the class that will receive the dependency.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+	<bean id="accountDao"
+		class="org.springframework.samples.jpetstore.dao.jpa.JpaAccountDao">
+		<!-- additional collaborators and configuration for this bean go here -->
+	</bean>
+
+	<bean id="itemDao" class="org.springframework.samples.jpetstore.dao.jpa.JpaItemDao">
+		<!-- additional collaborators and configuration for this bean go here -->
+	</bean>
+
+	<!-- more bean definitions for data access objects go here -->
+
+</beans>
+```
+
+</details>
+
+
+#### Composing XML based Configuration Metadata
+
+- Use `import` to load beans definition from another file or files 
+    <details>
+    <summary> Example of import </summary>
+
+    ```xml
+    <beans>
+        <import resource="services.xml">
+        <import resource="resources/messageSource.xml">
+        <import resource="resources/themeSource.xml">
+
+        <bean id="bean1" class="..."/>
+        <bean id="bean2" class="..."/>
+    </beans>
+
+    ```
+
+    </details>
+
+
+    #### Using the Container
+
+    ```java
+
+    ApplicationContext context = new ClassPathXmlApplicationContext("services.xml", "daos.xml");
+
+    // Use getBean to retrieve the instance of your bean 
+    PetStoreService service = context.getBean("petStore", PetStoreService.class);
+
+    List<String> userList = service.getUserNameList();
+
+    ```
+
+### Bean Overview 
+
+The bean definition 
+
+| Property | IoC term | Example | 
+|---|---| -- |
+| Class | Instantiating Beans| Which Java class Object spring will create |
+| Name  | Naming Beans | id or name field |
+| Scope | Bean Scope | singleton or prototype | 
+|Constructor Argument | Dependency Injection | Argument to the constructor | 
+|Properties | Depedency Injection |  Injection to the setters | 
+| Autorwiring mode | Autowiring Collaborators |  Automatic inject matching beans or manually |
+| Initialization method | Initialization Callbacks | After bean creation if something needs to be initialize |
+| Desctruction method | Destruction Callbacks | Clean up after baen is destoryed |
+
+
+<details>
+<summary> An odd path - Registering objects as bean (which are not part of container) </summary>
+
+- Yes, `ApplicationContext` allows you to register an object which was created outside the container. But this is least used (not recommended in general)
+- First get the Bean factory `getBeanFactory()` which returns `DefaultListableBeanFactory` and then use methods `registerSingleton(...)` or `registerBeanDefinition(..)` 
+
+    ```java
+    public class MyService {
+        public void doSomething() {
+
+        }
+    }
+    ```
+
+    ```java
+
+    import org.springframework.context.ApplicationContext; 
+    import org.springframework.context.support.ClassPathXmlApplicationContext;
+    import org.springframework.beans.factory.config.ConfigurableListBeanFactory;
+
+    public class MainApp {
+        public static void main(String[] args) {
+            ApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");
+            MyService myService = new MyService();
+            ConfigurableListBeanFactory beanFactory = ((ClassPathXmlApplicationContext) context).getBeanFactory();
+            beanFactory.registerSingleton("myServiceBean", myService);
+
+            MyService serviceFromContext = (MyService) context.getBean("myServiceBean");
+            serviceFromContext.doSomething();
+        }
+    }
+    ```
+
+</details>
+
+#### Naming Beans
+
+> [!NOTE]
+> Every bean has one or more identifiers
+> Each must be unique. If multiple then other are aliases.
+
+```xml
+<bean id="myBean" name="beanAlias1, beanAlias2" class="com.example.MyBean"/>
+```
+- Both `id` and `name` are optional, if not provided then Spring container generate a unique name for that bean
+  - But if you want to use `ref` then you have to assign a name
+  - Not supplying a `name` is relevant in case of inner beans
+    <details>
+    <summary> Inner bean (Short live or Temporary Beans)</summary>
+
+    ```xml
+        <beans>
+            <bean id="engine" class="com.example.Engine">
+                <property name="type" value="V8"/>
+            </bean>
+
+            <bean id="car" class="com.example.Car">
+                <property name="engine">
+                    <bean class="com.example.Engine">
+                        <property name="type" value="V8"/>
+                    </bean>
+                </property>
+            </bean>
+        </beans>
+    ```
+    </details>
+  - Spring scans components (`@Component`, `@Service`, `@Repository`, and `@Controller`)
+    - If not named, then name based on the rule
+      - __Simple Class Name__ i.e., if class name `MyService` then `myService`
+      - If `HTMLParser` then it keep it as same (both H and T are capital)
+
+#### Instantiating Beans
+- Bean Definition 
+  - `class`: which class's object container need to create
+  - Two ways to use `class` property either direct (constructor call) or static factory method 
+    - Direct: 
+        ```xml
+        <bean id="myBean" class="com.example.MyClass"/>
+        ```
+    - Static Factory Method: 
+      ```xml
+      <bean id="myBean" class="com.example.MyFactoryClass" factory-method="createMyClass"/>
+      ```
+      ```java
+        public class MyFactoryClass {
+            private static MyFactoryClass myFactoryClass = new MyFactoryClass();
+            private MyFactoryClass() {}
+
+            public static MyFactoryClass createMyClass() {
+                return myFactoryClass;
+            }
+        }
+      ```
+  - Nested Classes
+    ```xml
+      <bean id="myNestedBean" class="com.example.SomeThing.OtherThing"/>
+      <bean id="myNestedBean" class="com.example.SomeThing$OtherThing"/>
+    ```
+
+- No special treatement is required before making a class as Bean in Spring. You can use this with any class
+
+#### Instantiating by Using an Instance Factory Method 
+
+- Factory beans itself can be managed through __DI__
+
+>[!NOTE]
+> In Spring "Factory bean" refer to a bean that is configured in Spring contianer and that itself can creates object through an `instance` or `static` factory method.
+
+
+```java
+public class DefaultServiceLocator {
+    private static ClientService clientService = new ClientServiceImpl();
+    private static AccountService accountService = new AccoutnServiceImpl();
+
+    public ClientService createClientServiceInstance() {
+        return clientService;
+    }
+
+    public AccountService createAccountServiceInstance() {
+        return accountService;
+    }
+}
+```
+
+```xml
+
+<bean id="serviceLocator" class="example.DefaultServiceLocator">
+</bean>
+
+<bean id="clientService" factory-bean="serviceLocator" factory-method="createClientServiceInstance"/>
+<bean id="accountService" factory-bean="serviceLocator" factory-method="createAccountServiceInstacne"/>
+```
