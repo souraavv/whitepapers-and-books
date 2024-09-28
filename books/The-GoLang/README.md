@@ -8,13 +8,12 @@
   - [Maps](#maps)
   - [Struct in Go](#struct-in-go)
 - [Chapter 4 : Blocks, Shadows, and Control Structure](#chapter-4--blocks-shadows-and-control-structure)
+  - [Blocks](#blocks)
   - [Shadowing variable](#shadowing-variable)
   - [If](#if)
   - [for, four ways](#for-four-ways)
-  - [Iterating over maps](#iterating-over-maps)
-  - [Iterating over strings](#iterating-over-strings)
-  - [Labelling your for statements](#labelling-your-for-statements)
-  - [Switch in GO](#switch-in-go)
+  - [Switch](#switch)
+  - [goto](#goto)
 - [Chapter 5 : Functions](#chapter-5--functions)
   - [Functions in Go](#functions-in-go)
   - [Example of use of Go function as value](#example-of-use-of-go-function-as-value)
@@ -646,8 +645,33 @@ bob.name = "new Name of Bob"
 
 ## Chapter 4 : Blocks, Shadows, and Control Structure
 
-### Shadowing variable
+### Blocks
+- **variables declaration**
+    1. outside of functions : package block
+    2. parameters to function
+    3. local variables within functions
+- each place where declration occurs is called a **block**
+  - **package block :** variables, constants, types & functions declared outside of any functions 
+  - **file block :** `import` statement to define names for other packages that are valid for the file
+  - parameters to a function are in a block
+  - set of braces `{}` defines another block
+  - control structures in Go defines blocks of their own
+> [!Tip]
+> **Universe Block**
+> - Go is a small language with only 25 keywords
+> - Built-in types (like `int` & `string`), constants (like `true` & `false`), functions (like `make` or `close`) are not present in the list
+> - Go considers these predeclared identifiers and defines them in universe block
+> - They can be shadowed in other scopes
+> ```go
+>     fmt.Println(true)
+>     true := 10
+>     fmt.Println(true)
+> ```
+- **access**
+  - identifier defined in any outer block can be accessed from within any inner block
 
+### Shadowing variable
+- shadowing variable is a variable that has the same name as a variable in containing block
 ```go
     func main() {
         x := 10
@@ -670,25 +694,20 @@ bob.name = "new Name of Bob"
     // 10
 
 ```
+> [!NOTE] 
+> Not all variables on the lefthand side of `:=` have to be new, it will work as long as there is atleast one new variable on the lefthand side
 
-- Shadowing packages names
-```go
-func main() {
-    x := 10
-    fmt.Println(x)
-    fmt := "oops"
-    fmt.Println(fmt)
-}
-```
-
-> Weird in Go: int, string, true, false, make, close are not reserved in GO. Go consider these predeclared identifiers and define them in a universal block, which is a block containing all the blocks
-
-
-```go
-    fmt.Println(true)
-    true := 10
-    fmt.Println(true)
-```
+> [!CAUTION]
+> - Make sure that we don't unintentially shadow variables from an outer scope using `:=`
+> - Ensure that we don't shadow a package import
+> ```go
+> func main() {
+>     x := 10
+>     fmt.Println(x)
+>     fmt := "oops"
+>     fmt.Println(fmt)
+> }
+> ```
 
 ### If 
 ```go
@@ -701,33 +720,35 @@ if n == 0 {
 
 }
 ```
-- Go feature : Scoping a variable to an `if` statement
-- In below code section `n` is only limited to scope of `if/else` and after that it is undefined
-- Shadow rules are applicable for the variable `n`
-```go
-if n := rand.Intn(10); n == 0 {
-    fmt.Println()
-} else if n > 5 {
+- Any variable declared within the brace of an `if` or `else` statement exists only within that block (scoped to the condition & to the `if` `else` block)
+    - In below code section `n` is only limited to scope of `if/else` and after that it is undefined
+    - Shadow rules are applicable for the declared variable `n`
+    ```go
+    if n := rand.Intn(10); n == 0 {
+        fmt.Println(n) // 10
+    } else if n > 5 {
 
-}
-
-fmt.Println(n) // out of scope 
-
-```
+    }
+    fmt.Println(n) // out of scope 
+    ```
+> [!TIP]
+> Use this feature for defining a new variable that is scoped to the if/else statements, anything else would be confusing
 
 ### for, four ways
-
-- A C style
+- `for` is the only looping keyword in the language
+- A C-style `for`
     ```go
     for i := 0; i < 10; i++ {
         fmt.Println(i)
     }
 
+    // initialization based on the value calculated before the loop
     i := 0
     for ; i < 10; i++ {
         fmt.Println(i)
     }
 
+    // complicated increment rule inside the loop
     for i := 0; i < 10; {
         fmt.Println(i)
         if i % 2 == 0 {
@@ -738,14 +759,17 @@ fmt.Println(n) // out of scope
 
     }
     ```
-- A condition-only `for`
+- A condition-only `for` (`while` loop in Go)
+  - leave off both the initialization & the increment in a `for` statement
+  - do not include a semicolon `;` 
     ```go
     i := 1
     for i < 100 {
 
     }
     ```
-- An infinite `for`
+- An infinite `for` (`while true` or `for true` in Go)
+    - `for` loop that loops forever
     ```go
     package main
     import "fmt"
@@ -755,92 +779,116 @@ fmt.Println(n) // out of scope
         }
     }
     ```
-- `for-range`
-    ```go
+    - get out of an infinite `for` loop using the `break` keyword
+    - `continue` keyword skips over the rest of the `for` loop body & proceeds directly to the next iteration
+> [!TIP]
+> `for` loop block containing only `if-else` can be translated to series of short `if` blocks with `continue` to make code easier to read & understand
 
-    envs := []int{2, 4, 5, 8, 10}
-    for i, v := range envs {
+- `for-range` loop
+    - For iterating over the elements in some of Go's built-in types
+    - Can use used to iterate over strings, arrays, slices, maps (built-in compound types)
+    - Gets two loop variables, first is the position(arrays, slices, string) / key(maps) in the data structure being iterated & second is the value at that position
+    ```go
+    envs := []int{2, 4, 5, 8, 10} // declaring slice using slice literal
+    for i, v := range envs { // for-range loop
         fmt.Println(i, v)
     }
 
+    // using `_` to hide the returned value
     for _, v := range envs {
         ...
     }
+
+    // leave off the second variable if just wanted key and don't want the value
+    // usecase : iterating over the map being used as a set
+    uniqueNames := map[string]bool{"Fred": true, "Raul": true, "Wilma": true}
+    for k := range uniqueNames {
+        fmt.Println(k)
+    }
     ```
 
-### Iterating over maps
+- Iterating over maps
 
-```go
-m := map[string]int {
-    "a": 1,
-    "c": 3,
-    "b": 2
-}
-
-for i := 0; i < 3; i++ {
-    fmt.Println("Loop", i)
-    for k, v := range m {
-        fmt.Println(k, v)
+    ```go
+    m := map[string]int {
+        "a": 1,
+        "c": 3,
+        "b": 2
     }
-}
-/*
-    Loop 0
-    c 3
-    b 2
-    a 1
-    Loop 1
-    a 1
-    c 3
-    b 2
-    Loop 2
-    b 2
-    a 1
-    c 3
-*/
-```
-- Why different order ?
-    - Save from Ddos attack
-    - Writing code based on assumption of order is not safe and can break at wierd time
+
+    for i := 0; i < 3; i++ {
+        fmt.Println("Loop", i)
+        for k, v := range m {
+            fmt.Println(k, v)
+        }
+    }
+    /*
+        Loop 0
+        c 3
+        b 2
+        a 1
+        Loop 1
+        a 1
+        c 3
+        b 2
+        Loop 2
+        b 2
+        a 1
+        c 3
+    */
+    ```
+  - Why different order ? security feature
+      - Save from **Hash DoS** attack where hacker sends specially crafted data with keys that all hash to the same bucket, which will slow down server if maps always hash items to the exact same values
+      - Writing code based on assumption of order is not safe and can break at wierd time
     
-### Iterating over strings
+- Iterating over strings
+    - String were made out of bytes
+    - But `for-range` iterates over the `runes`, not the `bytes`, first variable holds the number of bytes from the beginning of the string while type of the second variable is rune (type `int32`)
+    ```
+    samples := []string{"hello", "apple_ɸ!"} // assume pi as actual pi symbol 
 
-```go
-
-samples := []string{"hello", "apple_pi!"} // assume pi as actual pi symbol 
-
-for _, sample := range samples {
-    for i, r := range sample {
-        fmt.Println(i, r, string(r))
-    }
-    fmt.Println()
-}
-```
-- Use a `for-range` loop to access the runes in a string in order. 
-- The `for-range` value is a copy. Modifying the value of variable will not modify the value in the compound type
-
-
-### Labelling your for statements
-```go
-func main() {
-    samples := []string{"hello", "world"}
-
-outer:
     for _, sample := range samples {
         for i, r := range sample {
             fmt.Println(i, r, string(r))
-            if r == 'l' {
-                continue outer <<---
-            }
         }
         fmt.Println()
     }
-}
+    ```
+    - The `for-range` value is a copy
+      - Modifying the value of variable will not modify the value in the compound type
+      - Since Go 1.22, the default behavior is to create a new __index__ and __value__ variable on each iteration through the for loop
 
-// output:  helworl 
-```
 
-### Switch in GO
+- Labelling your for statements
+    - used when you have nested `for` loops and want to exit or skip over an iterator of an outer loop
+    ```go
+    func main() {
+        samples := []string{"hello", "world"}
 
+    outer:
+        for _, sample := range samples {
+            for i, r := range sample {
+                fmt.Println(i, r, string(r)) // index, rune, conversion of rune to string (character)
+                if r == 'l' {
+                    continue outer
+                }
+            }
+            fmt.Println()
+        }
+    }
+
+    // output:  helworl 
+    ```
+
+### Switch
+- Don't put parentheses around the value compared
+- Declare a variable that's scoped to all branches
+- Don't put braces around the contents of the `case` clauses
+  - Multiple lines inside the case clause, are considered to be part of the same block
+  - Any variable declared within the case clause's block is only visible within that block
+- By default, cases in `switch` statements in Go don't fallthrough (`break` statement at end of every `case` statement not required)
+- An empty case clause's block means nothing happens
+- Only switch on the types that are comparable ( with `==` operator)
 ```go
 words := []string{"a", "cow", "smile"}
 for _, word := range words {
@@ -889,26 +937,51 @@ for _, word := range words {
     ```
 
 - Blank Switches
-    ```go
-    words := []string{"go", "there", "is", "a", "playground"}
-    for _, word := range words {
-        switch wordLen := len(word) {
-            case wordLen < 5:
-                fmt.Println("less than 5")
-            case wordLen > 10:
-                fmt.Println("greater than 10")
-            default:
-                fmt.Println(word)
-        }
+> [!TIP]
+> favour blank switch statements over if/else chains only when we have multiple related cases
+    
+```go
+words := []string{"go", "there", "is", "a", "playground"}
+for _, word := range words {
+    switch wordLen := len(word) {
+        case wordLen < 5:
+            fmt.Println("less than 5")
+        case wordLen > 10:
+            fmt.Println("greater than 10")
+        default:
+            fmt.Println(word)
     }
-    ```
-    ```go
-    switch {
-        case a == 2:
-            fmt.Println("a", 2)
-    }
+}
+```
+```go
+switch {
+    case a == 2:
+        fmt.Println("a", 2)
+}
 
-    ```
+```
+
+### goto
+- `goto` statement specifies a labelled line of code and execution jumps to it
+- Limitations imposed by Go language, forbits jumps that
+  1. skip over variable declarations
+  2. go into an inner or parallel block
+- Always try very hard to avoid using `goto`
+```go
+func main() {
+    a := rand.Intn(10)
+    for a < 100 {
+        if a%5 == 0 {
+            goto done
+        }
+        a = a*2 + 1
+    }
+    fmt.Println("do something when the loop completes normally")
+done:
+    fmt.Println("do complicated stuff no matter why we left the loop")
+    fmt.Println(a)
+}
+``` 
 
 ## Chapter 5 : Functions
 ### Functions in Go
