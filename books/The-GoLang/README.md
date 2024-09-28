@@ -3,6 +3,8 @@
 - [Chapter 1 - Introduction to GoLang](#chapter-1---introduction-to-golang)
 - [Chapter 2 - Basics](#chapter-2---basics)
 - [Chapter 3 : Composite Types in GoLang](#chapter-3--composite-types-in-golang)
+  - [Array](#array)
+  - [Slices](#slices)
   - [Maps](#maps)
   - [Struct in Go](#struct-in-go)
 - [Chapter 4 : Blocks, Shadows, and Control Structure](#chapter-4--blocks-shadows-and-control-structure)
@@ -100,20 +102,55 @@
 
 ## Chapter 2 - Basics
 - Pre declared Type
+    - types built into the language
     - booleans, integers, floats and strings
 
 - Zero value in Go (to avoid the mistakes of C/C++)
-    - Boolean : false
-    - String : empty string
+    - assign default zero value to any variable that is declared but not assigned a value
+    - zero values 
+        - Boolean : false
+        - String : empty string
 
-- Strings in Go are immutable; 
+- Literals
+    1. Integer literal : sequence of numbers
+    2. Floating-point literal : decimal point to indicate fractional portion, optionally have exponent specified with the letter e and a positive or negative number
+    3. Rune-literal(single quotes) : numeric & backslash escaped rune literals
+    4. Interpreted string literal(double quotes) : contains zero or more rune literals, interpret rune literals
+    5. Raw string literal(backquotes) : can contain any character except a backquote 
+
+- Strings in Go are immutable 
     - You can reassign the value of a string variable, but you cannot change the value of the string that is assigned to it.
 
-- Literal in Go are untyped 
+- Literal in Go are untyped
+  - Literal has no type on its own but does have a default type that is used when no other type can be inferred
+  - Literal can be used with any variable whose type is compatible with that literal
+  - Untyped literals are constants that do not have a specific type until they are used in a **context** that requires a specific type.
+  - **Context** : assignment to variable, type expected by the context (expression or function argument)
     ```go
-
+    // 10 is an int literal which get assigned to float64
     var x float64 = 10
+    // 4 is an int literal which get assigned to float64
     var y float64 = 200.3 * 4
+    ```
+> [!CAUTION]
+> - size limitation exists, cannot write numeric literals that are larger than any integer can hold
+> - **cannot assign**
+>   1. literal string to a variable with a numeric type
+>   2. literal number to a string variable
+>   3. literal float to an int variable (but int literal can be assigned to float variable)
+
+- Explicit Type Conversion
+  - __Automatic type promotion__ between numeric literals is not allowed in go
+  - we must use __type conversion__ when 
+    - variable types do not match
+    - different sized integers / floats needs to interact
+    ```go
+    // illegal
+    var i = 20
+	var f float32 = i
+    // legal
+    var i = 20
+	var f float32 = float32(i)
     ```
 
 - `var` Vs `:=`
@@ -121,11 +158,17 @@
     var x int = 10
     var x = 10
 
-    var x int // zero-value 
+    // zero-value 
+    var x int 
 
+    // same type
     var x, y int = 10, 20 
+    var x, y int
+
+    // different type
     var x, y = 10, "hello"
 
+    // declaration list : wrapping multiple variables
     var (
         x int
         y int = 20
@@ -135,68 +178,99 @@
     )
 
     ```
-    - Go also supports short declaration 
-        - When you are within a function, you can use `:=` operatore to replace a `var` declaration that uses type inference 
+    - Go also supports __short declaration & assignment format__
+        - When you are **within a function**, you can use `:=` operator to replace a `var` declaration that uses type inference 
 
         ```go
-        var x = 10
+        // var x = 10
         x := 10
 
-        var x, y = 10, "hello"
+        // declare multiple variables at once
+        // var x, y = 10, "hello"
         x, y := 10, "hello"
+        ```     
+> [!CAUTION]
+> illegal to use outside the function.
 
-        - Limitation of `:=` : illegal to use outside the function.
-
-- Tip
-    - Don't declare variables at the level of package (most of the time you should only declare inside the methods)
-        - Issues ?
-            - complicate data flow analysis
-            - Subtle bugs (var whose value changes)
-            - Difficult to track the changes made to it 
-        - In which scenario can use ?
-            - immutable variable
+> [!TIP]
+> - Don't declare variables outside of the function i.e __package block__ (most of the time you should only declare inside the methods)
+>   - Issues ?
+>        - Complicate data flow analysis
+>        - Subtle bugs (var whose value changes)
+>        - Difficult to track the changes made to it 
+>    - In which scenario can use ?
+>        - Immutable variable
 
 
 - Constants in Go are a way to give names to literals. There is no way in Go to declare that a variable is immutable.
-- Another Go requirement is that every declared local variable must be read. It is a compile-time error to declare a local variable and to not read its value.
-- The Go compiler won’t stop you from creating unread package-level variables. This is one more reason you should avoid creating package-level variables.
-- Unused constants Perhaps surprisingly, the Go compiler allows you to create unread constants with const. This is because constants in Go are calculated at compile time and cannot have any side effects. This makes them easy to eliminate: if a constant isn’t used, it is simply not included in the compiled binary.
 
-- Variables in go used camelCase not `snake_case`
+- Another Go requirement is that every declared local variable must be read. It is a compile-time error to declare a local variable and to not read its value.
+    - The Go compiler won’t stop you from creating unread package-level variables. This is one more reason you should avoid creating package-level variables.
+    - Unused constants perhaps surprisingly, the Go compiler allows you to create unread constants with const. This is because constants in Go are calculated at compile time and cannot have any side effects. This makes them easy to eliminate: if a constant isn’t used, it is simply not included in the compiled binary.
+
+- Variables in idiomatic go uses `camelCase` not `snake_case`
+- Go uses the case of the **first letter** in the name of package-level declaration to determine if the item is accessible outside the package
+  - Constants in go are **not** written in all uppercase letters, with words separated by underscores
+
+> [!TIP]
+> __The smaller the scope for a variable the shorter the name that's used for it__
+> Benefits
+> - Eliminate repeatitive typing, keeping your code shorter
+> - Serve as a check on how complicated your code is. If you find it hard to keep track of your short-named variables, then your code block is likely doing too much.
 
 ## Chapter 3 : Composite Types in GoLang
 
-- Array 
-    ```go
-    var x = [3]int{10, 20, 30}
-    var x = [...]int{10, 20, 30}
-    fmt.Println(x == y) // prints true
-    ```
+### Array 
+    
+```go
+var x = [3]int{10, 20, 30}
+// using array literal to initialize an array, replace number of elements with ...
+var x = [...]int{10, 20, 30}
+fmt.Println(x == y) // prints true
+```
 
-- Go only supports one-dimensional arrays, but you can simulate multidimensional arrays:
+- Go only supports one-dimensional arrays, but you can simulate multidimensional arrays : Go lack true matrix support
     ```go
-    var x[2][3] int 
+    var x [2][3]int 
     ```
+    - example declares x to be an array of length 2 whose type is an array of ints of length 3
 
-- Can't 
-    - read or write past the end of an array
-    - negative index
+- Can't read or write past the end of an array or negative index
     - If constant literal index, it is a compile-time error
-    - out-of-bounds read or write with a variable index compiles but fails at runtime with a panic
+    - If variable index, it compiles but fails at runtime with a panic
 
 - Don't use array unless you know the exact length you need ahead of time
-- Limitation with Arrays ?
+
+- Arrays - Too Rigid to Use Directly ? Go consider size of the array to be part of the type of the array
+    - Cannot use a variable to specify the size of an array because types must be resolved at the compile time, not at the runtime
     - Can't use type conversion to directly convert arrays of different sizes to identical types
     - Can't write a function that works with arrays of any size 
     - Can't assign arrays of different sizes to the same variable
-    - Go consider size of the array to be part of the type of the array. Thus [3]int is different type from an array that's declared to be [4]int 
-        - That also means you can use an variable to specify the size of an array, because types must be resolved at compile time, not at runtime.
-- Why so many restrictions/limited feature in the language ?
-    - Main reason array exists in Go is to provide the backing store for slices, which are one of the most useful features of Go.
+  
+- If there are too many limitations, then why it's present in the language ?
+    - To provide the backing store for slices, which are one of the most useful features of Go
 
-Slices
-> Nil in Go is an identifier that represents the lack of a value for some types (no type)
-- A slice is the first type that isn't **comparable**
+### Slices
+- Length of the slice is not part of its type, it can grow as needed
+- Allows us to write single function that processes slices of any type
+- Slice literal : `[]int{10, 20, 30}`
+- Zero length slice vs `nil`
+  ```go
+    // nil
+    // zero value of the slice, assigned if no value is no other value is assigned
+    var data []int
+
+    // zero length slice
+    var x = []int{} // length = 0, capacity = 0
+  ```  
+- A slice is the first type that isn't **comparable**, except comparing a slice with `nil`
+    - `slices.Equal` function : 
+        - takes two slices and returns true/false
+        - checks slices of same length & all elements equals
+        - requires elements to be __comparable__
+    - `slices.EqualFunc` function : 
+        - lets you pass function to determine equality
+        - not require elements to be __comparable__
     ```go
     var x []int
     fmt.Println(x == nil) // prints true
@@ -209,64 +283,116 @@ Slices
     fmt.Println(slices.Equal(x, z)) //print false
     fmt.Println(slices.Equal(x, s))  // does not compile
     ```
+- len
+  - Built-in function 
+  - Returns number of consecutive memory location that have been a value
+  - len of nil slice is zero
+  ```go
+  var x []int
+  fmt.Println(len(x) == 0) // returns true
+  ```
+> [!NOTE]
+> len is a special function which supports var of type array, slices, maps, strings, channel types, but returns compile-time error on passing var of any other type
 
-    - Zero length slice vs Nil
-    ```go
-        var data []int
-        var x = []int{} // length = 0, capacity = 0
-    ```
 - append
+  - Go is call-by-value language, passing slice to append function actually passes copy of the slice to the function
+  - Assign the returned slice back to the variable in the calling function
     ```go
     var x []int
+    // appending to an zero length slice
     x = append(x, 10)
 
-    x = append(x, 5, 6, 7)
-
+    // appending one slice to another
+    y := []int{20, 30, 40}
+    x = append(x, y...)
     ```
 
 - capacity
-    - \> than length of the slice
+    - Number of consecutive memory locations reserved, can be larger than length
+    - Expansion of slice backing array on appends : each value added to slice via append, increases it's length by one and when length equals the capacity, the append function in the Go runtime allocates a new backing array for the slice with a larger capacity
     - If #element in `slice == capacity`, then copy to new location 
 
+> [!TIP]
+> **Go Runtime**
+> - [Understanding the Go runtime](https://golab.io/talks/understanding-the-go-runtime)
+> - Go runtime is compiled into every Go binary
+> - Go compiler convert code into super fast binary ( by including runtime )
+> - Makes Go programs easy to distribute & avoid compatibility issues between runtime & the program
+> - Go runtime provides
+>    - Memory allocation
+>    - Garbage collection 
+>    - concurrency support
+>    - Networking
+>    - Buildin types/functions
+> - Overheads with new memory allocation
+>   1. Allocating new memory
+>   2. Copying from old memory to new
+>   3. Garbage collection of the old memory
 
-[Understanding the Go runtime](https://golab.io/talks/understanding-the-go-runtime)
-> Go runtime is compiled into every Go binary
-- Go compiler convert code into super fast binary ( by including runtime )
-
-- Go runtime provides
-    - Memory allocation
-    - Garbage collection 
-    - concurrency support
-    - Networking
-    - Buildin types/functions
-
-- Make in GO
-    - create slice with correct initial capacity 
+- Make
+    - Via make we can create empty slice that has a length & capacity specified
+    - Capacity is optional, equal to length if not supplied
+    - Useful when we know length of slice beforehand
 
     ```go
-     x := make([]int, 5) // len == capacity == 5
-     // x[0] .. x[4] = 0
+     // intialized with zero value of int type : x[0] .. x[4] = 0
+     // len == capacity == 5
+     x := make([]int, 5)
+     fmt.Println(x) // [0, 0, 0, 0, 0]
 
-     x := make([]int, 5, 10) // len = 5, capacity = 10 (init)
-
+     // len = 5, capacity = 10 (init)
+     x := make([]int, 2, 10)
+     // append always increases the length of the slice
+     x = append(x, 10) 
+     fmt.Println(x) // [0, 0, 10]
+     
+     // zero length slice cannot be used for indexing but can be used for appending values to it
      x := make([]int, 0, 10) 
      x = append(x, 5, 6, 7, 8)
      // [5, 6, 7, 8] 
     ```
 
-    - If capacity < length && if both are numerical literals or constants
-      then compile-time error
-      else runtime panic !!
+    - capacity < length 
+      - if numerical literals or constants then compile-time error
+      - if variable then panic at runtime
 
-- Emptying a Slice
-    - `clear(s)`
-
-- Declaring a slice with defaults
+- Emptying a Slice `clear`
+    - :sunglasses: sets all of the slice's elements to their zero value & length remains unchanged
     ```go
-     data := []int{2, 4, 6, 8}
+    s := []string{"first", "second", "third"}
+    clear(s)
     ```
 
-- Slicing Slices 
+- Declaring slice
+  - 🏁 Minimize the number of times the slice needs to grow (expansion has overheads)
+    ```go
+    var data []int
+
+    // 1. empty slice literal / zero length slice
+    var x = []int{}
+    // creates slice with zero length & zero capacity
+    fmt.Println(len(x), cap(x)) // 0 0
+    // comparing with nil returns false
+    fmt.Println(x == nil) // false
+    
+    // 2. with default values
+    data := []int{2, 4, 6, 8}
+
+    // 3. know length of the slice but not know the values
+    data = make([]int, 5)
+
+    // 4. zero length and non-zero capacity with make
+    // - reduces expansion overhead
+    // - append will work correctly
+    data = make([]int, 0, 5)
+    ```
+
+- Slicing Slices (subslices)
+    - Slice expression : 
+      - Starting and ending offset separated with colon ':'
+      - Ending offset is one past the last position to include
+      - Example : `s[0:5]`
+    
     ```go
     x := []string {"a", "b", "c", "d"}
     y := x[:2]
@@ -277,33 +403,38 @@ Slices
     z : [b c d]
     */
     ```
-    - No copying, shared memory 
-    - Changing element has side-effects on all slices sharing memory
-    - Slicing slices is not recommended
-
-- copy of slices
+    - No copying, shared memory : changing element has side-effects on all slices sharing memory
+> [!CAUTION]
+> **Slicing slices is not recommended**
+> - Whenever we take a slice from another slice, subslice capacity is set to the capacity of the orignal slice minus the starting offset of the subslice within the original slice
+> - Means that elements beyond the end of slice including unused capacity is shared by both slices
+> - Never use append with a subslice or make sure that append doesn't cause an overwrite in the parent slice by using a full slice expression
+    - Full slice expression / Three part slice expression : 
+      - Includes a third part which indicates the last position in the parent slice's capacity that's available for the subslice
+      - Trying to append beyond the mentioned capacity will result in allocation of new memory
+      - Example : `x[:2:2]`
+    
+- Copy of slices
+  - `copy` function copies as many values as it can from source to destination, limited by whichever slice is smaller
+  - Returns the number of elements copied
+  - Also copy a subset of a slice by subslicing using slice expression
     ```go
         x := []int{1, 2, 3, 4}
         y := make([]int, 4)
         num := copy(y, x) // destination, source ; returns #element copied
     ```
 
-- copy of array with slices
+- Converting arrays to slices
+    - From array use slice expression to convert it into slice
+    - Slice from an array has same memory-sharing properties as taking a slice from a slice
     ```go
-    x := []int{1, 2, 3, 4}
-    d := [4]int{5, 6, 7, 8}
-
-    y := make([]int, 2)
-    copy(y, d[:])
-
-    /*
-     * x : [1, 2, 3, 4]
-     * y : [1, 2]
-     */
+    xArray := [4]int{5, 6, 7, 8}
+    xSlice := xArray[:]
     ```
 
-- Converting slices into arrays
-    - This is copying, no memory sharing.
+- Converting slices to arrays
+    - Type conversion is required to make an array from a slice
+    - This is copying, no memory sharing
     - Size must be specified at the compile time, thus you can't use `[...]` in a slice to array type conversion
     ```go
     xSlice := []int{1, 2, 3, 4}
@@ -322,47 +453,90 @@ Slices
      * /
     ```
 
-    - While size of array can be small that the slice, but it can't be larger that the slice size, else you code will panic at runtime
+    - While size of array can be small that the slice, but it can't be larger that the slice size(i.e length not capacity), else you code will panic at runtime as compiler cannot detect it
 
 - Strings and Runes and Bytes
-    - Go uses sequences of bytes to represent the string
+    - Go uses __sequences of bytes__ to represent the string
     - These bytes don't have to be in particular character encoding, but several Go library functions (and for-range loop) assumes that a string is composed of UTF-8 encoded code points
+    - Code point : unique numerical assigned to unicode character
 
     ```go
     var s string = "hello there"
-    var b byte = s[5]
+    var b byte = s[6] // 116 i.e UTF-8 value of lowercase t 
 
     var s2 string = s[4: 7] 
     ```
 
     ```go
-    var s string = "Hello (imagine a sun emoji which is four bytes)"
+    var s string = "Hello 🌞"
     var s2 string = s[4:7] // This will not show the emoji, instead [4: 10] will show 
     var s3 string = s[:5]
     var s4 string = s[6:]
     // length of s is not 5(Hello) + 1(space) + 1(emoji), but instead
     // 5 + 1 + 4 = 
     ```
-    - String in Go are immutables, thus no side-effects while creating slices
-    > There is a problem : UTF-8 ( can be 1-4 bytes ) for non-English letters it can be > 1 bytes, thus we might end up reading  
-    - Only use slice on string when you are sure that each character is only taking 1 byte
+    - String in Go are immutables, thus no side-effects while creating slices (no memory sharing)
+    > There is a problem : UTF-8 ( can be 1-4 bytes ) for non-English letters it can be > 1 bytes, thus we might end up reading it partially
+    - Only use slicing & indexing syntax with strings when you are sure that each character is only take upto 1 byte
 
+    - Runes & Bytes
+        - single rune or byte can be converted to a string
+        ```go
+        var a rune    = 'x'
+        var s string  = string(a)
+        var b byte    = 'y'
+        var s2 string = string(b)
+        ```
+        - string can be considered as an array, converted back & forth to a slice of bytes or a slice of runes using type conversion
+        - rune is an alias for the `int32` type, therefore the size of a rune is 4 bytes (32 bits) & represents a single unicode code point
+        ```go
+        var s string = "Hello, 🌞"
+        var bs []byte = []byte(s)
+        var rs []rune = []rune(s)
+        fmt.Println(bs) // [72 101 108 108 111 44 32 240 159 140 158]
+        fmt.Println(rs) // [72 101 108 108 111 44 32 127774]
+        ```
+> [!NOTE]
+>  - UTF-32 : store four bytes for each code point
+>  - UTF-16 : use one or two 16-bit sequences to represent each code point
+>  - UTF-8  : occupies single byte for all letters, puncutations & numbers in english, can extend to 4 bytes for unicode code points
+
+> [!TIP]
+> Use functions from `strings` & `unicode/utf8` packages in standard library for extracting **substring** & **code points** from string
+ 
 ### Maps
 - `map[keyType]valueType`
-- `var nilMap map[string]int`
-- The zero value for map is `nil`. A `nil` map has a length 0.
-- Attempting to read a `nil` map always returns the zero value for the map's value type
+- Maps are not comparable, but we can check if they are equal to `nil` using `==` operator
+> [!NOTE]
+> - Key for a map must be a **comparable** type
+> - Therefore it cannot use a slice or a map as the key for the map
+- `nil` map
+  - `var nilMap map[string]int`
+  - The zero value for map is `nil`. A `nil` map has a length 0.
+  - Attempting to read a `nil` map always returns the zero value for the map's value type, but attempting to write to a `nil` map causes a panic
 - Creating map using literals
-    - `totalWins := map[string]int{}`
-    - The above is not same as nilMap. It has a length of 0, but you can read and write to a mpa assigned an empty map literal
+    - Empty map literal : `totalWins := map[string]int{}`
+    - The above is not same as `nil` map. It has a length of 0, but you can read and write to a map assigned an empty map literal
 - Non empty map literal looks like
+    - Comma sepates each key-value pair in the map, __even on the last line__
     ```go
     teams := map[string][]string {
-        "abc": []string{"def", "ghij", "klm"},
+        "abc": []string{
+                    "def", 
+                    "ghij", 
+                    "klm"
+                },
+        "cde": []string{
+                    "afads",
+                    "afaf"
+                },
     }
     ```
-- You can use `make` to create a map with a default size
-    `ages := make(map[int][]string, 10)
+- `make` to create a map with a default size
+    - Know number of key-value pairs but don't know the exact values
+    ```go
+    ages := make(map[int][]string, 10)
+    ```
 
 - Reading and Writing a map
     ```go
@@ -373,7 +547,7 @@ Slices
         totalWins["abc"]++
     ```
 - The comma ok Idiom
-    - How to check if a key is present in map ?
+    - How to check if a key is present in map ? as map returns zero value if you ask for the value associated with the key that's not in the map
     ```go
     m := map[string]int {
         "hello" : 5,
@@ -381,7 +555,9 @@ Slices
     }
     v, ok := m["hello"] // value and Ok (boolean) : if true, then key is present, else no
     fmt.Println(v, ok)
+    ```
 - Deleting from Maps / Emptying a map
+    - Cleared map has its length set to zero, whereas in slice it's length remains unchanged
     ```go
     m := map[string]int {
         "hello", 5,
@@ -391,6 +567,7 @@ Slices
     clear(m) // clears the map 
     ```
 - Comparing the maps
+    - `maps.Equal` & `maps.EqualFunc` functions are used for comparing the maps
     ```go
         m := map[string]int{
             "hello": 5,
@@ -414,6 +591,9 @@ Slices
     ```
 
 ### Struct in Go
+- Way to pass data from function to function
+- Group related data together by defining a struct
+- Unlike map literals, no comma separate the fields in a struct declaration
 ```go
 type person struct {
     name string
@@ -423,17 +603,16 @@ type person struct {
 
 var fred person // declare variable on struct
 
-bob := person{} // literal 
+bob := person{} // literal, zero struct
 
-// if below format, then provide all the values + order need to same
+// 1. provide all the values + order need to same
 julia := person {
     "Julia",
     40,
     "cat",
 }
 
-// More flexible
-
+// 2. More flexible
 beth := person {
     age: 30,
     name: "Beth",
@@ -443,11 +622,19 @@ fmt.Println(bob.name)
 bob.name = "new Name of Bob"
 
 ```
+- Struct type defined within a function can only be used within that function
+- A zero value struct has every field set to the field's zero value
+- Allows type conversion from one struct to another only if the fields of both structs have the same name, type and order
+
+- Comparing structs
+    - Struct entirely composed of comparable types are comparable, no magic method to redefine equality and make `==` or `!=` work for incompatible structs
+    - Go doesn't allow comparing two struct of different types
 
 - Anonymous structs
-    - Helpful in unmarshaling and marshaling data 
+    - Variables implements a struct type without giving struct type a name
+    - Helpful in unmarshaling(de-serialization) and marshaling (serialization) data 
+    - Also used for writing tests
     ```go
-
     pet := struct {
         name string
         kind string
@@ -455,7 +642,6 @@ bob.name = "new Name of Bob"
         name : "Fido",
         kind: "dog",
     }
-
     ```
 
 ## Chapter 4 : Blocks, Shadows, and Control Structure
