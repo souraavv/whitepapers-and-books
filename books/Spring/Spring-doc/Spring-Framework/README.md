@@ -1,3 +1,13 @@
+- [The IoC container](#the-ioc-container)
+  - [Introduction to the Spring IoC Containers and Beans](#introduction-to-the-spring-ioc-containers-and-beans)
+  - [Container Overview](#container-overview)
+    - [XML as an External Configuration](#xml-as-an-external-configuration)
+    - [Composing XML based Configuration Metadata](#composing-xml-based-configuration-metadata)
+  - [Bean Overview](#bean-overview)
+    - [Naming Beans](#naming-beans)
+    - [Instantiating Beans](#instantiating-beans)
+    - [Instantiating by Using an Instance Factory Method](#instantiating-by-using-an-instance-factory-method)
+  - [Dependency Injection](#dependency-injection)
 
 
 ## The IoC container
@@ -369,3 +379,77 @@ public class DefaultServiceLocator {
 <bean id="clientService" factory-bean="serviceLocator" factory-method="createClientServiceInstance"/>
 <bean id="accountService" factory-bean="serviceLocator" factory-method="createAccountServiceInstacne"/>
 ```
+
+
+### Dependency Injection 
+
+- DI is a process whereby objects defines their depedencies 
+  - Through constructor arguments
+  - Arguments to a factory method 
+  - Properties set on an object instance after it is constructed or returned from a factory method
+- The container inject these dependency while creating the bean 
+- The process is fundamentally inverse thus called IoC 
+- Code is more clean with DI 
+- Decoupling is more effective when objects are provided with their dependencies 
+  - Use of Intefaces and DI makes you easy to test using `Mock`
+    <details>
+    <summary> An example </summary>
+
+    ```java
+    public interface MessageService {
+        void send(String msg);
+    }
+    ```
+
+    ```java
+    public class EmailService implements MessageService {
+        void send(String msg) {
+            log.info("Email service msg");
+        }
+    }
+
+    public class SmsService implements MessageService {
+        void send(String msg) {
+            log.info("SMS service");
+        }
+    }
+
+    ```
+
+    ```java
+    public class NotificationService {
+        private MessageService messageService;
+
+        public NotificationService(MessageService messageService) {
+            this.messageService = messageService;
+        }
+
+        public sendNotification(String message) {
+            messageService.sendMessage(message);
+        }
+    }
+    ```
+    - Mock 
+    ```java
+    public class MockMessageService implements MessageService {
+        void send(String msg) {
+            log.info("mocked message service");
+        }
+    }
+    ```
+    ```java
+    public class NotificationServiceTest {
+        public static void main(String[] args) {
+            MessageService mockService = new MockMessagingService();
+
+            NotificationService notificationService 
+                    = new NotificationService(mockService);
+
+            notificationService.sendNotification("Test Message");
+        }
+    }
+
+    ```
+
+
+    </details>

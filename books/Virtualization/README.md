@@ -80,6 +80,7 @@
         - So all translation now happen through the hardware, there is no need to maintain shadow page table
         - Guest page table are maintained by guest OS, and other page table are maintained by VMM (hypervisor)
         
+        >[!NOTE] 
         > Main issue is the flush of cache or TLB (translation look-aside buffer) [part of MMU], cache need to be flushed on a context switch, this is bringing up another VM. But in EPT, the hardware introduces a VM identifier via the address space identifier, which means the TLB cache can have mapping for different VMs at the same time, which is performance booster
 
 ### CPU Virtualization
@@ -107,6 +108,7 @@
         - The guest and host drivers now communicate over ring buffers
         - Ring buffer is allocated from the guest memory
         - Now guest can accumulate data into the ring buffer and make one *hypercall* (also called as kick) to signal that the data is ready to drained. This avoid excessive traps from the guest to the host and is a performance win
+    > [!TIP]
     > In 2005, x86 finally became virtualizable. Intel introduces one more ring, called Ring-1, which is also called VMX root mode (Virtual Machine Extension). The VMM runs in VMX mode and the guest run in non-root mode
     - This means now guest can run in Ring 0 of VMX mode and, for the majority of the instruction there is no trap.
     - Privilege and sensitive instruction that guests need are executed by the VMM in root mode via the trap
@@ -136,6 +138,7 @@ There are two mode of IO virtualization
 - Front-end is designed based on virtio standards. Virtio is the virtualization standard for implementing para-virtualization 
   - Virtio-net, vertio-block are some of the devices which QEmu supports
 
+> [!NOTE]
 > Virtio is the virtualization standard for implementing para-virtualization
 
 - The back-end drivers can work in two ways
@@ -144,6 +147,7 @@ There are two mode of IO virtualization
 - The communication between front-end and back-end is done by virtqueue abstraction. The virtqueue presents an API to interact with, which allows it to enqueue and dequeue buffer. Depending on driver type, the driver can use zero or more queues. In case of network virtqueue on queue is for request and other to receive the packets
 - Guest Initiate network packet write via guest kernel → virtio device in the guest take those buffer and put in virtqueue → back end of the virtqueue is the worker thread, receive the buffer (or guest can use `eventfd` for telling back-end) → Buffer are then written to the tap device file descriptor. The tap device is connected via software bridge (Linux Bridge) → other side of bridge is physical interface
 
+> [!TIP]
 > So hardware industry is catching up with the virtualization, CPU with more rings and instruction with vt-x or be it memory - Extended Page Table
 
 - IO are virtualized using IO-MMU
@@ -232,6 +236,7 @@ Technically we are not limited to only run guest OS after using isolation provid
 - Instead of presenting a disk interface to the VM, no vm present a file system (9p) interface to VM
 - No BIOS, VMM simply put into 32 bit protected mode directly, thus save time
 
+> [!TIP]
 > Web Assembly (Wasm) is leading innovation in this space. Wasm module, within the same process (the WASM runtime). Each module is isolated from other module, so we get sandboxing per tenant. This will prevent cold start and leading forward towards serverless computer paradigm
 
 </aside>
@@ -344,6 +349,7 @@ Technically we are not limited to only run guest OS after using isolation provid
   - The thread calls the KVM kernel module to switch to guest mode and proceeds to execute the VM code.
   - On a privileged instruction, it switches back to the KVM kernel module, which, if necessary, signals the Qemu thread to handle most of the hardware emulation.
   
+> [!NOTE]
 > When working together, KVM arbitrates access to the CPU and memory, and QEMU emulates the hardware resources (hard disk, video, USB, etc.). When working alone, QEMU emulates both CPU and hardware. KVM is to accelerate it if the CPU has VT enabled. Libvirt provides a daemon and client to manipulate VMs for convenience.
 
 
