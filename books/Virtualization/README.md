@@ -8,6 +8,14 @@
   - [IO Virtualization](#io-virtualization)
     - [Full virtualization](#full-virtualization)
     - [Para virtualization](#para-virtualization)
+      - [Xen](#xen)
+      - [CPU virtualization in Xen](#cpu-virtualization-in-xen)
+      - [Trap handling in Xen](#trap-handling-in-xen)
+      - [Memory virtualization in Xen](#memory-virtualization-in-xen)
+      - [I/O virtualization in Xen](#io-virtualization-in-xen)
+    - [Virtio](#virtio)
+    - [VirIO Architecture](#virio-architecture)
+    - [Virtio-NET](#virtio-net)
   - [More Details on Hypervisors](#more-details-on-hypervisors)
   - [The Intel Vt-x Instruction Set](#the-intel-vt-x-instruction-set)
   - [The Quick Emulator (QEmu)](#the-quick-emulator-qemu)
@@ -139,6 +147,73 @@ There are two mode of IO virtualization
 - Front-end is designed based on virtio standards. Virtio is the virtualization standard for implementing para-virtualization 
   - Virtio-net, vertio-block are some of the devices which QEmu supports
 
+
+##### Xen
+> [!TIP]
+> Xen: most popular example of paravirtualized VMM
+
+Ref: [Prof-Mythili-IITB](https://www.cse.iitb.ac.in/~mythili/virtcc/slides_pdf/08-paravirt-xen.pdf)
+
+- Paravirtualization: modify guest OS to be amenable to virtualization
+  - XenoLinux is a modified Linux OS that runs on Xen hypervisor
+- Benefits: better performance than binary translation
+- Disadvantages: requires source code changes to OS, porting effort
+  - 1-2% code changes reported in the original Xen paper
+
+> [!TIP]
+> WhitePaper: “Xen and the Art of Virtualization”, Paul Barham, Boris Dragovic, Keir Fraser, Steven Hand, Tim Harris, Alex Ho, Rolf
+> Neugebauer, Ian Pratt, Andrew Warfield"
+
+- Type 1 hypervisor: runs directly over hardware
+- __Trap-and-emulate__ architecture
+  - Xen runs in ring 0, guest OS in ring 1
+- A guest VM is called a __domain__
+
+##### CPU virtualization in Xen
+- Guest OS code modified to not invoke any privileged instruction
+  - Any privileged operation traps to Xen in ring 0
+- __Hypercalls__: guest OS voluntarily invokes Xen to perform privileged ops
+  - Much like system calls from user process to kernel
+  - Synchronous: guest pauses while Xen services the hypercall
+- Asynchronous event mechanism
+  - Much like interrupts from hardware to kernel
+  - Used to deliver hardware interrupts and other notifications to domain
+
+##### Trap handling in Xen
+- When trap/interrupt occurs, Xen copies the trap frame onto the guest OS kernel stack, invokes guest interrupt handler
+
+
+##### Memory virtualization in Xen
+
+Ref: [Prof-Mythilli-Xen-Notes](https://www.cse.iitb.ac.in/~mythili/virtcc/slides_pdf/08-paravirt-xen.pdf)
+- Combined GVA -> HPA page tables in guest memory
+  - CR3 points to this page table
+  - Like shadow page table, but in memory, not in VMM
+- Guest is only given with Read-only mapping (GPA -> HPA)
+  - Using this guest constructs GVA -> HPA
+- Guest Page Table is in Guest Memory, but validated by Xen
+  - Guest marks its page table pages as read-only, cannot modify
+  - When guest needs to update, it makes a hypercall to Xen to update page table
+  - Xen validates updates (is guest accessing its slice of RAM?) and applies them
+  - Batched updates for better performance
+
+##### I/O virtualization in Xen
+- I/O via shared memory rings between guest and Xen/domain0
+- Front-end device driver in guest domain and backend in dom0
+- I/O requests placed in shared queue by guest domain
+- Request handled by Xen/domain0, responses placed in ring
+- Descriptors in queue: pointers to request data (DMA buffers with data for writes, empty DMA buffers for reads, etc.)
+
+> [!NOTE]
+> Similar design to virtio
+> 
+> Batching for High Performance
+>
+> Memory pages swapped between domains to exchange requests/responses
+>
+> No copying of request data
+> 
+
 > [!NOTE]
 > Virtio is the virtualization standard for implementing para-virtualization
 
@@ -147,6 +222,63 @@ There are two mode of IO virtualization
     - They can use mechanism like vhost, where QEMU emulation is avoided and the hypervisor kernel make the actual device call
 - The communication between front-end and back-end is done by virtqueue abstraction. The virtqueue presents an API to interact with, which allows it to enqueue and dequeue buffer. Depending on driver type, the driver can use zero or more queues. In case of network virtqueue on queue is for request and other to receive the packets
 - Guest Initiate network packet write via guest kernel → virtio device in the guest take those buffer and put in virtqueue → back end of the virtqueue is the worker thread, receive the buffer (or guest can use `eventfd` for telling back-end) → Buffer are then written to the tap device file descriptor. The tap device is connected via software bridge (Linux Bridge) → other side of bridge is physical interface
+
+
+#### Virtio
+
+Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-to-virtio)
+
+The VirtIO spec defines standard requirements that VirtIO devices and drivers must meet. This is important as this means that, regardless of the OS/environment using VirtIO, the core framework of its implementation must be the same.
+
+- An abstraction layer over a host’s devices for VMs
+- An interface (control plane/front-end) that allows a VMs to use its host’s devices via minimized virtual devices called VirtIO devices
+- These VirtIO devices are minimal because they’re implemented with only the bare necessities to be able to send and receive data.
+
+- We let the host handle the majority of the setup, maintenance, and processing on its actual physical hardware devices
+- VirtIO device’s role is more or less getting data to and from the host’s actual physical hardware.
+
+#### VirIO Architecture
+
+Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-to-virtio)
+
+- __VirtIO Drivers__ (Front-End)
+  - Exists in Guest Kernel 
+  - Accept I/O from the Guest Processes
+  - Transfer those to the back-end (devices)
+  - Retrieve completed request 
+- __VirtQueues__ (Transport layer)
+  - Assist devices and drivers in performing various vRing operations
+  - Shared in the Guest Physical Memory (b/w devices & drivers) 
+  - VirtRings
+    - Data structure which holds the actual data being transferred
+    - Why "rings" ? because essentially this is an circular array that wraps backs around
+- __VirtIO Devices__ (Back-End)
+  - Exists in the Hypervisor 
+  - Accept I/O from front-end
+  - Offload bulk of request in single go to the hardware 
+  - Make the processed request data avail to the drivers
+
+
+#### Virtio-NET
+
+Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-to-virtio)
+
+- VM running on a host and the VM wants to access the internet.
+- The VM doesn’t have its own NIC to access the internet, but the host does.
+- For the VM to access the host’s NIC, and therefore access the internet, a VirtIO device called virtio-net can be created.
+- In a nutshell, it’s main purpose is to send and receive network data to and from the host.
+
+<details>
+<summary> Simple Interaction (high-level) </summary>
+
+1. VM: I want to go to oda.oracle.com. Hey virtio-net, can you tell the host to retrieve this webpage for me?
+2. Virtio-net: Ok. Hey host, can you pull up this webpage for us?
+3. Host: Ok. I’m grabbing the webpage data now.
+4. Host: Here’s the requested webpage data.
+5. Virtio-net: Thanks. Hey VM, here’s that webpage you requested.
+
+</details>
+
 
 > [!TIP]
 > So hardware industry is catching up with the virtualization, CPU with more rings and instruction with vt-x or be it memory - Extended Page Table
@@ -309,7 +441,7 @@ Technically we are not limited to only run guest OS after using isolation provid
   - QEmu is Type-2 hypervisor (user space)
 - Qemu is designed to work as standalone 
   - Qemu provides supports to fully emulate peripheral devices, memory and cpu.
-  - Qemu works on the principle of binary-translation (if no h/w support)
+  - Mainly it works by a special 'recompiler' that transforms binary code written for a given processor into another one
 - KVM on the other hand provide hardware-assisted virtualization (helping hand to the virtualization software like QEmu)
   - Build-in CPU virtualization(VT-x, AMDv) to reduce overhead like cache, I/O, memory 
 - How do KVM and QEmu talks ? 
@@ -335,10 +467,6 @@ Technically we are not limited to only run guest OS after using isolation provid
     - Used to send actual data (packets) b/w host and guest
   
     
-- KQemu 
-  - In special case when source and target are same architecture (like x86 on x86)
-  - It still has to parse the code and remove any 'priviledge instruction' and replace them with the context switches 
-  
 - KVM (kernel Virtual Machine)
   - Linux kernel module 
   - This switches the processor into a new **guest** state
@@ -358,4 +486,4 @@ Technically we are not limited to only run guest OS after using isolation provid
 
 - [Prof. Abhilash Jindal - IIT Delhi](https://abhilash-jindal.com/teaching/2022-1-col-732/)
 - [Prof. Mythilli Vutukuru - IIT Bombay](https://www.cse.iitb.ac.in/~mythili/virtcc/)
-- [Stack Exchange](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)
+- [Stack Exchange - Diff b/w KVM & QEmu](https://serverfault.com/questions/208693/difference-between-kvm-and-qemu)

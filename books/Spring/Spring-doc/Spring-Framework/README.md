@@ -8,15 +8,16 @@
     - [Instantiating Beans](#instantiating-beans)
     - [Instantiating by Using an Instance Factory Method](#instantiating-by-using-an-instance-factory-method)
   - [Dependency Injection](#dependency-injection)
+    - [Constructor argument resolution](#constructor-argument-resolution)
 
 
 ## The IoC container
 ### Introduction to the Spring IoC Containers and Beans
 
-- IoC is a broader principle of design pattern where the control flow of the program is inverted 
-  - Instead programmer instantiation of dependencies, the resposibility is inverted to an external framework 
-- Dependency Injection (DI) is a specialized form of IoC
-  - DI is one of the technique to achieve IoC, where objects are injected into a class, rather than a class creating object
+- __Inversion of Control__ (IoC) is a broader design principle where the control flow of a program is reversed.
+  - Instead of the programmer instantiating dependencies, the responsibility is handed over to an external framework.
+- __Dependency Injection__ (DI) is a specific form of IoC.
+  - DI is a technique used to achieve IoC, where dependencies are injected into a class, rather than the class creating the objects itself.
     <details>
     <summary>Without DI </summary>
 
@@ -124,26 +125,28 @@
   
 #### XML as an External Configuration 
 - Why called external ? Becuase not a part of the code, unlike others i.e., `Annotation` and `Java` based configurations
-- 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans
-		https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <details>
+    <summary> XML configuration - sample </summary>
 
-    <bean id="..." class="...">  
-            <!-- collaborators and configuration for this bean go here -->
-    </bean>
-```
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <beans xmlns="http://www.springframework.org/schema/beans"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.springframework.org/schema/beans
+            https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+        <bean id="..." class="...">  
+                <!-- collaborators and configuration for this bean go here -->
+        </bean>
+    ```
+    </details>
 
 - The `id` attribute is a string that identifies the individual bean definition.
   - This can be refer to collaborating objects
-- The `class` attribute defines the type of the bean and uses the fully qualified class name.
-
-```java
-ApplicationContext context = new ClassPathXmlApplicationContext("services.xml", "daos.xml");
-```
+- The `class` attribute defines the type of the bean and uses the fully qualified class name. 
+    ```java
+    ApplicationContext context = new ClassPathXmlApplicationContext("services.xml", "daos.xml");
+    ```
 
 <details>
 <summary> Sample: services.xml & daos.xml  </summary>
@@ -450,6 +453,53 @@ public class DefaultServiceLocator {
     }
 
     ```
+    </details>
 
+#### Constructor argument resolution
+- Order in which they are defined in the bean is the same order they are passed to the constructor
+    <details>
+    <summary> </summary>
+
+
+    ```xml
+    <beans>
+        <bean id="beanOne" class="x.y.ThingOne">
+            <constructor-arg ref="beanTwo"/>
+            <constructor-arg ref="beanThree"/>
+        </bean>
+
+        <bean id="beanTwo" class="x.y.ThingTwo"/>
+        <bean id="beanThree" class="x.y.ThingThree"/>
+
+    </beans>
+    ```
+
+    ```java
+    package x.y;
+
+    public class ThingOne {
+        public ThingOne(ThingTwo thingTwo, ThingThree thingThree) { 
+        }
+    }
+    ```
 
     </details>
+
+- Constructor arg type matching
+    ```xml
+        <bean id="exampleBean" class="examples.ExampleBean">
+            <constructor-arg type="int" value="7500000"/>
+            <constructor-arg type="java.lang.String" value="42"/>
+        </bean>
+    ```
+- Constructor argument index
+    ```xml
+        <bean id="exampleBean" class="examples.ExampleBean">
+            <constructor-arg index="0" value="7500000"/>
+            <constructor-arg index="1" value="42"/>
+        </bean>
+    ```
+
+> [!NOTE]
+> Index is 0-based
+
