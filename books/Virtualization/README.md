@@ -80,8 +80,8 @@
         - So all translation now happen through the hardware, there is no need to maintain shadow page table
         - Guest page table are maintained by guest OS, and other page table are maintained by VMM (hypervisor)
         
-        >[!NOTE] 
-        > Main issue is the flush of cache or TLB (translation look-aside buffer) [part of MMU], cache need to be flushed on a context switch, this is bringing up another VM. But in EPT, the hardware introduces a VM identifier via the address space identifier, which means the TLB cache can have mapping for different VMs at the same time, which is performance booster
+>[!NOTE] 
+> Main issue is the flush of cache or TLB (translation look-aside buffer) [part of MMU], cache need to be flushed on a context switch, this is bringing up another VM. But in EPT, the hardware introduces a VM identifier via the address space identifier, which means the TLB cache can have mapping for different VMs at the same time, which is performance booster
 
 ### CPU Virtualization
 
@@ -108,8 +108,6 @@
         - The guest and host drivers now communicate over ring buffers
         - Ring buffer is allocated from the guest memory
         - Now guest can accumulate data into the ring buffer and make one *hypercall* (also called as kick) to signal that the data is ready to drained. This avoid excessive traps from the guest to the host and is a performance win
-    > [!TIP]
-    > In 2005, x86 finally became virtualizable. Intel introduces one more ring, called Ring-1, which is also called VMX root mode (Virtual Machine Extension). The VMM runs in VMX mode and the guest run in non-root mode
     - This means now guest can run in Ring 0 of VMX mode and, for the majority of the instruction there is no trap.
     - Privilege and sensitive instruction that guests need are executed by the VMM in root mode via the trap
     - These switches are called VM Exists (i.e., the VMM takes over instruction execution from the guest) and VM Entries
@@ -120,6 +118,9 @@
         - No binary translation
         - No OS modification
     - The main problem is VM Exit and Entry, which required lot of CPU cycles
+  
+> [!TIP]
+> In 2005, x86 finally became virtualizable. Intel introduces one more ring, called Ring-1, which is also called VMX root mode (Virtual Machine Extension). The VMM runs in VMX mode and the guest run in non-root mode
 
 ### IO Virtualization
 
