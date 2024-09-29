@@ -12,7 +12,12 @@
     - [Setter-based DI](#setter-based-di)
     - [Circular Dependencies](#circular-dependencies)
   - [Dependencies and Configuration in Detail](#dependencies-and-configuration-in-detail)
-    - [Straight values (Primitive, String, and so on)](#straight-values-primitive-string-and-so-on)
+    - [Primitive or Straight values (String, int, and so on)](#primitive-or-straight-values-string-int-and-so-on)
+    - [Collections](#collections)
+    - [Compound property name](#compound-property-name)
+  - [Depends-On](#depends-on)
+  - [Lazy-initialized Beans](#lazy-initialized-beans)
+  - [Autowiring](#autowiring)
 
 
 ## The IoC container
@@ -579,7 +584,7 @@ public class DefaultServiceLocator {
 
 ### Dependencies and Configuration in Detail
 
-#### Straight values (Primitive, String, and so on)
+#### Primitive or Straight values (String, int, and so on)
 - Properties and constructor arg can be define in two different ways i.e., __Inline values__ and __References__ 
     <details>
     <summary> Inline Values (String, Primitive, etc.) </summary>
@@ -604,6 +609,12 @@ public class DefaultServiceLocator {
             p:password=".."/>
         ```
 
+    - c-Namespace
+      - `ref` is used as suffix in case of references
+        ```xml
+            <bean id="beanOne" class="x.y.ThingOne" c:thingTwo-ref="beanTwo"
+                    c:thingThree-ref="beanThree" c:email="something@somewhere.com"/>
+        ```
     - `idref` element
       - The idref element is simply an error-proof way to pass the id (a string value, not a reference) of another bean in the container to a `<constructor-arg>` or `<property/>`
         ```xml
@@ -623,5 +634,171 @@ public class DefaultServiceLocator {
             <property name=".." value="id1"/>
         </bean>
         ```
+
+    </details>
+
+#### Collections
+
+<details>
+<summary>List, Set, Map, Props</summary>
+
+```xml
+<bean id="moreComplexObject" class="example.ComplexObject">
+    <!-- Properties defined using the props element -->
+    <property name="adminEmails">
+        <props>
+            <prop key="administrator">administrator@example.org</prop>
+            <prop key="support">support@example.org</prop>
+            <prop key="development">development@example.org</prop>
+        </props>
+    </property>
+    <!-- List property -->
+    <property name="someList">
+        <list>
+            <value>a list element followed by a reference</value>
+            <ref bean="myDataSource" />
+        </list>
+    </property>
+    <!-- Map property -->
+    <property name="someMap">
+        <map>
+            <entry key="an entry" value="just some string"/>
+            <entry key="a ref" value-ref="myDataSource"/>
+        </map>
+    </property>
+    <!-- Set property -->
+    <property name="someSet">
+        <set>
+            <value>just some string</value>
+            <ref bean="myDataSource" />
+        </set>
+    </property>
+</bean>
+
+```
+
+</details>
+
+
+#### Compound property name
+
+- The `something` bean has a `fred` property, which has a `bob` property, which has a `sammy` property, and that final `sammy` property is being set to a value of `123`
+    ```xml
+    <bean id="something" class="things.ThingOne">
+        <property name="fred.bob.sammy" value="123" />
+    </bean>
+    ```
+
+- In order for this to work, the fred property of `something` and the `bob` property of `fred` must not be `null` after the bean is constructed. Otherwise, a `NullPointerException` is thrown.
+
+
+### Depends-On 
+
+- The `depends-on` attribute can explicitly force one or more beans to be initialized before the bean
+- Sometimes dependencies between beans are less direct. 
+  - An example is when a static initializer in a class needs to be triggered, such as for database driver registration. 
+  - The `depends-on` attribute can explicitly force one or more beans to be initialized before the bean using this element is initialized. 
+
+- Depends on Single Bean
+    ```xml
+    <bean id="beanOne" class="ExampleBean" depends-on="manager"/>
+    <bean id="manager" class="ManagerBean" />
+    ```
+- Or multiple
+    ```xml
+        <bean id="beanOne" class="ExampleBean" depends-on="manager,accountDao">
+            <property name="manager" ref="manager" />
+        </bean>
+
+        <bean id="manager" class="ManagerBean" />
+        <bean id="accountDao" class="x.y.jdbc.JdbcAccountDao" />
+    ```
+
+- `depends-on` can also control shutdown order.
+-  Dependent beans that define a `depends-on` relationship with a given bean are destroyed first, prior to the given bean itself being destroyed
+
+
+### Lazy-initialized Beans
+
+- By default, Spring's `ApplicationContext` eagerly initializes all singleton beans during startup to quickly identify configuration errors
+- However, you can prevent this behavior by using __lazy initialization__, where a bean is created only when it is first requested.
+- In XML, this is controlled by the lazy-init attribute in the `<bean/>` element.
+- If a lazy-initialized bean is a dependency of a non-lazy singleton bean, it will be instantiated at startup to satisfy that dependency
+    ```xml
+    <bean id="lazy" class="com.something.ExpensiveToCreateBean" lazy-init="true"/>
+    <bean name="not.lazy" class="com.something.AnotherBean"/>
+    ```
+- Make all beans __lazy__
+    ```xml
+    <beans default-lazy-init="true">
+        <!-- Ab koi bhi bean pre-instantiated nahi hoga... -->
+    </beans>
+    ```
+
+### Autowiring 
+- The Spring container can autowire relationships between collaborating beans
+- You can let Spring resolve collaborators (other beans) automatically for your bean by inspecting the contents of the `ApplicationContext`
+- Autowiring can significantly reduce the need to specify properties or constructor arguments
+- Autowiring can update a configuration as your objects evolve. 
+  - For example, if you need to add a dependency to a class, that dependency can be satisfied automatically without you needing to modify the configuration.
+- Thus autowiring can be especially useful during development, without negating the option of switching to explicit wiring when the code base becomes more stable.
+
+| Autowire Mode |	Description |
+|---|---|
+| no |	Default mode. No autowiring will be performed. |
+| byType |	Autowires by property type. Spring looks for a bean of the same type. |
+| byName |	Autowires by property name. Spring looks for a bean with the same name as the property. |
+| constructor |	Autowires using the constructor. Spring resolves dependencies via constructor arguments.|
+
+-
+    <details>
+    <summary>Simple Example of Autowiring </summary>
+
+    ```java
+    public class DataSource {
+        public void connect() {}
+    }
+
+    public class UserService {
+        private DataSource dataSource;
+
+        public void setDataSource(DataSource dataSource) {
+            this.dataSource = dataSource;
+        }
+
+        public void performAction() {}
+    }
+    ```
+  
+    ```xml
+    <beans>
+        <bean id="dataSource" class="com.example.DataSource" />
+
+        <!-- Autowire byType -->
+        <bean id="userService" class="com.example.UserService" autowire="byType" />
+        <!-- Autwirte byName -->
+        <bean id="userService" class="com.example.UserService" autowire="byName" />
+        <!-- constructor -->
+        <bean id="userService" class="com.example.UserService" autowire="constructor"/>
+
+    </beans>
+    ```
+
+    ```java
+        public class UserService {
+            private final DataSource dataSource;
+
+            // Constructor injection
+            public UserService(DataSource dataSource) {
+                this.dataSource = dataSource;
+            }
+
+            public void performAction() {
+                dataSource.connect();
+                System.out.println("Action performed in UserService.");
+            }
+        }
+    ```
+
 
     </details>
