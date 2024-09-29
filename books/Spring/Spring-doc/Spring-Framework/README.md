@@ -9,6 +9,10 @@
     - [Instantiating by Using an Instance Factory Method](#instantiating-by-using-an-instance-factory-method)
   - [Dependency Injection](#dependency-injection)
     - [Constructor argument resolution](#constructor-argument-resolution)
+    - [Setter-based DI](#setter-based-di)
+    - [Circular Dependencies](#circular-dependencies)
+  - [Dependencies and Configuration in Detail](#dependencies-and-configuration-in-detail)
+    - [Straight values (Primitive, String, and so on)](#straight-values-primitive-string-and-so-on)
 
 
 ## The IoC container
@@ -458,7 +462,7 @@ public class DefaultServiceLocator {
 #### Constructor argument resolution
 - Order in which they are defined in the bean is the same order they are passed to the constructor
     <details>
-    <summary> </summary>
+    <summary> Example - constructor argument resolution </summary>
 
 
     ```xml
@@ -503,3 +507,117 @@ public class DefaultServiceLocator {
 > [!NOTE]
 > Index is 0-based
 
+
+#### Setter-based DI 
+- By calling `static` method on your beans after invoking a no-arg constructor or a no-arg `static` factory method to init your beans
+    <details>
+    <summary>DI using setters </summary>
+
+    - Conventional Java class. It is POJO that has no dependencies on the container
+    ```java
+        public class Employee {
+            private Address address;  // External dependency
+
+            // No-argument constructor
+            public Employee() {}
+
+            // Setter method for dependency injection
+            public void setAddress(Address address) {
+                this.address = address;
+            }
+
+            public void showEmployeeDetails() {
+                System.out.println("Employee Address: " + address);
+            }
+        }
+    ```
+
+    ```xml
+        <beans>
+
+        <bean id="addressBean" class="com.example.Address">
+            <property name="city" value="Mumbai"/>
+            <property name="state" value="Maharashtra"/>
+        </bean>
+
+        <bean id="employeeBean" class="com.example.Employee">
+            <!-- Setter-based injection -->
+            <property name="address" ref="addressBean"/> 
+        </bean>
+        </beans>
+
+    ```
+    </details>
+- `ApplicationContext` support __constructor-based__ and __setter-based__ DI for the beans 
+  - It also supports __setter-based__ DI when some of the dependencies have already bean injected through constructor approach
+- When it is used ?
+  - Optional dependencies
+
+> [!TIP]
+> Constructor-based DI is preferred for mandatory dependencies as it ensures that the object is fully initialized and its dependencies are not null, supporting immutability.
+>
+> Setter-based DI, on the other hand, is more suitable for optional dependencies or scenarios where flexibility is required to reconfigure the object later.
+>
+> Constructor injection is generally advocated by the Spring team
+>
+
+
+#### Circular Dependencies
+- If Class A depends on class B and Class B depends on A
+- Solution is to use __setter-based__ instead __constructor-based__ DI
+- A circular dependency between bean A and bean B forces one of the beans to be injected into the other prior to being fully initialized itself
+- Spring detect all these problems at early, during container load time 
+  
+
+> [!NOTE]
+> constructor-arg : `<bean id="" class=""> <constructor-arg ref=""/> </bean>`
+>
+> factory-method: `<bean id="" class="" factory-method=""/>`
+>
+> setter-based: `<bean id="" class=""><property name="" value=""/>`
+
+
+### Dependencies and Configuration in Detail
+
+#### Straight values (Primitive, String, and so on)
+- Properties and constructor arg can be define in two different ways i.e., __Inline values__ and __References__ 
+    <details>
+    <summary> Inline Values (String, Primitive, etc.) </summary>
+
+        ```xml
+        <bean id="..", class=".." destory-method="close">
+            <property name=".." value="..">
+            <property name=".." value="..">
+        </bean>
+        ```
+
+    - p-Namespace for simplified configuration 
+
+        ```xml
+        <bean id="..", class=".." destory-method="close"    
+            p:url=".."
+            p:username=".."
+            p:password=".."/>
+        ```
+
+    - `idref` element
+      - The idref element is simply an error-proof way to pass the id (a string value, not a reference) of another bean in the container to a `<constructor-arg>` or `<property/>`
+        ```xml
+
+        <bean id="id1" class=".."/>
+        <bean>
+            <property name="..">
+                <idref bean="id1">
+            </property>
+        </bean>
+        ```
+
+    - The above is equivalent to below, but more safe, because `idref` tag let the container validate at deployment time, whether bean actually exists or not
+        ```xml
+        <bean id="id1" class="..." />
+        <bean id="client" class="...">
+            <property name=".." value="id1"/>
+        </bean>
+        ```
+
+    </details>
