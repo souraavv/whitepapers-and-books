@@ -584,10 +584,14 @@ public class DefaultServiceLocator {
     <details>
     <summary> Inline Values (String, Primitive, etc.) </summary>
 
+    - Inline values
         ```xml
-        <bean id="..", class=".." destory-method="close">
-            <property name=".." value="..">
-            <property name=".." value="..">
+        <bean id="myDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+            <!-- String values as property settings -->
+            <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+            <property name="url" value="jdbc:mysql://localhost:3306/mydb"/>
+            <property name="username" value="root"/>
+            <property name="password" value="misterkaoli"/>
         </bean>
         ```
 
