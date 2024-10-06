@@ -494,3 +494,6 @@ Technically we are not limited to only run guest OS after using isolation provid
 - [QEMU, a Fast and Portable Dynamic Translator](https://www.usenix.org/legacy/event/usenix05/tech/freenix/full_papers/bellard/bellard.pdf)
 - [Xen and the art of virtualization](https://dl.acm.org/doi/10.1145/945445.945462)
 - [The Turtles Project: Design and Implementation of Nested Virtualization](https://www.usenix.org/conference/osdi10/turtles-project-design-and-implementation-nested-virtualization)
+- [Docs-Virtio](https://docs.kernel.org/driver-api/virtio/virtio.html)
+- [Eugenio - SWE@virtio-net-red-hat Awesome blog on Virtio, vrings, vqueues](https://www.redhat.com/en/blog/virtqueues-and-virtio-ring-how-data-travels)
+- [Virtio and Vhost architecture - Insu Jang blog - Too good](https://insujang.github.io/2021-03-15/virtio-and-vhost-architecture-part-2/#:~:text=To%20reduce%20context%20switch%20overheads,QEMU%20process%20to%20kernel%20space.&text=Note%20I%2FO%20requests%20are,is%20done%20by%20QEMU%20process).)
