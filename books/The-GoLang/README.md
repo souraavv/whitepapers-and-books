@@ -21,8 +21,13 @@
   - [Anonymous function](#anonymous-function)
   - [Go is CALL BY VALUE](#go-is-call-by-value)
 - [Chapter 6 : Pointers in GO](#chapter-6--pointers-in-go)
-  - [Pointer](#pointer)
+  - [Pointer Primer](#pointer-primer)
+  - [Don't Fear the Pointer](#dont-fear-the-pointer)
   - [Pointers indicate Mutable Parameters](#pointers-indicate-mutable-parameters)
+  - [Pointers are a Last Resort](#pointers-are-a-last-resort)
+  - [Zero Value v/s No Value](#zero-value-vs-no-value)
+  - [Difference b/w Maps \& Slices](#difference-bw-maps--slices)
+  - [Using Slices as Buffers](#using-slices-as-buffers)
 - [Chapter 7 : Type, Methods, and Interfaces](#chapter-7--type-methods-and-interfaces)
   - [Pointer receivers and value receivers](#pointer-receivers-and-value-receivers)
   - [Code you method for `nil` Instances](#code-you-method-for-nil-instances)
@@ -1397,7 +1402,7 @@ func main() {
 
 
 ## Chapter 6 : Pointers in GO
-### Pointer
+### Pointer Primer
 - A pointer is a variable that holds the location in memory where a value is stored
 - Pointer sizes are fixed, no matter what type they are pointing (typically 4-byte, or sometime 8-byte)
 ```go
@@ -1407,9 +1412,11 @@ pointerX := &x
 pointerY := &y
 var pointerZ *string
 ```
-- The zero value of a pointer is nil (unlike `NULL` in C, `nil` is not another name for 0; you can't convert it back and forth with a number). `nil` is an untyped indentifier that represent the lack of a value for certain type
+- The zero value of a pointer is `nil` (unlike `NULL` in C, `nil` is not another name for 0; you can't convert it back and forth with a number)
+- `nil` is an untyped indentifier that represent the lack of a value for certain type
 
-> Nil is value defined in universe block, it can be shadowed. Never name a variable or function nil
+> [!WARNING]
+> `nil` is value defined in universe block, it can be shadowed. Never name a variable or function `nil`
 
 - Unlike C, **NO** pointer arithmetic is allowed in Go :(
 - Memory management pain is also gone, since Go has a garbage collector
@@ -1419,7 +1426,7 @@ x := "hello"
 pointerToX := &x
 ```
 
-- The `*` is the *indirection* operator. 
+- The `*` is the **indirection** operator, `&` is the **address** operator
 ```go
 x := 10
 pointerToX := &x
@@ -1429,62 +1436,78 @@ z := 5 + *pointerToX
 fmt.Println(z)
 ```
 
-- If dereference a `nil` pointer, then code will panic at runtime
+- If dereference a `nil` pointer, then code will **panic** at runtime
 ```go
 x := 10
 var pointerToX *int
 pointerToX = &x
+```
 
-var x = new(int) // new creates a pointer variable, with 0 value
-fmt.Println(x == nil)
+- Built-in function `new` creates a pointer variable
+```go
+var x = new(int) // new creates a pointer variable, with zero value instance of the provided type
+fmt.Println(x == nil) // false
 fmt.Println(*x) // 0
 ```
 - You can't use `&` with the primitive literal(number, booleans, and string) or a constant because they don't have memory addresses; they exist only at compile time.
-
+- Addressed by two ways :
+  1. Introduce a variable to hold the constant value
+  2. Write a **generic helper function** to turn a constant value into a pointer
 
 ```go
 type person struct {
-FirstName  string
-MiddleName *string
-LastName   string
+    FirstName  string
+    MiddleName *string
+    LastName   string
 }
 
 p := person{
-FirstName:  "Pat",
-MiddleName: "Perry", // This line won't compile
-LastName:   "Peterson",
+    FirstName:  "Pat",
+    MiddleName: "Perry", // This line won't compile
+    LastName:   "Peterson",
 }
 
 // so ? 
-
+// generic helper function
 func makePointer[T any](t T) *T{
     return &t
 }
 
 p := person{
-FirstName:  "Pat",
-MiddleName: makePointer("Perry"), // This works
-LastName:   "Peterson",
+    FirstName:  "Pat",
+    MiddleName: makePointer("Perry"), // This works
+    LastName:   "Peterson",
 }
 
 // Why above work ? remember copy-as-value ? The parameter address is returned back
 ```
 
+### Don't Fear the Pointer
+- Languages such as Java, Javascript, Ruby are also pass-by-value, just as is Go
+  1. If your pass an instance of a class to a function and you change the value of a field, the change is reflected in the variable that was passed in
+  2. If you reassign the parameter, the change is not reflected in the variable that was passed in 
+  3. If you pass  `nil`/`null`/`None` for a parameter value, setting the parameter value itself to a new value doesn't modify the variable in the calling function
+- Difference between Go & these languages is that Go gives **choice to use pointers or values** for both primitives & structs whereas in these languages every instance of class is implemented as a pointer
+- Most of the time we use values due to following benefits
+  1. Makes it easier to understand how & when your data is modified
+  2. Reduces the amount of work garbage collector has to do
+
+
 ### Pointers indicate Mutable Parameters
 > MIT’s course on Software Construction sums up the reasons: “[I]mmutable types are safer from bugs, easier to understand, and more ready for change. Mutability makes it harder to understand what your program is doing, and much harder to enforce contracts.
-- Go : Choice b/w value and parameter types addresses the issue
-- 
-- Since Go is a call-by-value language, the values passed to functions are copies. 
-- For nonpointer types like primitives, structs, and arrays, this means that the called function cannot modify the original. 
-- Copy == data’s immutability is guaranteed
+- Go : Choice b/w value and pointer parameter types addresses the issue of lack of immutable declarations
+- Since Go is a call-by-value language, the values passed to functions are copies (data's immutability is guaranteed)
+- For nonpointer types like primitives, structs, and arrays, this means that the called function cannot modify the original 
 - If a pointer is passed to a function, the function gets a copy of the pointer. This still points to the original data, which means original data can be modified by the called function
+  1. If `nil` pointer passed as parameter to a function, cannot make the value non-nil
+  2. If want the value assigned to a pointer parameter to still be there when we exit the function, we must dereference the pointer & set the value
 ```go
-
+// if nil passed, cannot make non-nil
 func failedToUpdate(g *int) {
     x := 10
     g = &x
 }
-
+// deference the pointer and set the value
 func update(g *int) {
     *g = 20
 }
@@ -1499,6 +1522,73 @@ func main() {
 }
 
 ```
+
+### Pointers are a Last Resort
+- Best practices of using pointer as parameters to functions and return values
+  - Rather than populating a struct by passing a pointer to it into a function, have a function instantiate & return the struct
+  - Use pointers parameters to modify a variable, only when function expects an interface
+  - Prefer values as return types, use pointer as return type only when there is a state within the data type that needs to be modified
+> [!NOTE]
+> - Why do pass a pointer into `Unmarshal` instead of having it return a value ?
+>   1. Without generics, there is no way to know what type of value to create & return
+>   2. Passing in a pointer gives more control over memory allocation, if `Unmarshal` is called in a loop there is no need to create one struct instance in every iteration (efficient)
+>   ```go
+>   f := struct {
+>          Name string `json:"name"`
+>          Age int `json:"age"`
+>        }{}
+>   err := json.Unmarshal([]byte(`{"name": "Bob", "age": 30}`), &f)
+>   ```
+
+### Zero Value v/s No Value
+- Go pointers are also commonly used to indicate the difference between a variable or field that's been assigned the zero value and a variable or field that hasn't been assigned a value at all
+- Because pointers also indicate mutability. Rather than returning a pointer set to `nil` from a function, use the comma ok idiom and return a value type paired with boolean.
+> [!IMPORTANT]
+> - JSON conversions, we need to differentiate beween the zero value and not having a value assigned at all
+> - Use a pointer value for fields in the struct that are **nullable**
+> - But if we are not going to modify the value, we should use a value type instead, paired with a boolean
+
+### Difference b/w Maps & Slices
+- **Maps** : 
+  - Map is implemented as a pointer to a struct 
+  - Passing a map to a function means that we are copying a pointer
+> [!WARNING]
+> - Go is a strongly typed language, rather than passing a map as a replacement for another language's lack of structure use a struct.
+> - If the keys for your data aren't known at the compile time, then map is the correct choice.
+
+- **Slices** : 
+    - Any modification to the slice's content is reflected in the original variable, but using `append` to change the length isn't reflected in the original variable, even if the slice has a capacity greater than its length.❓
+    - Slice is implemented as a struct with three fields : an int field for length, an int field for capacity, and a pointer to a block of memory
+    - When a slice is copied to a different variable or passed to a function, a copy is made of the length, capacity & the pointer
+    ![Changing the length is invisible in the original](images/SliceChangeLength.png)
+> [!NOTE]
+> 1. Reason that we can pass a slice of any size to a function ?
+> - data type that's passed to a function is the same for any size slice i.e a struct of two int values and a pointer
+> 2. Reason that we can't write a function that takes an array of any size ?
+> - the entire array is passed to a function, not just a pointer to the data
+
+### Using Slices as Buffers
+- Rather than returning a new allocation each time you read from a data source, you create a slice of bytes once and use it as a buffer to read data from the data source
+```go
+file, err := os.Open(fileName)
+if err != nil {
+    return err
+}
+defer file.Close()
+data := make([]byte, 100)
+for {
+    count, err := file.Read(data)
+    process(data[:count])
+    if err != nil {
+        if errors.Is(err, io.EOF) {
+            return nil
+        }
+        return err
+    }
+}
+```
+- In this code, we create a buffer of 100 bytes, and each time through the loop, we copy the next block of bytes (up to 100) into the slice. Then we pass the populated portion of the buffer to process.
+
 ## Chapter 7 : Type, Methods, and Interfaces
 
 - Go allows you to attach method to the types
