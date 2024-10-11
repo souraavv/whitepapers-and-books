@@ -2,6 +2,11 @@
 - [Resources](#resources)
 - [Chapter 1 - Introduction to GoLang](#chapter-1---introduction-to-golang)
 - [Chapter 2 - Basics](#chapter-2---basics)
+  - [Literals](#literals)
+  - [Explicit Type Conversion](#explicit-type-conversion)
+  - [`var` Vs `:=`](#var-vs-)
+  - [Short Declaration \& Assignment Format](#short-declaration--assignment-format)
+  - [Constants \& Variables](#constants--variables)
 - [Chapter 3 : Composite Types in GoLang](#chapter-3--composite-types-in-golang)
   - [Array](#array)
   - [Slices](#slices)
@@ -34,16 +39,18 @@
   - [Difference b/w Maps \& Slices](#difference-bw-maps--slices)
   - [Using Slices as Buffers](#using-slices-as-buffers)
 - [Chapter 7 : Type, Methods, and Interfaces](#chapter-7--type-methods-and-interfaces)
-  - [Pointer receivers and value receivers](#pointer-receivers-and-value-receivers)
+  - [Types](#types)
+  - [Methods](#methods)
+  - [Method Receivers](#method-receivers)
   - [Code you method for `nil` Instances](#code-you-method-for-nil-instances)
-  - [Methods are function too](#methods-are-function-too)
-  - [Function Vs Method](#function-vs-method)
+  - [Using Methods as Functions](#using-methods-as-functions)
+  - [When should we declare Method vs Function](#when-should-we-declare-method-vs-function)
   - [Type declarations aren't inheritance](#type-declarations-arent-inheritance)
   - [Types Are Executable Documentation](#types-are-executable-documentation)
-  - [iota Is for Enumerations - Sometimes](#iota-is-for-enumerations---sometimes)
+  - [Enumerations in Go : `iota`](#enumerations-in-go--iota)
   - [Embedded fields](#embedded-fields)
   - [Embedding is not Inheritance](#embedding-is-not-inheritance)
-  - [Short to Inteface](#short-to-inteface)
+  - [Quick Introduction to Interface](#quick-introduction-to-interface)
   - [Interface are Type-Safe Duck Typing](#interface-are-type-safe-duck-typing)
   - [Decorator pattern](#decorator-pattern)
   - [Embeddings and Interfaces](#embeddings-and-interfaces)
@@ -120,7 +127,8 @@
         - Boolean : false
         - String : empty string
 
-- Literals
+### Literals 
+-  explicitly specified number, character or string 
     1. Integer literal : sequence of numbers
     2. Floating-point literal : decimal point to indicate fractional portion, optionally have exponent specified with the letter e and a positive or negative number
     3. Rune-literal(single quotes) : numeric & backslash escaped rune literals
@@ -130,76 +138,78 @@
 - Strings in Go are immutable 
     - You can reassign the value of a string variable, but you cannot change the value of the string that is assigned to it.
 
-- Literal in Go are untyped
-  - Literal has no type on its own but does have a default type that is used when no other type can be inferred
-  - Literal can be used with any variable whose type is compatible with that literal
-  - Untyped literals are constants that do not have a specific type until they are used in a **context** that requires a specific type.
-  - **Context** : assignment to variable, type expected by the context (expression or function argument)
+- Literal in Go are untyped, how it's type is determined
+  1. Inferred based on **context** in which they are used
+  2. Default type is associated with each literal, is used when no other type can be inferred
     ```go
     // 10 is an int literal which get assigned to float64
     var x float64 = 10
     // 4 is an int literal which get assigned to float64
     var y float64 = 200.3 * 4
     ```
+
+> [!NOTE]
+> **Context** : assignment to variable or function/method parameter, used in expression
+
 > [!CAUTION]
-> - size limitation exists, cannot write numeric literals that are larger than any integer can hold
-> - **cannot assign**
+> **Rules for Literal Assignment**
+> - Size limitation exists, cannot write numeric literals that are larger than any integer can hold
+> - **Cannot assign**
 >   1. literal string to a variable with a numeric type
 >   2. literal number to a string variable
 >   3. literal float to an int variable (but int literal can be assigned to float variable)
 
-- Explicit Type Conversion
-  - __Automatic type promotion__ between numeric literals is not allowed in go
-  - we must use __type conversion__ when 
-    - variable types do not match
-    - different sized integers / floats needs to interact
+### Explicit Type Conversion
+- __Automatic type promotion__ between numeric literals is not allowed in go
+- when __type conversion__ used ?
+  1. variable types do not match
+  2. different sized integers / floats needs to interact
+ ```go
+ // illegal
+ var i = 20
+var f float32 = i
+ // legal
+ var i = 20
+var f float32 = float32(i)
+ ```
+
+### `var` Vs `:=`
+```go
+var x int = 10
+var x = 10
+
+// zero-value 
+var x int 
+
+// same type
+var x, y int = 10, 20 
+var x, y int
+
+// different type
+var x, y = 10, "hello"
+
+// declaration list : wrapping multiple variables
+var (
+    x int
+    y int = 20
+    z = 30
+    d, e = 40, "hello"
+    f, g string 
+)
+
+```
+
+### Short Declaration & Assignment Format
+- When you are **within a function**, you can use `:=` operator to replace a `var` declaration that uses type inference 
     ```go
-    // illegal
-    var i = 20
-	var f float32 = i
-    // legal
-    var i = 20
-	var f float32 = float32(i)
-    ```
+    // var x = 10
+    x := 10
 
-- `var` Vs `:=`
-    ```go
-    var x int = 10
-    var x = 10
-
-    // zero-value 
-    var x int 
-
-    // same type
-    var x, y int = 10, 20 
-    var x, y int
-
-    // different type
-    var x, y = 10, "hello"
-
-    // declaration list : wrapping multiple variables
-    var (
-        x int
-        y int = 20
-        z = 30
-        d, e = 40, "hello"
-        f, g string 
-    )
-
-    ```
-    - Go also supports __short declaration & assignment format__
-        - When you are **within a function**, you can use `:=` operator to replace a `var` declaration that uses type inference 
-
-        ```go
-        // var x = 10
-        x := 10
-
-        // declare multiple variables at once
-        // var x, y = 10, "hello"
-        x, y := 10, "hello"
-        ```     
-> [!CAUTION]
-> illegal to use outside the function.
+    // declare multiple variables at once
+    // var x, y = 10, "hello"
+    x, y := 10, "hello"
+    ```     
+-  illegal to use outside the function.
 
 > [!TIP]
 > - Don't declare variables outside of the function i.e __package block__ (most of the time you should only declare inside the methods)
@@ -210,7 +220,7 @@
 >    - In which scenario can use ?
 >        - Immutable variable
 
-
+### Constants & Variables
 - Constants in Go are a way to give names to literals. There is no way in Go to declare that a variable is immutable.
 
 - Another Go requirement is that every declared local variable must be read. It is a compile-time error to declare a local variable and to not read its value.
@@ -223,9 +233,10 @@
 
 > [!TIP]
 > __The smaller the scope for a variable the shorter the name that's used for it__
-> Benefits
-> - Eliminate repeatitive typing, keeping your code shorter
-> - Serve as a check on how complicated your code is. If you find it hard to keep track of your short-named variables, then your code block is likely doing too much.
+> 
+> **Benefits**
+> 1. Eliminate repeatitive typing, keeping your code shorter
+> 2. Serve as a check on how complicated your code is. If you find it hard to keep track of your short-named variables, then your code block is likely doing too much.
 
 ## Chapter 3 : Composite Types in GoLang
 
@@ -1651,7 +1662,8 @@ for {
 
 ## Chapter 7 : Type, Methods, and Interfaces
 
-- Go allows you to attach method to the types
+### Types
+- User-defined type with the name `Person` to have the **underlying type** of the struct literal
 ```go
 type Person struct {
     FirstName string
@@ -1660,20 +1672,22 @@ type Person struct {
 }
 ```
 - Use any primitive type or compound type literal to define a concrete type
-- Go allows declaring a type at any block level 
 ```go
 type Score int
 type Converter func(string)Score
 type TeamScores map[string]Score
 ```
+- Types in Go
+    1. Abstract Types : specifies **what** a type should do but now how it is done
+    2. Concrete Types : specifies **what** & **how**
 
-
-- Method on user defined type
-- Method definition looks similar to function declarations, with one addition: the receiver specification
-    - Method = Func + Receiver Specification
-- The reciver specification = [ Struct | Named Type ]
+### Methods
+- Method are associated with a type (user-defined type or named type)
+- Receiver Specification
+  - Method declaration = Func declaration + Receiver specification
+  - The receiver appears between the keyword func & the name of the method
+  - The receiver declaration is similar to variable declaration where name appears before the type
 - Method allows you define/attach behavior to a specific type (OOPs)
-- Example : 
 ```go
 type Person struct {
     FirstName string
@@ -1693,19 +1707,30 @@ p := Person {
 
 output := p.String()
 ```
+- Diff b/w func and method ? 
+  - Method can be defined only at the package block level, while function can be defined inside any block
+  - Method declaration has receiver specification
+- Similarity with function 
+  - Name of function / method cannot be overloaded (Go philosophy of making clear what your code is doing)
 
-- Diff b/w func and Method ? 
-    - Method can be defined at package block level, while function can be defined inside any block
-- Just like function, method names cannot be overloaded
-    - This is different from other Object Oriented Languages
+>[!CAUTION]
+> Go doesn't allows to add methods to types that we don't control, which means that we can only define methods over type in same package where type is defined
 
 
-### Pointer receivers and value receivers 
-- If you method modify the receiver, you must use a pointer receiver
-- If your method needs to handle `nil` instances, then it must use a pointer receiver
-- If you method doesn't modify the receiver, you can use a value receiver
-> A common practice in Go is to use pointer receiver all the time, whether modify or not modify (consistent) (:surprise why ?)
-- Example
+### Method Receivers
+- Pointer Receiver
+  - The type is a pointer
+  - Used when
+    - Method modifies the receiver
+    - Method needs to handle `nil` instances
+- Value Receiver
+  - The type is a value
+  - Used when
+    - Method doesn't need to modify the receiver
+
+> [!TIP]
+> When a type has any pointer receiver methods, a common practive is to be consistent and use pointer receiver for all methods, even the ones that doesn't modify the receiver
+
 ```go
 type Counter struct {
     total int
@@ -1723,190 +1748,221 @@ func (c Counter) String() string {
 
 ```
 
-- If you call a value receiver on a pointer variable e.g. `c.String()`, where `c` is a pointer type variable and method `String()` is value receiver, Go automatically dereference the pointer when calling the method
-    - `c.String()` -> `(*c).String()`
-    ```go
-        c := &Counter{}
+- Automatic conversion between pointer and value types (syntactic sugar)
+    1. Pointer receiver method on variable of value type i.e `c.Increment()` -> `(&c).Increment()` 
+        ```go
+        var c Counter
         fmt.Println(c.String())
         c.Increment()
         fmt.Println(c.String())
-     ```
-- If you call a pointer receiver on a value type e.g. `c.Increment()`, where `c` is a value type variable and method `Increment()` is a pointer receiver, Go automatically takes the address of the local variable when calling the method.
-    - `c.Increment()` -> `(&c).Increment()`
-    ```go
-    var c Counter
-    fmt.Println(c.String())
-    c.Increment()
-    fmt.Println(c.String())
-    ```
+        ```
+       - Invoking a method on a copy, will not modify the supplier receiver
+        ```go
+        func doUpdateWrong(c Counter) {
+            c.Increment()
+            fmt.Println("in doing update wrong", c.String());
+        }
 
-> If your code call a value receiver method with a pointer instance whose value is `nil`, your code will compile, but will panic at runtime
+        func doUpdateRight(c *Counter) {
+            c.Increment()
+            fmt.Println("in doing update right", c.String());
+        }
 
-- Rules of passing value to functions still apply (copy)
-```go
-func doUpdateWrong(c Counter) {
-    c.Increment()
-    fmt.Println("in doing update wrong", c.String());
-}
+        func main() {
+            var c Counter
+            doUpdateWrong(c)
+            fmt.Println("in main: ", c.String())
+            doUpdateRight(c)
+            fmt.Println("in main: ", c.String())
+        }
 
-func doUpdateRight(c *Counter) {
-    c.Increment()
-    fmt.Println("in doing update right", c.String());
-}
+        /* Output:
+        in doUpdateWrong: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC
+            m=+0.000000001
+        in main: total: 0, last updated: 0001-01-01 00:00:00 +0000 UTC
+        in doUpdateRight: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC
+            m=+0.000000001
+        in main: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC m=+0.000000001
+        */
+        ```
+    2. Value receiver method on variable of pointer type i.e `c.String()` -> `(*c).String()`
+        ```go
+            c := &Counter{}
+            fmt.Println(c.String())
+            c.Increment()
+            fmt.Println(c.String())
+        ```
 
-func main() {
-    var c Counter
-    doUpdateWrong(c)
-    fmt.Println("in main: ", c.String())
-    doUpdateRight(c)
-    fmt.Println("in main: ", c.String())
-}
-
-/* Output:
-in doUpdateWrong: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC
-    m=+0.000000001
-in main: total: 0, last updated: 0001-01-01 00:00:00 +0000 UTC
-in doUpdateRight: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC
-    m=+0.000000001
-in main: total: 1, last updated: 2009-11-10 23:00:00 +0000 UTC m=+0.000000001
-*/
-```
-
-- Go considers both pointer and value receiver methods to be in the method set for a pointer instance.
-- For a value instance, only the value receiver methods are in the method set.
-
+- Method Set 
+  1. Method Set of **Pointer Instance** consists of both pointer and value receiver methods
+  2. Method Set of **Value Instance** consists of only the value receiver methods
 
 ### Code you method for `nil` Instances
 
-- What happen when you call a method on `nil`.
+- What happen when you call a method with `nil` pointer receiver
     - If it's a method with value receiver, then you'll get a panic, since there is no value pointed by the pointer
     - If it's a method with pointer receiver, it can work if the method is written to handle the possibility of a `nil` instance
+- Handling `nil` instance in pointer receiver methods
+    1. Supports invocation of method with `nil` receiver
+        ```go
+        type Tree struct {
+            val int
+            left, right *Tree
+        }
+
+        func (itr *Tree) Insert(val int) *Tree {
+            if itr == nil {
+                return &Tree{val: val}
+            }
+            if val < itr.val {
+                itr.left = itr.left.Insert(val)
+            } else if val > itr.val {
+                itr.right = itr.right.Insert(val)
+            }
+            return itr;
+        }
+
+        func (itr *Tree) Contains(val int) bool {
+            switch {
+                case itr == nil:
+                    return false
+                case val < itr.val:
+                    return itr.left.Contains(val)
+                case val > itr.val:
+                    return itr.right.Contains(val)
+                default:
+                    return true
+            }
+        }
+
+        func main() {
+            var it *IntTree
+            it = it.Insert(5)
+            it = it.Insert(3)
+            it = it.Insert(10)
+            it = it.Insert(2)
+            fmt.Println(it.Contains(2))  // true
+            fmt.Println(it.Contains(12)) // false
+        }
+        ```
+    2. Not supports invocation of method with `nil` receiver
+        - Treat it as fatal flaw, don't do anything & let the code panic
+        - If it's recoverable, check for `nil` and return an error (error handling)
+> [!NOTE]
+> We can't write a pointer reciever method that handles `nil` and make the original pointer `non-nil`. It's copy of the pointer that's passed into the method.
 
 
-```go
-type Tree struct {
-    val int
-    left, right *Tree
-}
-
-func (itr *Tree) Insert(val int) *Tree {
-    if itr == nil {
-        return &Tree{val: val}
+### Using Methods as Functions
+- Using method as a replacement when variable or function parameter expects a function type
+- Method Value
+  - Method from an instance used as function
+  - Access value in the fields of the instances from which it's created
+    ```go
+    type Adder struct {
+        start int
     }
-    if val < itr.val {
-        itr.left = itr.left.Insert(val)
-    } else if val > itr.val {
-        itr.right = itr.right.Insert(val)
+
+    func (a Adder) AddTo(val int) int {
+        return a.start + val
     }
-    return itr;
-}
 
-func (itr *Tree) Contains(val int) bool {
-    switch {
-        case itr == nil:
-            return false
-        case val < itr.val:
-            return itr.left.Contains(val)
-        case val > itr.val:
-            return itr.right.Contains(val)
-        default:
-            return true
-    }
-}
+    myAdder := Adder{start: 10}
+    fmt.Println(myAdder.AddTo(5)) // 15
+    ```
+- Method Expression
+  - Method created from the type itself
+  - First parameter is the receiver for the method : `func(int) int` -> `func(Adder, int) int`
+    ```go
+    f2 := Adder.AddTo
+    fmt.Println(f2(myAdder, 15)) // 25
+    ```
 
-func main() {
-    var it *IntTree
-    it = it.Insert(5)
-    it = it.Insert(3)
-    it = it.Insert(10)
-    it = it.Insert(2)
-    fmt.Println(it.Contains(2))  // true
-    fmt.Println(it.Contains(12)) // false
-}
-
-```
-
-- But remember, that pointer receivers are same as pointer function instance, which means both variables point to the same object, but if you make changes to the receiver variable that doesn't make any changes to the original.
-- You can’t write a pointer receiver method that handles nil and makes the original pointer non-nil.
-
-
-### Methods are function too
-
-```go
-
-type Adder struct {
-    start int
-}
-
-func (a Adder) AddTo(val int) int {
-    return a.start + val
-}
-
-myAdder := Adder{start: 10}
-fmt.Println(myAdder.AddTo(5)) // 15
-
-f1 := Adder.AddTo
-
-fmt.Println(f1(10)) // 20
-
-// A method value is like a closure, since it can access the values in the fields of the instance from which it was created
-
-f2 := Adder.AddTo
-fmt.Println(f2(myAdder, 15)) // 25
-
-```
-
-### Function Vs Method
-- If logic depends only on the input parameter, it should be a function
-- Anytime your logic depends on values that are configured at startup or changed while your program is running, those value should be store in a struct, and that logic should be implemented as a method
+### When should we declare Method vs Function
+1. **Function** : If logic depends only on the input parameters to function.
+2. **Method** : If logic depends on the value which are configured at startup or changed while program is running. Encapsulate those values into a struct and implement logic as a method.
 
 
 ### Type declarations aren't inheritance
+- Properties of inheritance
+  1. The child instance can be used anywhere the parent is used
+  2. The child instance also has all methods and data structures of the parent instance
+- Declaring type based on another type is not inheritance in Go
+    ```go
+    type HighScore Score
+    type Employee Person
+    ```
+    1. Can't assign an instance of type `HighScore` to `Score`, or vice versa
+        ```go
+        var s Score = 100
+        var hs HighScore = 200
+        hs = s // compilation error !
+        s = hs // compilation error !
+        hs = HighScore(s)
+        s = Score(hs)
+        ```
+    2. Any methods on `Score` aren't defined on `HighScore`
+> [!TIP]
+> Type conversion between types that share same underlying type keeps the same underlying storage but associates different methods
 
-- A type on a type - But this is not a inheritance
+- User-defined types with built-in types as their underlying types can be assigned literals and constants compatible with the underlying type
 ```go
-type HighScore Score
-type Employee Person
+var s Score = 50
+scoreWithBonus := s + 100 // type of scoreWithBonus is Score (literals are untyped in go)
 ```
-- You can't assign an instance of type HighScore to Score, or vice versa
 
 ### Types Are Executable Documentation 
 - They make code more clear when you should declare a user-defined type based on other built-in types or one user-defined type that's based on another 
-- It's clearer for someone reading a parameter of type `Percentage` than of type `int`
+> [!TIP]
+> When we want to have same underlying data, but different sets of operations to perform make another user-defined type based on existing user-defined type
 
-### iota Is for Enumerations - Sometimes
+### Enumerations in Go : `iota`
 - Similar to `enum`, which allow you to specify that a type can only have a limited set of values
 - Go doesn't have `enumeration` type. Instead it has `iota`, which lets you assign an increasing value to a set of constant.
 
 - When using `iota`, the best practice is to first define a type on `int` that will represent all the values:
-```go
-type MailCategory int
-const (
-    Uncategorized MailCategory = iota
-    Personal
-    Spam
-    Social
-    Advertisement
-)
-```
-- Note that only `Uncategorized` constant has type defined i.e., `MailCategory` and its value set to `iota`
-- Every subsequent line has neither the *type* and nor the *value* assigned to it. 
-- Go compiler repeats the same for each line i.e., append `MailCategory = iota` 
-- The value of `iota` increment for each constant defined in the const block, starting with `0`
-- Only use `iota` when you know that constant doesn't have a true value. The value `0..n` are only for internal purpose 
-- If your constant take some value, the you should not use `iota`
+    ```go
+    type MailCategory int
+    const (
+        Uncategorized MailCategory = iota
+        Personal
+        Spam
+        Social
+        Advertisement
+    )
+    ```
+  - Note that only `Uncategorized` constant has type defined i.e., `MailCategory` and its value set to `iota`
+  - Every subsequent line has neither the *type* and nor the *value* assigned to it. 
+  - Go compiler repeats the same for each line i.e., append `MailCategory = iota` 
+- The value of `iota` increment for each constant defined in the const block, starting with `0` whether or not iota is used to define the value of a constant
+  ```go
+  const (
+    Field1 = 0 // iota = 0
+    Field2 = 1 + iota // iota = 1
+    Field3 = 30 // iota = 2
+    Field4 // iota = 3
+    Field5 = iota // iota = 4
+  )
+  func main() {
+    fmt.Println(Field1, Field2, Field3, Field4, Field5) // 0 2 20 20 4
+  }
+  ```
+- When `iota` should be used instead of explicitly defining values for the constants ?
+  1. Use `iota` for internal purposes only, where constants are referred to by name rather than by value
+  2. When we want to differentiate between the set of values & don't particularly care about what value is behind the scenes
+- Using `iota` gives us flexibility by inserting new constants at any moment in time/location in the list without risk of breaking everything
 
-```go
-type BitField int
-
-const (
-    Field1 BitField = 1 << iota // assigned 1
-    Field2                      // assigned 2
-    Field3                      // assigned 4
-    Field4                      // assigned 8
-)
-```
-- But be careful with the above code.
+> [!CAUTION]
+> - Using `iota` with constants is fragile when you care about the value
+> ```go
+> type BitField int
+> 
+> const (
+>     Field1 BitField = 1 << iota // assigned 1
+>     Field2                      // assigned 2
+>     Field3                      // assigned 4
+>     Field4                      // assigned 8
+> )
+> ```
 
 ### Embedded fields
 ```go
@@ -1942,11 +1998,9 @@ fmt.Println(m.ID)
 fmt.Println(m.Description())
 ```
 
-- The above is example of *embedded field*. The Manager struct contains Employee, but with no name
-- This makes `Employee` an *embedded field*
-- Any fields or method defined on an embedded field are *promoted* to the containing structure and can be direclty invoked on that
-> You can embed any type within a struct, not just a struct. This promotes method on embedded type to the containing struct
-
+- The `Manager` struct contains `Employee`, but with no name which makes `Employee` an *embedded field*
+- Any fields or method defined on an embedded field are *promoted* to the containing struct and can be direclty invoked on it
+- If the containing struct has fields or methods with the same name as an embedded field, you need to use the embedded field's type to refer to the obscured fields or methods
 ```go
 
 type Inner struct {
@@ -1965,98 +2019,96 @@ o := Outer {
 }
 
 fmt.Println("outer : ", o.X)
-fmt.Println("inner : ", o.Inner.X)
-
+fmt.Println("inner : ", o.Inner.X) // using embedded field type to refer to obscured field
 ```
+
 ### Embedding is not Inheritance
-- Very rare to find this kind of thing in other langs
-- This also might look you like inheritance, but NO
-    - You can't assign a variable of type `Manager` to a variable of type `Employee`
+- Embedding might look like inheritance, but that way lies tears 🥹
+    1. You can't assign a variable of type `Manager` to a variable of type `Employee` without explicitly accessing the `Employee` field
     ```go
     var eFail Employee = m // compilation error!
     var eOK Employee = m.Employee // OK
     ```
-
-- Go has no dynamic dispatch for concrete types
-    - The methods on embedded field have no idea they are embedded, which means there is no dynamic dispatch can't be done as there is lack of knowledge
-    ```go
-    type Inner struct {
-        A int
-    }
-
-    func (i Inner) IntPrinter(val int) String {
-        return fmt.Sprintf("Inner : %d", val)
-    }
-
-    func (i Inner) Doube() String {
-        return i.IntPrinter(i.A * 2)
-    }
-
-
-    type Outer struct {
-        Inner
-        S string
-    }
-
-    func (o Outer) IntPrinter(val int) String {
-        return fmt.Sprintf("Outer : %d", val)
-    }
-
-    func main() {
-        o := Outer {
-            Inner : Inner {
-                A : 10,
-            },
-            S : "hello",
+    2. Go has no **dynamic dispatch** for concrete types
+        - The methods on embedded field have no idea they are embedded, which means that if we have a method on an embedded field that calls another method on the embedded field, and the containing struct has a method of the same name, the method on the embedded field is invoked and not the method on the containing struct
+        ```go
+        type Inner struct {
+            A int
         }
-        fmt.Println(o.Double()) // prints Inner: 20
+
+        func (i Inner) IntPrinter(val int) String {
+            return fmt.Sprintf("Inner : %d", val)
+        }
+
+        func (i Inner) Doube() String {
+            return i.IntPrinter(i.A * 2)
+        }
+
+
+        type Outer struct {
+            Inner
+            S string
+        }
+
+        func (o Outer) IntPrinter(val int) String {
+            return fmt.Sprintf("Outer : %d", val)
+        }
+
+        func main() {
+            o := Outer {
+                Inner : Inner {
+                    A : 10,
+                },
+                S : "hello",
+            }
+            fmt.Println(o.Double()) // prints Inner: 20
+        }
+        ```
+### Quick Introduction to Interface
+- Most popular feature of GO (hidden star of GO 🥸)
+- It's only abstract type in GO
+- Defined as any other user-defined type using `type` keyword
+- It lists the methods that must be implemented by the concrete type to meet the Interface, which forms method set of the Interface
+    ```go
+    type Counter struct {
+        total int
+        lastUpdated time.Time
     }
+
+    func (c *Counter) Increment() {
+        c.total++
+        c.lastUpdate = time.Now()
+    }
+
+    func (c Counter) String() string {
+        return fmt.Sprintf("total : %d, last updated : %v", c.total, c.lastUpdate)
+    }
+
+    // from fmt package (Stringer interface)
+    type Stringer inteface {
+        String() string
+    }
+
+    type Incrementer interface {
+        Increment();
+    }
+
+
+    var myStringer fmt.Stringer
+    var myIncrementer Incrementer
+
+    pointedCounter := &Counter{}
+    valueCounter := Counter{}
+
+    myStringer = pointerCounter // ok
+    myStringer = valueCounter // ok
+
+    myIncrementer = pointerCounter // ok
+    myIncrementer = valueCounter // compile-time error!
     ```
-### Short to Inteface
-- Most popular feature of GO (real star of GO)
-- By convention interface names end with `er`
-```go
-
-type Counter struct {
-    total int
-    lastUpdated time.Time
-}
-
-func (c *Counter) Increment() {
-    c.total++
-    c.lastUpdate = time.Now()
-}
-
-func (c Counter) String() string {
-    return fmt.Sprintf("total : %d, last updated : %v", c.total, c.lastUpdate)
-}
-
-
-// --- 
-
-// from fmt package (Stringer interface)
-type Stringer inteface {
-    String() string
-}
-
-type Incrementer interface {
-    Increment();
-}
-
-
-var myStringer fmt.Stringer
-var myIncrementer Incrementer
-
-pointedCounter := &Counter{}
-valueCounter := Counter{}
-
-myStringer = pointerCounter // ok
-myStringer = valueCounter // ok
-
-myIncrementer = pointerCounter // ok
-myIncrementer = valueCounter // compile-time error!
-
-```
+    - Why compile time error ? Method set of value instance only contains value receiver methods. Therefore method set of `valueCounter` doesn't contains `Increment()` method required to be implemented by `Incrementer` interface
+> [!TIP]
+> Names of Interfaces usually ends with `er` like `io.Reader`, `io.Closer`, `io.ReadCloser`, `json.Marshaler`
 
 ### Interface are Type-Safe Duck Typing
 - Interface in Go looks similar to other language but with one diff
@@ -3072,14 +3124,13 @@ sum := numStrings.Map(func(s string) int {
 
 ### Summary points
 
-- Changing a function with an interface parameter into a function with a generic type parameter might lead to runtime lookups causing a slowdown. The current Go compiler, when using generics, generates unique functions for different underlying types. However, all pointer types share a single generated function, and additional runtime lookups are added to differentiate between the different types passed into shared generated functions. This, in turn, causes a slowdown in performance. See "Idiomatic Go and Generics."
-- 
-
+- Changing a function with an interface parameter into a function with a generic type parameter might lead to runtime lookups causing a slowdown. The current Go compiler, when using generics, generates unique functions for different underlying types. However, all pointer types share a single generated function, and additional runtime lookups are added to differentiate between the different types passed into shared generated functions. This, in turn, causes a slowdown in performance. See "Idiomatic Go and Generics"
 
 ## Chapter 9 : Errors 
 
 
 ## Chapter 10 : Modules, Packages And Imports 
+  - 
 
 
 ## Chapter 11 : Concurrency in Go
