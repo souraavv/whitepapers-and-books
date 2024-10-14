@@ -52,11 +52,11 @@
   - [Embedding is not Inheritance](#embedding-is-not-inheritance)
   - [Quick Introduction to Interface](#quick-introduction-to-interface)
   - [Interface are Type-Safe Duck Typing](#interface-are-type-safe-duck-typing)
-  - [Decorator pattern](#decorator-pattern)
   - [Embeddings and Interfaces](#embeddings-and-interfaces)
   - [Accept Interfaces, Return Structs](#accept-interfaces-return-structs)
   - [Interfaces and nil](#interfaces-and-nil)
   - [Interfaces Are Comparable](#interfaces-are-comparable)
+  - [Empty Interface `Interface{}` or `any`](#empty-interface-interface-or-any)
   - [Type Assertion and Type Switches](#type-assertion-and-type-switches)
   - [Function Type are Bridge to Interfaces](#function-type-are-bridge-to-interfaces)
   - [Implicit Interface makes Dependency Injection Easier](#implicit-interface-makes-dependency-injection-easier)
@@ -2111,17 +2111,23 @@ fmt.Println("inner : ", o.Inner.X) // using embedded field type to refer to obsc
 > Names of Interfaces usually ends with `er` like `io.Reader`, `io.Closer`, `io.ReadCloser`, `json.Marshaler`
 
 ### Interface are Type-Safe Duck Typing
-- Interface in Go looks similar to other language but with one diff
+- Interface in Go looks similar to other language but with one diff, that interfaces in Go are implemented implicitly
 - Note in the above `Counter` and `Incrementer`. There is no where in the `Counter` (a concrete type) struct we have specified that this *implements* the interface
 - If the method set for concrete type contains all the method in the method set for an interface, the concrete type implements the interface
-- This implicit behavior make interfaces most interesting!!
+- This implicit behavior make interfaces most interesting!! :sunglasses:
     - Enables type safety and decoupling 
-    - Bridge the functionality in both static and dynamic language
-    - Allows you to swap implementation as needed
+    - Bridge the functionality in both static and dynamic languages
+    - Favours design pattern i.e *Program to an interface, not an implementation*
+    - Provides flexibility to change implementation 
+    - Other people will understand what out code is doing by specifying what the code depends on
 
-> Duck Typing - "if it walks like a duck and quacks like a duck, it's a duck" - Used a lot in dynamic typed language like Python, Ruby, and Javascript that don't have interfaces.  The concept is that you can pass an instance of a type as a parameter to a function as long as the function can find a method to invoke that it expects:
+> [!NOTE]
+> **Duck Typing**
+> - "if it walks like a duck and quacks like a duck, it's a duck" 
+> - Used a lot in dynamic typed language like Python, Ruby, and Javascript that don't have interfaces.  The concept is that you can pass an instance of a type as a parameter to a function as long as the function can find a method to invoke that it expects
+> - Without explicit type it's hard to know exactly what functionality should be expected
 
-- Python
+- Interfaces in Python
 ```python
 class Logic:
     def process(self, data):
@@ -2135,7 +2141,7 @@ logicToUse = Logic()
 program(logicToUse)
 ```
 
-- Java
+- Interfaces in Java
 ```java
 public interface Logic {
     String process(String data);
@@ -2166,6 +2172,8 @@ private static void main(String[] args) {
 
 ```
 
+- Interfaces in Go
+  - Only the caller(`Client`) knows about it, nothing is declared on `LogicProvider` to indicate that it meets the interface
 ```go
 type LogicProvider struct {}
 func (lp LogicProvider) Process (data string) string {
@@ -2192,28 +2200,28 @@ main() {
 
 ```
 
+> Need for Implicit Interfaces 
+> - Need flexibility to change implementation as our application grow and changes over time
+> - In order for people to understand what our code is doing, we need to specify what our code depends on
+> - Interfaces specify what callers need. The client code defines the interface to specify what functionality it requires.
 
-> Interfaces specify what callers need. The client code defines the interface to specify what functionality it requires.
-
-### Decorator pattern
-- Common in go to write factory methods 
-    - IN: An instance of a interface 
-    - OUT: return another type that implement the same interface
-
+- Standard Interfaces encourages the decorator pattern, common to write factory functions with : 
+    - **Input:** An instance of a interface 
+    - **Output:** Return another type that implement the same interface
 
 ```go
 func process(r io.Reader) error
+```
 
+```go
+// type(r) = os.File implements io.Reader interface
 r, err := os.Open(fileName)
 if err != nil {
     return err
 } 
 defer f.Close()
 return process(r)
-
 ```
-
-- Wrapper 
 
 ```go
 r, err := os.Open(fileName)
@@ -2221,26 +2229,23 @@ if err != nil {
     return err
 }
 defer r.Close()
+// [type(r) == os.File] & [type(gz)] implements io.Reader interface
 gz, err := gzip.NewReader(r)
 if err != nil {
     return err
 }
 defer gz.Close()
 return process(gz)
-
 ```
 
-- It’s perfectly fine for a type that meets an interface to specify additional methods that aren’t part of the interface. 
-    - Use case ?
-        - One set of client (say) may not care about those methods, but other do
-        - e.g. `io.File` *type* also meets the `io.Writer` *interface* 
-
-
+- It’s perfectly fine for a type that meets an interface to specify additional methods that aren’t part of the interface. Use case ?
+    - One set of client (say) may not care about those methods, but other do
+    - e.g. `io.File` *type* also meets the `io.Writer` *interface*
 
 ### Embeddings and Interfaces
-
-- Embeddings is not only for `structs`
-- You can embed an interface in an interface
+- Embeddings is not only for `structs`, is extended to interfaces with following possibilities :
+  1. Embedding an interface in an interface
+  2. Embedding an interface in a struct
 
 ```go
 type Reader interface {
@@ -2251,14 +2256,12 @@ type Closer interface {
     Close() error 
 }
 
+// embedding interface in an interface
 type ReadCloser interface {
     Reader
     Closer
 }
-
 ```
-- Later we will also see that we can embed an interface in a struct
-
 
 ### Accept Interfaces, Return Structs
 
@@ -2266,53 +2269,60 @@ type ReadCloser interface {
     - Business logic invoked by your functions should be invoked via intefaces
     - But the output of your function should be *concrete* type
 
-- Interfaces makes your code more flexibile (independent of implementation) 
+- *Accept Interfaces*
+  - Interfaces makes your code more flexibility (independent of implementation) 
+  - Explicitly declare the exact functionality being used
 
-- Why return concrete ? 
-    - When a concrete type is returned by a function, new methods and fields and methods are ignored
-    - Not true for interfaces
-        - Adding a new method to interface means that all existing implementations of that interface must be updated
-    - Avoids backward compatiabitity issues
+- *Return Structs* (Concrete Types)
+  - Makes it easier to gradually update a function's return value in new version of your code
+  - When a concrete type is returned by a function, new methods and fields are ignored
+  - Not true for interfaces, adding a new method to interface means that all existing implementations of that interface must be updated
+  - Avoids backward compatiabitity issues which keeps users happy 😄
 
-
-> Write separate factory method for each concrete type
+> [!TIP]
+> Rather than writing a single factory that returns different instances behind an interface based on input parameters, we should try to write separate factory functions for each concrete types
 
 - In some situation, it's unavoidable and you have no choice but to return an interface 
     - Erros are an exception to this rule 
-    - This bears some cost to the garbage collection, since returning struct avoids the heap allocation
-    - However, when invoking a function with the parameter of interface type, a heap allocation occurs for each interface parameter
-    - 
+    - Set of interfaces defined in `database/sql/driver` package in the standard library. It's the responsibility of the database driver author to provide the concrete implementation of these interfaces, so almost all methods on all interfaces defined in `database/sql/driver` return interfaces
 
+> [!IMPORTANT]
+> - Returning struct avoids heap allocation, reduces the amount of work for the garbage collector. 
+> - But when invoking a function with parameters of interface types, heap allocation occurs for each interface parameter
 
 
 ### Interfaces and nil
 
 - `nil` : Zero value for
     - pointer type 
-    - Inteface type  (but not as simple as it was for concrete type)
+    - Interface type  (but not as simple as it was for concrete type)
 
-- Understanding how Go implements inteface
-    - a struct with two fields
-        - 1 : value
-        - 2 : type of value
-    - As long as type field(2) is non-nil, interface is non-nil
-    - In order for an interface to be considered as `nil`, both the type and value must be `nil` 
-    ```go
-    var pointerCounter *Counter 
-    fmt.Println(pointerCounter == nil) // true
+- Implemented in Go using struct with two fields
+    1. pointer to value
+    2. pointer to type of value
+- As long as type field (2) is non-nil, interface is non-nil
+- In order for an interface to be considered as `nil`, both the type and value fields must be `nil` 
+```go
+var pointerCounter *Counter 
+fmt.Println(pointerCounter == nil) // true
 
-    var incrementer Incrementer 
-    fmt.Println(incrementer == nil) // true
+var incrementer Incrementer 
+fmt.Println(incrementer == nil) // true
 
-    incrementer = pointerCounter
-    fmt.Println(incrementer == nil) // false
-    ```
-    - `nil` indicates : whether you can invoke method on it or not
-    - If interface is `nil` + method invoke = panic 
-    - Allowed: You can have concrete type still `nil`, but note code can still panic if those method not handle `nil`
+incrementer = pointerCounter
+fmt.Println(incrementer == nil) // false
+```
+- `nil` indicates for a variable of interface type, whether we can invoke method on it or not
+  - If interface is `nil` + method invoked => panic 
+  - Possible to invoke methods on an interface variable, that was assigned `nil` concrete instance (but note code can still panic if those method not handle `nil`)
+
+>[!NOTE]
+> - `non-nil` type interface is not equal to `nil`, therefore it's hard to tell whether value associated with interface is `nil`
+> - we must use reflection to find out
 
 ### Interfaces Are Comparable
 - If type and values are equal -> interfaces are equal
+- Type field of the inteface must be comparable
 ```go
 
 type Doubler interface {
@@ -2325,7 +2335,7 @@ func (d *DoubleInt) Double() {
     *d = *d * 2
 }
 
-type DoubleIntSlice []int
+type DoubleIntSlice []int // slices aren't comparable
 
 func (d DbouleIntSlice) Double() {
     for i := range d {
@@ -2352,10 +2362,12 @@ DoubleComparator(dis, dis2) // compile, but run time panic (slices are not compa
 m := map[Doubler]int{}
 
 ```
+> [!TIP]
+> - Even if all our current interface implementations are comparable, but there isn't any way to ensure that interface can be implemented only by comparable types
+> - Just to be extra safe use `Comparable` method on `reflect.Value` to inspect an interface before using it with `==` & `!=` operators
 
-> `Interface{}` isn't special case syntax. An empty interface type simply state that type can store any value whose type implements zero or more methods. This just happens to to match every type in Go
-
-
+### Empty Interface `Interface{}` or `any`
+- An empty interface type simply state that type can store any value whose type implements zero or more methods (matches every type in Go)
 - Go added `any` as type alias for `interface{}`. Because an empty inteface doesn't tells you anything about the value it represent.
 - One common use of `any` is a placeholder for data of uncertain schema that's read from external store
 
@@ -2369,12 +2381,14 @@ json.Unmarshal(content, &data)
 
 ```
 - But avoid using `any` and stay with the strict type 
-- When you store a value in an empty interface, how to read that ? 
+- When you store a value in an empty interface, how to read the value back again ? 
     - Type assertions and Type switches
 
 ### Type Assertion and Type Switches
 
-- A type assertion names the concrete type that implements the interface 
+- A **type assertion** names the `concrete type` that implemented the interface, or names `another interface` that is also implemented by the concrete type whose value is stored in the interface
+- If a type assertion is wrong, our code panics
+- To avoid crash, use should be using comma ok idiom ⛑️, followed by if condition
 
 ```go
 type MyInt int 
@@ -2386,10 +2400,9 @@ func main() {
     i2 := i.(MyInt)
     fmt.Println(i2 + 1)
 
-    i2 := i.(string) // code will panic
+    i2 := i.(string) // without comma ok idiom, code will panic on incorrect type assertion
 
-    // To avoid panic use comma ok idiom
-
+    // comma ok idiom with type assertion
     i2, ok = i.(int)
     if !ok {
         return fmt.Errorf("unexpected type for %v", i)
@@ -2398,28 +2411,33 @@ func main() {
 }
 ```
 
-- A type assertion is different from type conversion. 
-    - Type conversion changes a value to the new 
-    - Assertion reveals the value stored in the interface
-    - All type assertions are checked at runtime, so must use comma ok idiom
-    - When an interface could be one of the multiple possible types, use a `type` switch instead
-    ```go
-    func doThings(i any) {
-        switch j := i.(type) {
-            case nil:
-            case int:
-            case MyInt:
-            case io.Reader:
-            case string:
-                // j is type of string
-            case bool, rune:
-                // j is type of any
-            default:    
-                // no idea, so j is of type any
-        }
-    }
-    ```
+> [!NOTE]
+>
+> | **Type Assertion** |  **Type Conversion** |
+> |--------------------|----------------------|
+> | Reveal the type of the value stored | Changes a value to a new type |
+> | Applied only to interfaces | Applied to both interfaces & concrete types |
+> | Checked at runtime, may cause panic | Most of them are applied at compile time |
 
+- A **type switch** looks similar to `switch` statement where we specify a variable of interface type and follow it with `.(type)`
+```go
+func doThings(i any) {
+    switch j := i.(type) {
+        case nil:
+        case int:
+        case MyInt:
+        case io.Reader:
+        case string:
+            // j is type of string
+        case bool, rune:
+            // j is type of any
+        default:    
+            // no idea, so j is of type any
+    }
+}
+```
+
+> [!CAUTION]
 > While getting the concrete implementation from the interface variable might seems handy, you should use these technique infrequently
 
 - Use case ? 
@@ -2495,7 +2513,7 @@ func main() {
 - If simple function like `sort.Slice` then parameter of a function type is good choice
 
 ### Implicit Interface makes Dependency Injection Easier
-- Software enginerres talks about *decoupling* code, so that changes effect the least code
+- Software engineers talks about *decoupling* code, so that changes effect the least code
 - One of the technique to achive decoupling is *dependency injection* 
 - Dependency injection is the concept that your code should explicitly specify the functionality it needs to perform its task
 > Dependency injection might be pain in other languages, but GO do it easily without any libraries
