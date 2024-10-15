@@ -57,7 +57,7 @@
   - [Interfaces and nil](#interfaces-and-nil)
   - [Interfaces Are Comparable](#interfaces-are-comparable)
   - [Empty Interface `Interface{}` or `any`](#empty-interface-interface-or-any)
-  - [Type Assertion and Type Switches](#type-assertion-and-type-switches)
+  - [Type Assertion and Type Switches : Uncovering Concrete Types](#type-assertion-and-type-switches--uncovering-concrete-types)
   - [Function Type are Bridge to Interfaces](#function-type-are-bridge-to-interfaces)
   - [Implicit Interface makes Dependency Injection Easier](#implicit-interface-makes-dependency-injection-easier)
 - [Chapter 8 : Generics](#chapter-8--generics)
@@ -2384,7 +2384,7 @@ json.Unmarshal(content, &data)
 - When you store a value in an empty interface, how to read the value back again ? 
     - Type assertions and Type switches
 
-### Type Assertion and Type Switches
+### Type Assertion and Type Switches : Uncovering Concrete Types
 
 - A **type assertion** names the `concrete type` that implemented the interface, or names `another interface` that is also implemented by the concrete type whose value is stored in the interface
 - If a type assertion is wrong, our code panics
@@ -2420,6 +2420,11 @@ func main() {
 > | Checked at runtime, may cause panic | Most of them are applied at compile time |
 
 - A **type switch** looks similar to `switch` statement where we specify a variable of interface type and follow it with `.(type)`
+- The type of the new variable depends on which case matches
+  - `nil` if the interface has no associated type
+  - if more than one type matched for a case, new variable is of type `any`
+  - `default`, new variable is of type `any`
+  - otherwise, new variable has the type of the case that matches
 ```go
 func doThings(i any) {
     switch j := i.(type) {
@@ -2436,56 +2441,37 @@ func doThings(i any) {
     }
 }
 ```
+> [!TIP]
+> If we don't know the type of the value stored in an interface, we need to use reflection
 
 > [!CAUTION]
 > While getting the concrete implementation from the interface variable might seems handy, you should use these technique infrequently
 
-- Use case ? 
-    - To check if the concrete type behind the interface, implements some other inteface 
-    - This allows you to specify the optional interface 
-
-    - ex. Standard library use this technique to allow more efficient copy
-    ```go
-    func copyBuffer(dst Writer, src Reader, buf[] byte) (written int64, err error) {
-        if wt, ok := src.(WriterTo); ok {
-            return wt.WriteTo(dst)
+- Use case for using optional interfaces
+    1. To check if the concrete type behind the interface, implements some other interface 
+        - `Eg` : Standard library use this technique to allow more efficient copy
+        ```go
+        func copyBuffer(dst Writer, src Reader, buf[] byte) (written int64, err error) {
+            if wt, ok := src.(WriterTo); ok {
+                return wt.WriteTo(dst)
+            }
+            if rt, ok := dst.(ReadFrom); ok {
+                return rt.ReadFrom(src)
+            }
         }
-        if rt, ok := dst.(ReadFrom); ok {
-            return rt.ReadFrom(src)
-        }
-    }
 
-    ```
-
-- Type switch statement
-    - Ability to differentiate b/w multiple implementation of an interface
-      that requires different processing
-    ```go
-    func walkTree(t *treeNode) (int, error) {
-        switch val := t.val.(type) {
-            case nil: 
-                return 0, errors.New("invalid expression")
-            case number:
-                return int(val), nil
-            case operator:
-                left, err := walkTree(t.lchild)
-                if err != nil {
-                    return 0, nil
-                }
-                right, err := walkTree(t.rchild) 
-                if err != nil {
-                    return 0, nil
-                }
-            default: 
-                return 0, errors.New("unknown node type")
-        }
-    }
+        ```
+    2. When evolving an API
+    
+> [!WARNING]
+> **Drawback** of using Optional Interfaces
+> - If an optional interface is implemented by one of the wrapped implementations(decorator pattern), we cannot detect it with a type assertion or type switch
+> - **Wrapped implementation (Decorator Pattern) :** wrap other implementations of the same interface to layer behaviour
 
 ### Function Type are Bridge to Interfaces
-- You see we define method on a struct (user defined type)
-- What if we have user defined type with an underlying type `int`, `string` ? 
-    - One POV - `int` and `string` are also holding some sort of state, and business logic inside method interact with the state
-- Go allows to define method on any *user-defined* type 
+- Go allows to define method on any *user-defined* type, including user-defined function types
+    - Allows function to implement interfaces
+    - Commonly used for HTTP handlers
 - Is it a flaw ?
     - Not actually
     - This is very helpful in some cases 
@@ -2506,17 +2492,14 @@ func doThings(i any) {
         f(w, r)
     }
     ```
-- When to use 
-    - Inteface VS
-    - function/method specify an input param as function type 
-- If your single function is likely to depend on many other functions or other state that's not specified in the input paramter, use interface parameter and define a function type to bridge a function to their interface
-- If simple function like `sort.Slice` then parameter of a function type is good choice
+- When should our function or method specify input parameter of function type and when should it uses an interface ?
+  - If your single function is likely to depend on many other functions or other state that's not specified in the input paramter, use interface parameter and define a function type to bridge a function to their interface
+  - If simple function like `sort.Slice` then parameter of a function type is good choice
 
 ### Implicit Interface makes Dependency Injection Easier
 - Software engineers talks about *decoupling* code, so that changes effect the least code
 - One of the technique to achive decoupling is *dependency injection* 
 - Dependency injection is the concept that your code should explicitly specify the functionality it needs to perform its task
-> Dependency injection might be pain in other languages, but GO do it easily without any libraries
 
 - Example of Implicit Interfaces to compose application via dependency injection
     ```go
@@ -2596,35 +2579,37 @@ func doThings(i any) {
         return "Goodbye, " + name, nil
     }
 
+    func NewSimpleLogic(l Logger, ds DataStore) SimpleLogic {
+        return SimpleLogic{
+            l : l,
+            ds : ds,
+        }
+    }
     ``` 
 
 - Note that in `SimpleLogic` nothing is defined about the concrete types, so there is no dependency on them
-- There is no problem if you later swap in some new implementation
-- Thus provider and interface are separate
+- There is no problem if you later swap in some new implementation provider and interface are separate
 - So this makes it different from *explicit interface* in language like Java
     - Even though Java uses interface to decouple the implementation from the inteface
     - Explicit intefaces is one which binds client and provider together
 
 - Example contd. : Let say a single endpoint you define `/hello`, which say hello to the person
-
-
 ```go
 type Logic interface {
     SayHello(userID string) (string, error)
 }
 
 // Note that in above, SayHello method is available to you SimpleLogic struct,
-// but once again, the concrete type is not aware of the inteface
+// but once again, the concrete type is not aware of the interface
 // Further more the other method on SimpleLogic, SayGoodBy, is not in the above inteface
 // because you controller doesn't care about this 
-// The above interace is owned by client, so it's method set is customized to the need of
-// client code
+
+// **The above interface is owned by client, so it's method set is customized to the need of client code**
 
 type Controller struct {
     l Logger
     logic Logic 
 }
-
 
 func (c Controller) SayHello(w http.ResponseWriter, r *http.Request) {
     c.l.Logger("In SayHello")
@@ -2658,6 +2643,10 @@ func main() {
     http.ListenAndServe(":8000", nil)
 }
 ```
+- `main` function is the only part of the code that knows what all the concrete types actually are, can swap in different implementations if required
+
+> [!NOTE]
+> Externalizing the dependencies using dependency injection limits the changes required to evolve code over time
 
 
 ## Chapter 8 : Generics
