@@ -263,4 +263,5 @@ Author: J Zhou, Published @ SIGMOD'21
     - transaction issued commit request parallely with commit version C2 & C3, where C1 < (R1, R2) < C2 < C3 
     - for commit we will sent previous LSN with LSN i.e (C1, C2) & (C2, C3)
     - now C2 will be committed before C3 to ensure serial history then C3 should fail as it's read version R3 < C2, and should be restarted ?
-- lock free conflict detection algorithm on resolvers 
+- lock free conflict detection algorithm on resolvers
+- 

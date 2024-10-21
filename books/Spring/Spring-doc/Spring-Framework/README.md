@@ -18,6 +18,8 @@
   - [Depends-On](#depends-on)
   - [Lazy-initialized Beans](#lazy-initialized-beans)
   - [Autowiring](#autowiring)
+  - [Method Injection](#method-injection)
+  - [Bean Scopes](#bean-scopes)
 
 
 ## The IoC container
@@ -802,3 +804,42 @@ public class DefaultServiceLocator {
 
 
     </details>
+
+
+### Method Injection 
+
+- __Singleton vs Prototype Problem__: In Spring, most beans are singletons, meaning they are created only once. But sometimes, a singleton bean (A) might need a fresh instance of a prototype bean (B) for every method call. How do you get a new instance every time?
+- __The Challenge__: Once Spring creates a singleton bean, it only sets the dependencies once. If a singleton bean depends on a prototype, it can only access the same prototype instance every time—not what we want!
+- __Common Fix__: Using `getBean()` from the Spring container provides new prototype instances but couples your code to Spring.
+- __Method Injection__: Allows Spring to automatically inject a new prototype instance each time, without coupling your code to Spring.
+
+<details>
+<summary></summary>
+
+```java
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+
+public class CommandManager implements ApplicationContextAware {
+    private ApplicationContext applicationContext;
+
+    public Object process(Map)
+}
+
+
+```
+</details>
+
+
+### Bean Scopes
+- Spring supports six scopes 
+
+| Scope | Description |
+|---|---|
+| Singleton | Single object instance for each Spring IoC Container |
+| Prototype | Scopes a single bean definition to any number of instances | 
+| Request | Scope is a single HTTP Request (web-aware Application Context) | 
+| Session | lifecycle of an HTTP session (web-aware Application Context)| 
+| Application | lifecycle of a Servlet Context (web-aware..) |
+| WebSocket | valid in the context of web socket | 
