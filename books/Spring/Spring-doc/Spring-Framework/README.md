@@ -20,6 +20,10 @@
   - [Autowiring](#autowiring)
   - [Method Injection](#method-injection)
   - [Bean Scopes](#bean-scopes)
+    - [Singleton](#singleton)
+    - [Prototype](#prototype)
+    - [Singleton Beans with Prototype-bean Dependencies](#singleton-beans-with-prototype-bean-dependencies)
+    - [Web Aware Application Context](#web-aware-application-context)
 
 
 ## The IoC container
@@ -843,3 +847,99 @@ public class CommandManager implements ApplicationContextAware {
 | Session | lifecycle of an HTTP session (web-aware Application Context)| 
 | Application | lifecycle of a Servlet Context (web-aware..) |
 | WebSocket | valid in the context of web socket | 
+
+
+#### Singleton 
+- Spring IoC creates exactly one instance of the object defined by the bean definition 
+    ```xml
+    <bean id="accountService" class="com.something.DefaultAccountService"/>
+    <!-- the following is equivalent, though redundant (singleton scope is the default) -->
+    <bean id="accountService" class="com.something.DefaultAccountService" scope="singleton"/>
+    ```
+
+
+#### Prototype 
+- Non-singleton (a new bean instance every time a request for that specific bean is made)
+    ```xml
+    <bean id="accountService" class="com.something.DefaultAccountService" scope="prototype"/>
+    ```
+
+#### Singleton Beans with Prototype-bean Dependencies
+- If Singleton dependes on Prototype bean
+  - When Spring creates the singleton bean, it injects one instance of the prototype bean (at the time of creation)
+- The singleton continues using this same prototype instance, even though prototypes should be fresh each time.
+- To get new prototype instances at runtime, regular dependency injection won’t work; use method injection instead.
+    ```java
+    @Component 
+    public class SingletonBean {
+
+        public void performTask() {
+            PrototypeBean pb = getPrototypeBean();
+            pb.doSomething();
+        }
+
+        // This method will return a new PrototypeBean instance every time it's called
+        @Lookup
+        public PrototypeBean getPrototypeBean() {
+            // Spring overrides this method with logic to return a new prototype bean
+            return null;
+        }
+    }
+    ```
+
+
+#### Web Aware Application Context
+
+```xml
+<bean id="loginAction" class="com.something.LoginAction" scope="request"/>
+```
+
+```java
+@RequestScope
+@Component
+public class LoginAction {
+	// ...
+}
+```
+
+
+```xml
+<bean id="userPreferences" class="com.something.UserPreferences" scope="session"/>
+```
+
+```java
+@SessionScope
+@Component
+public class LoginAction {
+	// ...
+}
+```
+
+
+```xml
+<bean id="appPreferences" class="com.something.AppPreferences" scope="application"/>
+```
+
+```java
+@ApplicationScope
+@Component
+public class LoginAction {
+	// ...
+}
+```
+
+
+```xml
+<bean id="loginAction" class="com.something.LoginAction" scope="session"/>
+```
+
+```java
+@SessionScope
+@Component
+public class LoginAction {
+	// ...
+}
+```
+
+- Spring also allows to have custom scopes
+
