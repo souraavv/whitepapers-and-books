@@ -3250,8 +3250,7 @@ sum := numStrings.Map(func(s string) int {
     ```
 
 #### Understanding How channels behave ?
-- ![alt text](image.png)
-
+- ![how channels behave](images/HowChannelsBehave.png)
 
 ## Chapter 12 : The Standard Library 
 
