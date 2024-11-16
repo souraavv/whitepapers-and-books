@@ -27,6 +27,8 @@
   - [Customizing the Nature of Beans](#customizing-the-nature-of-beans)
     - [Lifecycle Callbacks](#lifecycle-callbacks)
   - [Annotation-based container configuration](#annotation-based-container-configuration)
+  - [Fine-tuning Annotation-based Autowiring with @Primary or @Fallback](#fine-tuning-annotation-based-autowiring-with-primary-or-fallback)
+  - [Fine-tuning Annotation-based Autowiring with Qualifiers](#fine-tuning-annotation-based-autowiring-with-qualifiers)
 
 
 ## The IoC container
@@ -1061,3 +1063,153 @@ public class LoginAction {
     }
     ```
 
+### Fine-tuning Annotation-based Autowiring with @Primary or @Fallback
+- Because autowiring by type may lead to multiple candidates, it is often necessary to have more control over the selection process.
+    <details>
+    <summary> Example of multiple candidates </summary>
+
+    ```java
+
+    public interface PaymentService {
+        void processPayment();
+    }
+
+    @Component
+    public class CreditCardPaymentService implements PaymentService {
+        @Override
+        public void processPayment() {
+            System.out.println("Processing payment using Credit Card.");
+        }
+    }
+
+    @Component
+    public class PayPalPaymentService implements PaymentService {
+        @Override
+        public void processPayment() {
+            System.out.println("Processing payment using PayPal.");
+        }
+    }
+
+    // When you run the application, 
+    // Spring will throw an exception because there are two candidates 
+    // (CreditCardPaymentService and PayPalPaymentService), and it can’t decide which one to inject.
+
+    @Service
+    public class OrderService {
+
+        @Autowired
+        private PaymentService paymentService;
+
+        public void placeOrder() {
+            paymentService.processPayment();
+        }
+    }
+    ```
+    </details>
+- One way is to use `@Primary` annotation
+- If exactly one primary bean exists among the candidates, it becomes the autowired value.
+    ```java
+    @Configuration
+    public class MovieConfiguration {
+
+        @Bean
+        @Primary
+        public MovieCatalog firstMovieCatalog() { ... }
+
+        @Bean
+        public MovieCatalog secondMovieCatalog() { ... }
+
+        // ...
+    }
+    ```
+
+- In Spring 6.2, the introduction of the `@Fallback` annotation provides a mechanism to mark beans that should act as fallback options during dependency injection. 
+- This feature helps manage the scenario where you have multiple beans of the same type, and you want to specify one (or more) as a fallback in case the primary beans are unavailable or don't meet certain conditions.
+    <detials>
+    <summary> Fallback in Spring - Example </summary>
+
+    ```java
+    
+    public interface MessagingService {
+        void sendMessage(String message);
+    }
+
+    @Component
+    public class SmsMessagingService implements MessagingService {
+        @Override
+        public void sendMessage(String message) {
+            System.out.println("Sending SMS: " + message);
+        }
+    }
+
+    @Component
+    public class EmailMessagingService implements MessagingService {
+        @Override
+        public void sendMessage(String message) {
+            System.out.println("Sending Email: " + message);
+        }
+    }
+
+    @Component
+    @Fallback
+    public class DefaultMessagingService implements MessagingService {
+        @Override
+        public void sendMessage(String message) {
+            System.out.println("Fallback: Sending Default Message: " + message);
+        }
+    }
+
+
+    @Service
+    public class NotificationService {
+
+        @Autowired
+        private MessagingService messagingService;
+
+        public void notifyUser(String message) {
+            messagingService.sendMessage(message);
+        }
+    }
+
+    ```
+
+  - What Happens When Spring Starts?
+    1. If Both `SmsMessagingService` and `EmailMessagingService` Exist:
+
+    Spring will inject one of them based on the available beans.
+    `DefaultMessagingService` will not be injected because it is marked with `@Fallback` and is used only when no other bean is available.
+    2. If Only `SmsMessagingService` Exists:
+
+    It will be injected as the primary bean (since it's the only regular bean available).
+    The `@Fallback` bean (`DefaultMessagingService`) will not be injected, as there’s no need for a fallback.
+    If No Regular Bean Exists (e.g., only `DefaultMessagingService`):
+
+    3. The `@Fallback` bean (`DefaultMessagingService`) will be injected because there are no regular beans available.
+    </details>
+
+
+### Fine-tuning Annotation-based Autowiring with Qualifiers
+- `@Primary` and `@Fallback` are effective ways to use autowiring by type with several instances
+- When you need more control over the selection process, you can use Spring’s `@Qualifier` annotation
+
+    ```java
+    public class MovieRecommender {
+
+        @Autowired
+        @Qualifier("main")
+        private MovieCatalog movieCatalog;
+        // ...
+    }
+
+    public class MovieRecommender {
+        private final MovieCatalog movieCatalog;
+        private final CustomerPreferenceDao customerPreferenceDao;
+        @Autowired
+        public void prepare(@Qualifier("main") MovieCatalog movieCatalog,
+                CustomerPreferenceDao customerPreferenceDao) {
+            this.movieCatalog = movieCatalog;
+            this.customerPreferenceDao = customerPreferenceDao;
+        }
+        // ...
+    }
+    ```
