@@ -24,6 +24,9 @@
     - [Prototype](#prototype)
     - [Singleton Beans with Prototype-bean Dependencies](#singleton-beans-with-prototype-bean-dependencies)
     - [Web Aware Application Context](#web-aware-application-context)
+  - [Customizing the Nature of Beans](#customizing-the-nature-of-beans)
+    - [Lifecycle Callbacks](#lifecycle-callbacks)
+  - [Annotation-based container configuration](#annotation-based-container-configuration)
 
 
 ## The IoC container
@@ -942,4 +945,119 @@ public class LoginAction {
 ```
 
 - Spring also allows to have custom scopes
+
+### Customizing the Nature of Beans
+
+#### Lifecycle Callbacks
+
+- Keeping this section for future TODO, might not be required at this point
+- For now just remember that 
+  - The Spring Framework allows bean customization through various interfaces: Lifecycle Callbacks for managing bean initialization and destruction, `ApplicationContextAware` and `BeanNameAware` for accessing context and bean details, and Other Aware Interfaces for additional capabilities.
+
+
+### Annotation-based container configuration
+
+- Instead of xml use annotation to define and configure bean
+    ```java
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+
+    @Configuration
+    public class AppConfig {
+        @Bean
+        public MyService myService() {
+            return new MyServiceImpl();
+        }
+    }
+    ```
+- `@Component` and stereotype annotation;
+  - Used to mark a class as a Spring-managed component. Spring scans for these components.
+  - `@Component` - Generic Stereotype for any Spring-managed component
+  - `@Service` - Specialization for service-layer component
+  - `@Repository` - Specialization for DAO (Data Access Object) classes
+  - `@Controller` - Specialization for MVC controllers
+
+- Annotation based injection are preformed before external property injection. Thus, external configuration (for example Xml based) effectively overrides the annotations for properties when both approaches are used.
+
+- When using `@Autowired` makes sure that type of bean (class or interface) must match the type expected at the injection point
+    ```java
+    @Bean 
+    public MovieCatalog movieCatalog() {
+        return new MovieCataologImpl(); // Return type matches injection point
+    }
+
+    // Injection point
+    @Autowired
+    private MovieCatalog movieCatalog; // match correctly
+    ```
+
+- Self Injection 
+  - Self-injection in Spring allows a bean to refer it self. This is important when a bean is proxy. Proxy here means than Spring wraps orginal bean so that it can apply transactional logic before and after the method calls.
+    ```java
+        import org.springframework.beans.factory.annotation.Autowired;
+        import org.springframework.stereotype.Service;
+        import org.springframework.transaction.annotation.Transactional;
+
+        @Service
+        public class MyService {
+
+            @Autowired
+            private MyService self; // Self-injection
+
+            // Proxy starts the transaction; calls the real method; commit/rollback based on result
+            @Transactional
+            public void doSomething() {
+                System.out.println("Doing something with transaction support.");
+            }
+
+            public void triggerSomething() {
+                // Calling via self ensures transactional proxy is used
+                self.doSomething();
+            }
+        }
+    ```
+    - Instead this if you use `this.doSomething()` then proxy behavior will get skip. But please remember using self injection is not a preferred approach and only a backup option
+  
+- Non mandatory beans (Optional Dependencies) 
+  - `@Autowired(required = false)`: This tells Spring to inject the MovieFinder bean if it exists in the Spring context.
+    - If no matching `MovieFinder` bean is available, Spring does not throw an error and simply leaves the `movieFinder` field as `null`.
+    ```java
+    @Service
+    public class MyService {
+
+        private Logger logger;
+
+        @Autowired(required = false)
+        public void setLogger(Logger logger) {
+            this.logger = logger; // Injected only if Logger is defined
+        }
+
+        public void doSomething() {
+            if (logger != null) {
+                logger.log("Operation performed!");
+            } else {
+                System.out.println("Logger not available. Proceeding without logging.");
+            }
+        }
+    }
+    ```
+  - The above is not preffered way. Instead of using optional dependencies, you might use conditional bean creation (e.g., `@ConditionalOnMissingBean` in Spring Boot).
+  - Or Use
+    ```java
+    public class SimpleMovieLister {
+        @Autowired
+        public void setMovieFinder(Optional<MovieFinder> movieFinder) {
+            ...
+        }
+    }
+
+    // OR 
+
+    public class SimpleMovieLister {
+        @Autowired
+        public void setMovieFinder(@Nullable MovieFinder movieFinder) {
+            ...
+        }
+    }
+    ```
 
