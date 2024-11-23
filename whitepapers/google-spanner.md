@@ -1,3 +1,20 @@
+- [Spanner: Google's Globally-Distributed Database](#spanner-googles-globally-distributed-database)
+    - [Pre-req for this whitepaper](#pre-req-for-this-whitepaper)
+    - [Goals](#goals)
+    - [Configurable Parameters](#configurable-parameters)
+    - [Customers](#customers)
+    - [Challenges](#challenges)
+    - [Gains for Applications](#gains-for-applications)
+  - [Serializability versus Linearizability](#serializability-versus-linearizability)
+    - [Serializability is the "I", or isolation, in the ACID](#serializability-is-the-i-or-isolation-in-the-acid)
+    - [Linearizability is the "AC", or Atomicity Consistency, in the ACID](#linearizability-is-the-ac-or-atomicity-consistency-in-the-acid)
+  - [Strict Serializability: Why don’t we have both?](#strict-serializability-why-dont-we-have-both)
+  - [Two Phase Commit](#two-phase-commit)
+  - [Coordination costs and real-world deployments](#coordination-costs-and-real-world-deployments)
+  - [Implementation](#implementation)
+  - [Concurrency Control](#concurrency-control)
+  - [References](#references)
+
 
 # Spanner: Google's Globally-Distributed Database
 
@@ -33,7 +50,10 @@
   
 This papers tries to achieve 
 - **Externally consistent** - Read/Write in a Distributive Database
-  - External Consistency == Strict Serializability 
+  - External Consistency (or Strict Serializability)
+    - Why named External ? - 
+      - Highlights that the correctness of the system is judged based on how external observers perceive the ordering of operations.
+    - [Question to reader] Why External Consistency matters ? Or to be precise in which set of system External consistency matters ? 
 - **Globally consistent** - Read across the database at a time-stamp.
 
 ### Gains for Applications
@@ -47,8 +67,8 @@ All at the global scale, and even in the presence of ongoing transaction.
 ## Serializability versus Linearizability
 
 - When can one say two Transaction are isolated to each other ? 
-  - [T1(start), ... T1(end),.., T2(start), ... T2(end)] or
-  - [T2(start), ... T2(end),.., T1(start), ... T1(end)]
+  - $`[T1(start), ... T1(end),.., T2(start), ... T2(end)]`$ or
+  - $`[T2(start), ... T2(end),.., T1(start), ... T1(end)]`$
   - In the above two cases no partial writes are visible from either of the txn. This means if we do serial execution then we can always guarantee that two txns are isolated and consistent (if application writer is maintaining consistency)
   - Although in the real world we can't perform operations serially always. Reason - Multi-Cores are not getting utilize property and even for a single core system in case if a txn is busy with I/O we are under utilizing the CPU cycles.
   - So for throughput we will always have interleaving of operations, which brings us to the question - How we can ensure Isolation and Consistency when operations are interleaved.
@@ -74,11 +94,80 @@ All at the global scale, and even in the presence of ongoing transaction.
 - Combining serializability and linearizability yields strict serializability: transaction behavior is equivalent to some serial execution, and the serial order corresponds to real time. For example, say I begin and commit transaction T1, which writes to item x, and you later begin and commit transaction T2, which reads from x. A database providing strict serializability for these transactions will place T1 before T2 in the serial ordering, and T2 will read T1’s write. A database providing serializability (but not strict serializability) could order T2 before T1
 - linearizability can be viewed as a special case of strict serializability where transactions are restricted to consist of a single operation applied to a single object
 
+Reference: [Peter Bailis Notes - MIT](http://www.bailis.org/blog/linearizability-versus-serializability/)
+
+## Two Phase Commit 
+
+- In two-phase commits, RW transactions are executed in two phases. Transaction coordinator (TC) asks all shards to return all relevant values and prepare to write by taking the write locks. The values are sent back to the client. The client sends back the new values to write. TC asks all shards to commit the values and release all locks.
+
+Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/codenet/col733-cloud/blob/main/storage-spanner.md#:~:text=on%20multiple%20machines.-,Two%2Dphase%20commit,-In%20two%2Dphase)
+
 ## Coordination costs and real-world deployments
 - Neither linearizability nor serializability is achievable without coordination. That is we can’t provide either guarantee with availability (i.e., CAP “AP”) under an asynchronous network
 
 
-### References
+## Implementation
 
+- Following mapping is maintained `(key: string, timestamp: int64) -> String`
+  - Timestamp enables the multi-version database than a key-value store
+  - The entity which stores these is called as "tablet"
+- To support replication, single Paxos state machine on top of each tablet (allows more fine-grained replication)
+  - Writes must initiate the Paxos protocol at the leader; 
+  - Reads access state directly from the underlying tablet at any replica that is sufficiently up-to-date (will define up-to-date later)
+- Each state machine stores its metadata and log in its corresponding tablet
+- Lock tables - A leader maintain the lock table
+  - Lock table is for the Concurrency Control
+  - Table contains the state for two-phase locking; it maps ranges of keys to lock state
+- Design choice - Long live leaders with time-based leader lease
+  - Why ? Efficiently maintain the lock table 
+- Optimistic vs Pessimistic Concurrency Control
+  - Optimistic Concurrency Control
+    - OCC assumes most transaction do not conflict with each other. Transaction setup watch for different variables. If any variable changes before transaction could commit, the transaction is aborted
+    - Performance degrades as more long-live transactions
+  - Pessimistic Concurrency Control 
+    - PCC assumes most transactions conflict with each other, so they upfront lock variables. If transactions were not conflicting, we unnecessarily pay the locking overhead.
+    - Chances of deadlocks with multiple ongoing transactions
+    - 
+- Each leader also implements a *transaction manager* to support distributed transactions
+  - The transaction manager is used to implement a *participant leader*, the other replicas in the group will be referred to as *participant slaves*.
+  - Transaction manager is only required when a transaction involves more than one Paxos group, those groups leaders coordinate to perform two-phase commit
+    - Two-phase commit generates Paxos write for the prepare phase that has no corresponding Spanner client write
+  - One of the participant group is chosen as **coordinator**; the participant leader of that group is called as **coordinator leader**, and the slaves of that group as **coordinator slaves**
+  - The state of each transaction manager is stored in the underlying Paxos group (and therefore is replicated) 
+- TrueTime
+    | Method | Returns | 
+    | -- | -- |
+    | TT.now() | TTinterval: [earliest, latest] |
+    | TT.after(t) | true if t has definitely passed | 
+    | TT.before(t) | true if t has definitely not arrived |
+  - Note that time uncertainity is bounded (so notion of uncertainity is captured)
+    - We will see the power of this concept later. 
+  - Lets define ϵ : Instantenous error bounds and ϵ' as average error bound 
+  - Let $` t_{abs}(e) `$ the absolute time of an event $`e`$, In more formal TrueTime guarantees that for an invocation $`tt = TT.now(); tt.earliest \leq t_{abs}(e_{now}) \leq tt.latest `$, where $`e_{now}`$ is the invocation event
+  - Underlying reference for TrueTime are GPS and Atomic Clocks 
+
+    | Operation | Concurrency Control | Replica Required | 
+    | --- | --- | --- | 
+    | Read-Write Transaction | Pessimistic | Leader | 
+    | Read-Only Transaction | lock-free | leader for timestamp; any for read |
+    | Snapshot Read, client-provided timestamp | lock-free | any | 
+    | Snapshot Read, Client-provided bound | lock-free | any | 
+
+## Concurrency Control 
+
+In this section - How TrueTime is used to guarantee the correctness properties around concurrency control, and how those properties are used to implement features such as *external consistent transaction*, *lock-free* read-only transaction, and *non-blocking* reads in the past. This feature allow to audit the database at a timestamp *t* will see exactly the effects of every transaction that has commited as of *t*.
+
+### Paxos Leader Leases
+### Assigning TimeStamps to RW Transactions 
+### Serving Reads at a Timestamp
+### Assigning Timestamps to RO Transactions
+
+
+
+## References
+
+- [Linearizability versus Serializability: Peter Bailis Notes - MIT](http://www.bailis.org/blog/linearizability-versus-serializability/)
 - [When is "ACID" ACID? rarely](http://www.bailis.org/blog/when-is-acid-acid-rarely/)
 - [Weak vs Strong Memory Models](https://preshing.com/20120930/weak-vs-strong-memory-models/)
+- [COL-733 IIT Delhi Notes - Prof. Abhilash](https://github.com/codenet/col733-cloud/blob/main/storage-spanner.md)
+
