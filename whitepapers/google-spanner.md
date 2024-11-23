@@ -52,7 +52,8 @@
   - You can, but the cost you pay is the throughput
 - Availability comes from replication, and replication cost the consistency
   
-This papers tries to achieve 
+This paper tries to achieve
+
 - **Externally consistent** - Read/Write in a Distributive Database
   - External Consistency (or Strict Serializability)
     - Why named External ?
@@ -73,11 +74,11 @@ All at the global scale, and even in the presence of ongoing transaction.
 - When can one say two Transaction are isolated to each other ? 
   - $`[T1(start), ... T1(end),.., T2(start), ... T2(end)]`$ or
   - $`[T2(start), ... T2(end),.., T1(start), ... T1(end)]`$
-  - In the above two cases no partial writes are visible from either of the txn. This means if we do serial execution then we can always guarantee that two txns are isolated and consistent (if application writer is maintaining consistency)
-  - Although in the real world we can't perform operations serially always. Reason - Multi-Cores are not getting utilize property and even for a single core system in case if a txn is busy with I/O we are under utilizing the CPU cycles.
-  - So for throughput we will always have interleaving of operations, which brings us to the question - How we can ensure Isolation and Consistency when operations are interleaved.
-    - One thing if you notice - context switches are not in our control and if txns are running concurrently then there is no way for us to determine deterministically which operation will happen when (In general, ordering can't be guaranteed)
-    - This bring us to a point such that our definition of Isolation should be independent of real-time constraints on the ordering of txns. 
+  - In both of the above cases, no partial writes are visible from either of the transactions. This means that with serial execution, we can always guarantee that the two transactions are isolated and consistent (assuming the application writer maintains consistency).
+  - In the real world, we can't always perform operations serially. The reason is that multi-core processors are not utilized efficiently, and even in single-core systems, if a transaction is busy with I/O, the CPU cycles are underutilized.
+  - For throughput, we will always have interleaving of operations, which brings us to the question: How can we ensure isolation and consistency when operations are interleaved?
+    - One thing to note is that context switches are not under our control, and when transactions are running concurrently, there’s no way to deterministically determine which operation will occur when. In general, the ordering cannot be guaranteed.
+    - This brings us to the point that our definition of isolation should be independent of real-time constraints on the ordering of transactions.
     - If any interleaved order produced same result as one of the $`T1T2`$ or $`T2T1`$ then we can say the order of execution was "Serializable"
 
 ### Serializability is the "I", or isolation, in the ACID
@@ -112,7 +113,7 @@ Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/coden
 
 ## Implementation
 
-- Following mapping is maintained $`(key: string, timestamp: int64) -> String`$
+- The following mapping is maintained $`(key: string, timestamp: int64) -> String`$
   - Timestamp enables the multi-version database than a key-value store
   - The entity which stores these is called as **tablet**
 - To support replication, single Paxos state machine on top of each tablet (allows more fine-grained replication)
