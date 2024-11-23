@@ -13,6 +13,10 @@
   - [Coordination costs and real-world deployments](#coordination-costs-and-real-world-deployments)
   - [Implementation](#implementation)
   - [Concurrency Control](#concurrency-control)
+    - [Paxos Leader Leases](#paxos-leader-leases)
+    - [Assigning TimeStamps to RW Transactions](#assigning-timestamps-to-rw-transactions)
+    - [Serving Reads at a Timestamp](#serving-reads-at-a-timestamp)
+    - [Assigning Timestamps to RO Transactions](#assigning-timestamps-to-ro-transactions)
   - [References](#references)
 
 
@@ -51,7 +55,7 @@
 This papers tries to achieve 
 - **Externally consistent** - Read/Write in a Distributive Database
   - External Consistency (or Strict Serializability)
-    - Why named External ? - 
+    - Why named External ?
       - Highlights that the correctness of the system is judged based on how external observers perceive the ordering of operations.
     - [Question to reader] Why External Consistency matters ? Or to be precise in which set of system External consistency matters ? 
 - **Globally consistent** - Read across the database at a time-stamp.
@@ -74,12 +78,12 @@ All at the global scale, and even in the presence of ongoing transaction.
   - So for throughput we will always have interleaving of operations, which brings us to the question - How we can ensure Isolation and Consistency when operations are interleaved.
     - One thing if you notice - context switches are not in our control and if txns are running concurrently then there is no way for us to determine deterministically which operation will happen when (In general, ordering can't be guaranteed)
     - This bring us to a point such that our definition of Isolation should be independent of real-time constraints on the ordering of txns. 
-    - If any interleaved order produced same result as one of the T1T2 or T2T1 then we can say the order of execution was "Serializable"
+    - If any interleaved order produced same result as one of the $`T1T2`$ or $`T2T1`$ then we can say the order of execution was "Serializable"
 
 ### Serializability is the "I", or isolation, in the ACID
 - Multi-operation, multi-object, arbitrary total order
 - Serializability is a guarantee about transactions, or groups of one or more operations over one or more objects. It guarantees that the execution of a set of transactions (usually containing read and write operations) over multiple items is equivalent to some serial execution (total ordering) of the transactions.
-- Serializability is the traditional “I,” or isolation, in ACID. If users’ transactions each preserve application correctness (“C,” or consistency, in ACID), a serializable execution also preserves correctness. Therefore, serializability is a mechanism for guaranteeing database correctness.
+- Serializability is the traditional “I,” or isolation, in *ACID*. If users’ transactions each preserve application correctness (“C,” or consistency, in ACID), a serializable execution also preserves correctness. Therefore, serializability is a mechanism for guaranteeing database correctness.
 - Serializability is also not composable (Two serializable systems combined aren't guaranteed to remain serializable.)
 - Serializability does not imply any kind of deterministic order—it simply requires that some equivalent serial execution exists.
 
@@ -91,7 +95,7 @@ All at the global scale, and even in the presence of ongoing transaction.
 
 ## Strict Serializability: Why don’t we have both?
 
-- Combining serializability and linearizability yields strict serializability: transaction behavior is equivalent to some serial execution, and the serial order corresponds to real time. For example, say I begin and commit transaction T1, which writes to item x, and you later begin and commit transaction T2, which reads from x. A database providing strict serializability for these transactions will place T1 before T2 in the serial ordering, and T2 will read T1’s write. A database providing serializability (but not strict serializability) could order T2 before T1
+- Combining serializability and linearizability yields strict serializability: transaction behavior is equivalent to some serial execution, and the serial order corresponds to real time. For example, say I begin and commit transaction $`T1`$, which writes to item $`x`$, and you later begin and commit transaction $`T2`$, which reads from $`x`$. A database providing strict serializability for these transactions will place $`T1`$ before $`T2`$ in the serial ordering, and $`T2`$ will read $`T1`$’s write. A database providing serializability (but not strict serializability) could order $`T2`$ before $`T1$
 - linearizability can be viewed as a special case of strict serializability where transactions are restricted to consist of a single operation applied to a single object
 
 Reference: [Peter Bailis Notes - MIT](http://www.bailis.org/blog/linearizability-versus-serializability/)
@@ -108,9 +112,9 @@ Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/coden
 
 ## Implementation
 
-- Following mapping is maintained `(key: string, timestamp: int64) -> String`
+- Following mapping is maintained $`(key: string, timestamp: int64) -> String`$
   - Timestamp enables the multi-version database than a key-value store
-  - The entity which stores these is called as "tablet"
+  - The entity which stores these is called as **tablet**
 - To support replication, single Paxos state machine on top of each tablet (allows more fine-grained replication)
   - Writes must initiate the Paxos protocol at the leader; 
   - Reads access state directly from the underlying tablet at any replica that is sufficiently up-to-date (will define up-to-date later)
@@ -137,9 +141,9 @@ Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/coden
 - TrueTime
     | Method | Returns | 
     | -- | -- |
-    | TT.now() | TTinterval: [earliest, latest] |
-    | TT.after(t) | true if t has definitely passed | 
-    | TT.before(t) | true if t has definitely not arrived |
+    | $`TT.now()`$ | TTinterval: $`[earliest, latest]`$ |
+    | $`TT.after(t)`$ | true if $`t`$ has definitely passed | 
+    | $`TT.before(t)`$ | true if $`t`$ has definitely not arrived |
   - Note that time uncertainity is bounded (so notion of uncertainity is captured)
     - We will see the power of this concept later. 
   - Lets define ϵ : Instantenous error bounds and ϵ' as average error bound 
@@ -155,7 +159,7 @@ Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/coden
 
 ## Concurrency Control 
 
-In this section - How TrueTime is used to guarantee the correctness properties around concurrency control, and how those properties are used to implement features such as *external consistent transaction*, *lock-free* read-only transaction, and *non-blocking* reads in the past. This feature allow to audit the database at a timestamp *t* will see exactly the effects of every transaction that has commited as of *t*.
+In this section - How TrueTime is used to guarantee the correctness properties around concurrency control, and how those properties are used to implement features such as **external consistent transaction**, **lock-free read-only** transaction, and **non-blocking reads** in the past. This feature allow to audit the database at a timestamp $`t`$ will see exactly the effects of every transaction that has commited as of $`t`$.
 
 ### Paxos Leader Leases
 ### Assigning TimeStamps to RW Transactions 
