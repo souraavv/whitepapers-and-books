@@ -2,7 +2,8 @@
     - [Pre-req for this whitepaper](#pre-req-for-this-whitepaper)
     - [Goals](#goals)
     - [Configurable Parameters](#configurable-parameters)
-    - [Customers](#customers)
+    - [Open Source Implementation](#open-source-implementation)
+    - [What was the motivating use case?](#what-was-the-motivating-use-case)
     - [Challenges](#challenges)
     - [Gains for Applications](#gains-for-applications)
   - [Serializability versus Linearizability](#serializability-versus-linearizability)
@@ -44,8 +45,21 @@
 - How far are replica from each other (control write latency)
 - How may replicas are maintained (to control durability, availability & read performance)
 
-### Customers 
-- Google's Advertisement Backend
+### Open Source Implementation 
+- CockroachDB
+
+### What was the motivating use case?
+- Google F1 advertising database
+- Previously sharded over many MySQL and BigTable DBs;
+- Needed:
+  - Better (synchronous) replication.
+  - More flexible sharding.
+  - Cross-shard transactions.
+- Workload is dominated by read-only transactions 
+- Strong consistency is required.
+  - External consistency / linearizability / serializability.
+
+Reference: [MIT 6.5840 2023 Spanner Notes](http://nil.csail.mit.edu/6.5840/2023/notes/l-spanner.txt)
 
 ### Challenges
 - Building a scalable distributive database with consistency is difficult to achieve
@@ -195,7 +209,7 @@ In this section - How TrueTime is used to guarantee the correctness properties a
 
 $$
 \begin{split}
-s_{i} &< t_{abs}(e_{1}^{commit}) \quad (\text{commit wait}) \\
+s_{1} &< t_{abs}(e_{1}^{commit}) \quad (\text{commit wait}) \\
 t_{abs}(e_{1}^{commit}) &< t_{abs}(e_{2}^{start}) \quad (\text{assumption}) \\
 t_{abs}(e_{2}^{start}) &\leq t_{abs}(e_{2}^{server}) \quad (\text{causality}) \\
 t_{abs}(e_{2}^{server}) &\leq s_{2} \quad (\text{start}) \\
@@ -205,14 +219,29 @@ $$
 
 
 ### Serving Reads at a Timestamp
+- Every replica tracks a value called *safe time* $`t_{safe}`$ which is the maximum timestamp at which a replica is up-to-date.
+- A replica can satisfy a read at a timestamp $`t`$ if $`t \leq t_{safe}`$
+- Define $`t_{safe} = min(t_{safe}^{Paxos}, t_{safe}^{TM})`$, where each Paxos state machine has a safe time $`t_{safe}^{Paxos}`$ and each transactino manager (TM) has a safe time $`t_{safe}^{TM}`$
+-  $`t_{safe}^{Paxos}`$ is simpler: it is the timestamp of the highest-applied Paxos write. Because timestamps increase monotonically and writes are applied in order, writes will no longer occur at or below  $`t_{safe}^{Paxos}`$ with respect to Paxos.
+- $`t_{safe}^{TM}`$ is $`\infty`$ at a replica if there are zero prepared (but not committed) transactions - that is, txn in between the two phases of two-phase commit
+  - For participant slave, $`t_{safe}^{TM}`$ actually refers to the replica's leader's TM
+  - 
 ### Assigning Timestamps to RO Transactions
+- A read-only txn executes in two phases: assign a timestamp $`s_{read}`$, and then execute the txns read as snapshot read at $`s_{read}`$. 
+- The snapshot read can execute at any replicas that are sufficiently up-to-date.
+- $`s_{read} = TT.now().latest`$ , at any time after a txn start, preserving external consistency by an argument analogous to described in section (Assigning Timestamps to RW Transactions) 
 
 
 
 ## References
 
+- [Google Spanner Whitepaper](http://nil.csail.mit.edu/6.5840/2023/papers/spanner.pdf)
 - [Linearizability versus Serializability: Peter Bailis Notes - MIT](http://www.bailis.org/blog/linearizability-versus-serializability/)
 - [When is "ACID" ACID? rarely](http://www.bailis.org/blog/when-is-acid-acid-rarely/)
 - [Weak vs Strong Memory Models](https://preshing.com/20120930/weak-vs-strong-memory-models/)
-- [COL-733 IIT Delhi Notes - Prof. Abhilash](https://github.com/codenet/col733-cloud/blob/main/storage-spanner.md)
-
+- [COL-733 IIT D Notes - Prof. Abhilash](https://github.com/codenet/col733-cloud/blob/main/storage-spanner.md)
+- [Testing Distributed System for Linearizability](https://anishathalye.com/testing-distributed-systems-for-linearizability/)
+- [MIT 6.5840 2023 Lecture 9. Consistency, Linearizability](http://nil.csail.mit.edu/6.5840/2023/notes/l-linearizability.txt)
+- [MIT 6.5840 2023 Spanner Notes](http://nil.csail.mit.edu/6.5840/2023/notes/l-spanner.txt) Art of writing notes
+- [MIT 6.5840 2023 Spanner FAQ](http://nil.csail.mit.edu/6.5840/2023/papers/spanner-faq.txt)
+- [MIT 6.5840 FaRM, Optimstic Concurrency Control](http://nil.csail.mit.edu/6.5840/2023/notes/l-farm.txt)
