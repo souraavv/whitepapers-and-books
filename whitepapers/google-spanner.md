@@ -191,7 +191,7 @@ In this section - How TrueTime is used to guarantee the correctness properties a
   - The coordinator leader for a write $`T_{i}`$ assigns a commit timestmap $`s_{i}`$ no less than the value of $`TT.now().latest`$, computed after $`e_{i}^{server}`$
 - **Commit Wait**
   - The coordinator leader ensures that clients cannot see any data committed by $`T_{i}`$ until $`TT.after(s_{i})`$ is $`true`$ 
-  - Commit wait ensures that $`s_{i}`$ is less than absolute commit time of $`T_{i}`$, or $`s_{i}` \lt t_{abs}(e_{i}^{commit})`$
+  - Commit wait ensures that $`s_{i}`$ is less than absolute commit time of $`T_{i}`$, or $`s_{i} \lt t_{abs}(e_{i}^{commit})`$
 
 $$
 \begin{split}
