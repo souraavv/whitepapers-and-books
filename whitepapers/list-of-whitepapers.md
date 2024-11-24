@@ -1,10 +1,10 @@
 
 1. [RAFT](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/raft.md)
 2. Apache Zookeeper
-3. Amazon DynamoDB
+3. Amazon DynamoDB [Toy Implementation](https://github.com/souraavv/Amazon-Dynamo-CS)
 4. Spark Streaming
 5. Flink Asyn snapshots
-6. Google File System
+6. Google File System [Toy Implementation](https://github.com/souraavv/Half-Baked-GFS)
 7. CRDT
 8. Scalability at what COST
 9. Detection of Silent Data Corruption
