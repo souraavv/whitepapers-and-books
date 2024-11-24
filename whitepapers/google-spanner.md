@@ -184,7 +184,7 @@ In this section - How TrueTime is used to guarantee the correctness properties a
 - Remember Spanner also enforces the following **external consistency invariant**
   - If the start of transaction $`T_{2}`$ occurs after the commit of a transaction $`T_{1}`$, then the commit timestamp of $`T_{2}`$ must be greater than the commit timestamp of $`T_{1}`$.
 - Define the start and commit events of a txn $`T_{i}`$ by $`e_{i}^{start}`$ and $`e_{i}^{commit}`$; and the commit timestamp of a txn $`T_{i}`$ by $`s_{i}`$
-  - The invariant becomes $`t_{abs}(e_{1}^{commit})` \lt t_{abs}(e_{2}^{start}) \implies s_{1} \lt s_{2}$
+  - The invariant becomes $`t_{abs}(e_{1}^{commit}) \lt t_{abs}(e_{2}^{start}) \implies s_{1} \lt s_{2}`$
 - The protocol for executing txns and assigning timestamps obey two rules, which together guarantee this invariant.
 - Define the arrival event of a commmit request at the coordinator leader for a write $`T_{i}`$ to be $`e_{i}^{server}`$
 - **Start**
@@ -195,16 +195,11 @@ In this section - How TrueTime is used to guarantee the correctness properties a
 
 $$
 \begin{split}
-    s_{i} \lt t_{abs}(e_{1}^{commit})                     (commit wait) \\
-
-    t_{abs}(e_{1}^{commit}) \lt t_{abs}(e_{2}^{start})    (assumption)  \\
-
-    t_{abs}(e_{2}^{start}) \leq t_{abs}(e_{2}^{server})   (causality) \\
-
-    t_{abs}(e_{2}^{server}) \leq s_{2}                    (start)   \\
- 
-    s_{1} \lt s_{2}                                       (transitivity) \\
-
+s_{i} &< t_{abs}(e_{1}^{commit}) \quad (\text{commit wait}) \\
+t_{abs}(e_{1}^{commit}) &< t_{abs}(e_{2}^{start}) \quad (\text{assumption}) \\
+t_{abs}(e_{2}^{start}) &\leq t_{abs}(e_{2}^{server}) \quad (\text{causality}) \\
+t_{abs}(e_{2}^{server}) &\leq s_{2} \quad (\text{start}) \\
+s_{1} &< s_{2} \quad (\text{transitivity}) \\
 \end{split}
 $$
 
