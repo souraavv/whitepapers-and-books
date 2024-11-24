@@ -1,8 +1,5 @@
 
-#TODO: Add link to each of these
-
-1. RAFT 
-    Short Description: Consensus Algo in distributed system used to replicate logs and maintain consistency
+1. [RAFT](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/raft.md)
 2. Apache Zookeeper
 3. Amazon DynamoDB
 4. Spark Streaming
@@ -30,7 +27,7 @@
 26. SIEVE vs LRU
 27. Twitter cache clusters 
 28. Amazon Firecracker
-29. Google Spanner
+29. [Google Spanner](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/google-spanner.md) 
 30. Dremel
 31. Google File System
 32. BigTable
