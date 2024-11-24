@@ -13,7 +13,7 @@
 12. Cubrick
 13. Monitoring and Root Cause Analysis
 14. Presto
-15. Foundation DB
+15. [Apple Foundation DB](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/apple-foundation-db.md)
 16. F1 Lightning
 17. LinkedIn Distributed Graph
 18. TensorFlow
@@ -29,17 +29,15 @@
 28. Amazon Firecracker
 29. [Google Spanner](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/google-spanner.md) 
 30. Dremel
-31. Google File System
-32. BigTable
-33. Hive Warehousing Solution
-34. Google Pregel
-35. TAO
-36. End-to-End Path CDN Performance
-37. Google Backend Subsetting
-38. Tiktok Monoliths
-39. Meta Memcache
-40. Google Chubby 
-41. Meta FlexiRAFT
-42. Apache Cassandra
-43. Google Monarch
-44. 
+31. BigTable
+32. Hive Warehousing Solution
+33. Google Pregel
+34. TAO
+35. End-to-End Path CDN Performance
+36. Google Backend Subsetting
+37. Tiktok Monoliths
+38. Meta Memcache
+39. Google Chubby 
+40. Meta FlexiRAFT
+41. Apache Cassandra
+42. Google Monarch
