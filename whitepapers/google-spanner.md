@@ -163,7 +163,52 @@ Read more at [COL-733 IIT Delhi - Prof. Abhliash Notes](https://github.com/coden
 In this section - How TrueTime is used to guarantee the correctness properties around concurrency control, and how those properties are used to implement features such as **external consistent transaction**, **lock-free read-only** transaction, and **non-blocking reads** in the past. This feature allow to audit the database at a timestamp $`t`$ will see exactly the effects of every transaction that has commited as of $`t`$.
 
 ### Paxos Leader Leases
+- Spanner Paxos implementation uses timed leases to make leadership long-lived (10 seconds by default)
+- A potential leader sends requests for timed lease votes; upon receiving a quorum of lease votes the leader knows it has a lease.
+- A replica extends its lease vote implicitly on a successful write, and the leader requests lease-vote extensions if they are near expiration
+- Define a leader's *lease interval* as starting when it discovers it has a quorum of lease votes, and as ending when it no longer has a quorum of lease votes (because some have expired).
+- Spanner depends on following **Disjointness Invariant**: For each Paxos group, each Paxox leader's lease interval is disjoint from every other leaders's. (Will discuss later how this invariant is enforced)
+- Define $`s_{max}`$ to be the maximum timestamp used by a leader. Later we will see how $`s_{max}`$ is advanced. 
+- Spanner implementation permits a Paxos leader to abdicate by releasing its slaves from their lease votes. To ensure that disjointness invariant still holds, Spanner puts constraint when abdication is permissible. Before abdicating, a leader must wait $`TT.after(s_{max})`$ is $`true`$.
+
 ### Assigning TimeStamps to RW Transactions 
+- Transaction reads and writes use **two-phase locking**
+- Each transaction can be assigned timestamps at any time when all locks have been acquired, but before any locks have been released
+- Spanner assigns it the timestamp that Paxos assigns to the Paxos write that represents the transaction commit.
+- Spanner depends on the following **monotonicity invariant** within each Paxos group
+  - Spanner assigns timestamps to Paxos write in monotonically increasing (strictly increasing), even across leaders.
+  - A single leader replica can trivially assign timestamps in monotoincally increasing order. 
+  - This invariant is enforced across leaders by making use of **disjointness invariant** 
+  - A leader must only assign timestamps within the interval of its leader lease.
+  - Note that whenever a timestamp $`s`$ is assigned, $`s_{max}`$ is advanced to $`s`$ to preserve disjointness
+- Remember Spanner also enforces the following **external consistency invariant**
+  - If the start of transaction $`T_{2}`$ occurs after the commit of a transaction $`T_{1}`$, then the commit timestamp of $`T_{2}`$ must be greater than the commit timestamp of $`T_{1}`$.
+- Define the start and commit events of a txn $`T_{i}`$ by $`e_{i}^{start}`$ and $`e_{i}^{commit}`$; and the commit timestamp of a txn $`T_{i}`$ by $`s_{i}`$
+  - The invariant becomes $`t_{abs}(e_{1}^{commit})` \lt t_{abs}(e_{2}^{start}) \implies s_{1} \lt s_{2}$
+- The protocol for executing txns and assigning timestamps obey two rules, which together guarantee this invariant.
+- Define the arrival event of a commmit request at the coordinator leader for a write $`T_{i}`$ to be $`e_{i}^{server}`$
+- **Start**
+  - The coordinator leader for a write $`T_{i}`$ assigns a commit timestmap $`s_{i}`$ no less than the value of $`TT.now().latest`$, computed after $`e_{i}^{server}`$
+- **Commit Wait**
+  - The coordinator leader ensures that clients cannot see any data committed by $`T_{i}`$ until $`TT.after(s_{i})`$ is $`true`$ 
+  - Commit wait ensures that $`s_{i}`$ is less than absolute commit time of $`T_{i}`$, or $`s_{i}` \lt t_{abs}(e_{i}^{commit})$
+
+$$
+\begin{split}
+    s_{i} \lt t_{abs}(e_{1}^{commit})                     (commit wait) \\
+
+    t_{abs}(e_{1}^{commit}) \lt t_{abs}(e_{2}^{start})    (assumption)  \\
+
+    t_{abs}(e_{2}^{start}) \leq t_{abs}(e_{2}^{server})   (causality) \\
+
+    t_{abs}(e_{2}^{server}) \leq s_{2}                    (start)   \\
+ 
+    s_{1} \lt s_{2}                                       (transitivity) \\
+
+\end{split}
+$$
+
+
 ### Serving Reads at a Timestamp
 ### Assigning Timestamps to RO Transactions
 
