@@ -236,6 +236,9 @@ $$
 ## References
 
 - [Google Spanner Whitepaper](http://nil.csail.mit.edu/6.5840/2023/papers/spanner.pdf)
+- [Video - Google Spanner Author - Sebastian Kanthak](https://www.youtube.com/watch?v=LaLT6EC7Trc)
+- [Video - Dr. Martin Kleppmann (University of Cambridge)](https://www.youtube.com/watch?v=oeycOVX70aE)
+- [Distributed System - University of Cambridge - Dr. Martin Kleppmann](https://www.cl.cam.ac.uk/teaching/2122/ConcDisSys/dist-sys-notes.pdf)
 - [Linearizability versus Serializability: Peter Bailis Notes - MIT](http://www.bailis.org/blog/linearizability-versus-serializability/)
 - [When is "ACID" ACID? rarely](http://www.bailis.org/blog/when-is-acid-acid-rarely/)
 - [Weak vs Strong Memory Models](https://preshing.com/20120930/weak-vs-strong-memory-models/)
