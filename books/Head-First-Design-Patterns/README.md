@@ -1,11 +1,21 @@
 - [Head First Design Patterns](#head-first-design-patterns)
   - [Introduction to Design Patterns](#introduction-to-design-patterns)
-  - [First Design Pattern - Name will be introduced at the end](#first-design-pattern---name-will-be-introduced-at-the-end)
+  - [Chapter 1. First Design Pattern - Name will be introduced at the end](#chapter-1-first-design-pattern---name-will-be-introduced-at-the-end)
     - [Designing the Duck Behaviors](#designing-the-duck-behaviors)
     - [Integrating the Duck Behavior with Duck](#integrating-the-duck-behavior-with-duck)
     - [More Integration](#more-integration)
     - [The Big Picture on encapsulated behaviors](#the-big-picture-on-encapsulated-behaviors)
     - [HAS-A can be better than IS-A](#has-a-can-be-better-than-is-a)
+  - [Chapter 2. The Observer Pattern: Keeping your Objects in the know](#chapter-2-the-observer-pattern-keeping-your-objects-in-the-know)
+    - [Publisher + Subscriber = Observer Pattern](#publisher--subscriber--observer-pattern)
+    - [The Observer Pattern defined](#the-observer-pattern-defined)
+    - [The Observer Pattern defined: the class diagram](#the-observer-pattern-defined-the-class-diagram)
+    - [The Power of Loose Coupling](#the-power-of-loose-coupling)
+    - [Designing the Weather Station](#designing-the-weather-station)
+    - [Implementing the Weather Station](#implementing-the-weather-station)
+    - [Implementing the Subject interface in WeatherData](#implementing-the-subject-interface-in-weatherdata)
+    - [Now, let’s build those display elements](#now-lets-build-those-display-elements)
+    - [Test](#test)
   - [Decorator Pattern : Structural Design Pattern](#decorator-pattern--structural-design-pattern)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
@@ -38,7 +48,7 @@ Book - Head First Design Patterns (Eric Freeman et. al.)
 - Good OO designs are reusable, extensible, and maintainable.
 - Knowing the OO basics does not make you a good OO designer.
 
-## First Design Pattern - Name will be introduced at the end
+## Chapter 1. First Design Pattern - Name will be introduced at the end
 
 - Will start with an example 
     <details>
@@ -300,6 +310,205 @@ public class Duck {
 >[!IMPORTANT]
 > The Strategy Pattern defines a family of algorithms, encapsulates each one, and makes them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
 > Use THIS definition when you need to impress friends and influence key executives.
+
+## Chapter 2. The Observer Pattern: Keeping your Objects in the know
+
+### Publisher + Subscriber = Observer Pattern 
+- If you understand newspaper subscriptions, you pretty much understand the Observer Pattern, only we call the publisher the SUBJECT and the subscribers the OBSERVERS.
+- An Example
+    <details>
+    <summary> Weather Application </summary>
+    - Multiple screens, each show temperature, humidity and pressure. In future more screen can be introduced and more variables to the screen 
+    - Bad Design
+
+    ```java      
+    public void measurementsChanged() {
+        float temp = getTemperature();
+        float humidity = getHumidity();
+        float pressure = getPressure();
+        
+        currentConditionDisplay.update(temp, humidity, pressure);
+        statisticConditionDispaly.update(temp, humidity, pressure);
+        forecastDisplay.update(temp, humidity, pressure);
+    }
+    ```
+
+    - What is wrong ?
+        - Coding to concrete implementation i.e `currentConditionDisplay`
+        - Area of change i.e., more variables can be added to an display. We need to encapsulate this
+
+    </details>
+
+### The Observer Pattern defined
+
+> [!NOTE]
+> The Observer Pattern defines a one-to-many dependency between objects so that when one object changes state, all of its dependents are notified and updated automatically.
+> The Observer Pattern defines a one-to-many relationship between a set of objects.
+> When the state of one object changes, all of its dependents are notified.
+
+### The Observer Pattern defined: the class diagram
+
+<img src="./images/4-sub-obj.png" alt="description" width="800" height="500">
+
+
+- Q: How does dependence come into this?
+  - Because the subject is the sole owner of that data, the observers are dependent on the subject to update them when the data changes. This leads to a cleaner OO design than allowing many objects to control the same data.
+
+### The Power of Loose Coupling 
+- With this lets introduce the concept of **Loose Coupling** 
+  - When two objects are loosely coupled, they can interact, but have very little knowledge of each other.
+  - Same is the case with *Subject* and *Observer* 
+- The only thing the subject knows about an observer is that it implements a certain interface (the Observer interface). It doesn’t need to know the concrete class of the observer, what it does, or anything else about it.
+  - We can add new observers at any time
+  - We never need to modify the subject to add new type of observers
+  - We can re-use both independent of each other
+  - Changes to either will not affect the other
+
+>[!IMPORTANT]
+> Design Principle
+> Strive for loosely coupled designs between objects that interact. 
+> Loosely coupled designs allow us to build **flexible** OO systems that can handle change because they minimize the interdependency between objects.
+
+### Designing the Weather Station
+
+<img src="./images/5-weather-station.png" alt="description" width="750" height="650">
+
+### Implementing the Weather Station
+
+<details>
+<summary> Interfaces </summary>
+
+```java
+
+public interface Subject {
+    public void registerObserver(Observer o);
+    public void removeObserver(Observer o);
+    public void notifyObservers();
+}
+
+public interface Observer {
+    public void update(float temp, float humidity, float pressure);
+}
+
+public inteface DisplayElement {
+    public void display();
+}
+
+```
+
+</details>
+
+
+### Implementing the Subject interface in WeatherData
+
+<details>
+<summary> Implementing subject interface in weather data </summary>
+
+```java
+public class WeatherData implements Subject {
+    private ArrayList<Observer> observers;
+    private float temperature;
+    private float humidity;
+    private float pressure;
+
+    public WeatherData() {
+        observers = new ArrayList<Observer>();
+    }
+
+    public void registerObserver(Observer o) {
+        observers.add(o);
+    }
+
+    public void removeObserver(Observer o) {
+        int i = observers.indexOf(o);
+        if (i >= 0) {
+            observers.remove(i);
+        }
+    }
+
+    public void notifyObservers() {
+        for (Observer o: observers) {
+            o.update(temperature, humidity, pressure);
+        }
+    }
+
+    public void measurementsChanged() {
+        notifyObservers();
+    }
+
+    public void setMeasurements(float temperature, float humidity, 
+            float pressure) {
+        this.temperature = temperature;
+        this.humidity = humidity;
+        this.pressure = pressure;
+        measurementsChanged();
+    }
+}
+```
+
+</details>
+
+
+### Now, let’s build those display elements
+
+<details>
+<summary> Current Condition Display </summary>
+
+```java
+
+public class CurrentConditionsDisplay implements Observer, DisplayElement {
+    private float temperature;
+    private float humidity;
+    
+    private Subject weatherDataBejneBala; 
+
+    public CurrentConditionsDisplay(Subject weatherDataBejneBala) {
+        this.weatherDataBejneBala = weatherDataBejneBala;
+        weatherDataBejneBala.registerObserver(this);
+    }
+
+    public void update(float temperature, float humidity, float pressure) {
+        this.temperature = temperature;
+        this.humidity = humidity;
+        display();
+    }
+
+    public void display() {
+
+    }
+}
+
+```
+Q: Why did you store a reference to the Subject? It doesn’t look like you use it again after the constructor.
+
+A: True, but in the future we may want to un-register ourselves as an observer and it would be handy to already have a reference to the subject.
+
+</details>
+
+### Test 
+
+
+<details>
+<summary> Test WeatherStation </summary>
+
+```java
+
+public class WeatherStation {
+    
+    public static void main(String[] args) {
+        WeatherData weatherDataBejneBala = new WeatherData();
+
+        CurrentConditionsDisplay currentDisplay 
+                = new CurrentConditionsDisplay(weatherDataBejneBala);
+
+        weatherDataBejneBala.setMeasurements(11, 143, 28);
+
+    }
+}
+```
+
+</details>
+
 
 ## Decorator Pattern : Structural Design Pattern
 - attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
