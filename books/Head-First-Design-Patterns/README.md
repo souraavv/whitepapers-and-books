@@ -1,7 +1,7 @@
 - [Head First Design Patterns](#head-first-design-patterns)
   - [Introduction to Design Patterns](#introduction-to-design-patterns)
-  - [OO Principle - Inheritance and An Example of Duck App](#oo-principle---inheritance-and-an-example-of-duck-app)
-  - [Designing the Duck Behaviors](#designing-the-duck-behaviors)
+  - [First Design Pattern - Name will be introduced at the end](#first-design-pattern---name-will-be-introduced-at-the-end)
+    - [Designing the Duck Behaviors](#designing-the-duck-behaviors)
     - [Integrating the Duck Behavior with Duck](#integrating-the-duck-behavior-with-duck)
     - [More Integration](#more-integration)
     - [The Big Picture on encapsulated behaviors](#the-big-picture-on-encapsulated-behaviors)
@@ -38,7 +38,7 @@ Book - Head First Design Patterns (Eric Freeman et. al.)
 - Good OO designs are reusable, extensible, and maintainable.
 - Knowing the OO basics does not make you a good OO designer.
 
-## OO Principle - Inheritance and An Example of Duck App
+## First Design Pattern - Name will be introduced at the end
 
 - Will start with an example 
     <details>
@@ -124,7 +124,7 @@ Book - Head First Design Patterns (Eric Freeman et. al.)
 - We know that `fly` and `quack` are the parts of the `Duck` class that vary across ducks.
 - To separate these behaviors from the `Duck` class, we’ll pull both methods out of the `Duck` class and create a new set of classes to represent each behavior.
 
-## Designing the Duck Behaviors
+### Designing the Duck Behaviors
 - First we'll try to address the issue of not exposing implementation of `fly` and `quack` to each class and rather than we want to abstract this out from the type of Ducks
 - Also, we'd like to keep thing flexible; how about if we can change the behavior of a duck at runtime. This is also in parallel to first point. If you have hardcoded implmentation in each subclass, changing it at runtime not possible
 
@@ -297,7 +297,7 @@ public class Duck {
 - As you’ve seen, creating systems using composition gives you a lot more flexibility
 - You just applied your first design pattern—the STRATEGY Pattern. That’s right, you used the Strategy Pattern to rework the SimUDuck app. Thanks to this pattern
 
->[!INFO]
+>[!IMPORTANT]
 > The Strategy Pattern defines a family of algorithms, encapsulates each one, and makes them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
 > Use THIS definition when you need to impress friends and influence key executives.
 
