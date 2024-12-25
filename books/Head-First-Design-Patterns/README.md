@@ -1,4 +1,11 @@
 - [Head First Design Patterns](#head-first-design-patterns)
+  - [Introduction to Design Patterns](#introduction-to-design-patterns)
+  - [OO Principle - Inheritance and An Example of Duck App](#oo-principle---inheritance-and-an-example-of-duck-app)
+  - [Designing the Duck Behaviors](#designing-the-duck-behaviors)
+    - [Integrating the Duck Behavior with Duck](#integrating-the-duck-behavior-with-duck)
+    - [More Integration](#more-integration)
+    - [The Big Picture on encapsulated behaviors](#the-big-picture-on-encapsulated-behaviors)
+    - [HAS-A can be better than IS-A](#has-a-can-be-better-than-is-a)
   - [Decorator Pattern : Structural Design Pattern](#decorator-pattern--structural-design-pattern)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
@@ -17,6 +24,283 @@
 
 
 # Head First Design Patterns
+
+Book - Head First Design Patterns (Eric Freeman et. al.)
+
+## Introduction to Design Patterns
+- Why should I use design patterns ? 
+  - Why not? You can leverage the knowledge and lessons learned from other developers who have faced similar design challenges and successfully navigated them.
+- Functional or non-functional requirements often change over time in a project, and writing maintainable and extensible code is essential for software to thrive.
+- Design patterns don’t go directly into your code, they first go into your BRAIN. Once you’ve loaded your brain with a good working knowledge of patterns, you can then start to apply them to your new designs, and rework your old code when you find it’s degrading into an inflexible mess of jungle spaghetti code.
+- Patterns aren’t invented, they are discovered.
+- Patterns provide a shared language that can maximize the value of your communication with other developers.
+- Patterns are proven object-oriented experience.
+- Good OO designs are reusable, extensible, and maintainable.
+- Knowing the OO basics does not make you a good OO designer.
+
+## OO Principle - Inheritance and An Example of Duck App
+
+- Will start with an example 
+    <details>
+    <summary> Simple SimUDuck App </summary>
+
+    - `Duck` is a super class and all other class inherits the `Duck` superclass 
+    ```java
+    class Duck {
+        void quack() 
+        void swim()
+        void display()
+    }
+
+    class MallardDuck extends Duck {
+        void display() {
+            log.info("Mallard duck - method override");
+        }
+    }
+
+    class RedheadDuck extends Duck {
+        void display() {
+            log.info("ReadHead duck - method override");
+        }
+    }
+    ```
+
+    </details>
+
+- But now we need the ducks to FLY 
+  - How hard can this be ? - I'll simply add a `fly()` method in `Duck` class and that's all 
+- But now something went wrong - Why are rubber flying ? 
+  - You failed to notice that not *all* subclasses of `Duck` should fly
+
+>[!NOTE] 
+> A localized update to the code caused nonlocal side effects (flying rubber ducks)!
+
+- What happened ? 
+  - What you have thought was a great use of inheritance for the purpose of **reuse** hasn't turned out so well when it comes to maintenance 
+- What If I override these method in the sub-classes ? 
+  - No, don't even think that. What would you do when it comes to wooden ducks. They aren't suppose to be fly or quack..
+- Ok, fine How about *interfaces* ?
+    <details>
+    <summary> Expermient with intefaces : Move fly and quack to an interface </summary>
+
+    ```java
+    // modified Duck class 
+    public class Duck {
+        public void swim() {}
+        public void display() {}
+    }
+
+    public interface Flyable {
+        void fly() {}
+    }
+
+    public interface Quackable {
+        void quack() {}
+    }
+
+    public MallardDuck extends Duck implements Quackable {
+        void quack() {
+            log.info("Mallard duck quack");
+        }
+    }
+    ```
+    </details>
+
+- Isn't this nice ? 
+  - Nope, code reuse nahi hoga. Har duck ko manually fly aur quack ka behavior likhna padega, jo duplicate code aur maintenance problems create karega.
+  - The above will become a maintenance nightmare for you
+
+- Now what ? Summary till this point 
+  - Can't use inheritance because not all subclasses have flying or quacking behavior
+- Using interfaces like *Flyable* and *Quackable* solves the problem partially but creates maintenance nightware and no code resuability
+
+- Our first lesson
+
+>[!NOTE]
+> Identify the aspects of you application that vary and separate them from what stays the same.
+> Take what varies and encapsulate it so it won't affect rest of your code 
+
+- Okay, time to pull out the Duck behavior out of `Duck` class
+- We know that `fly` and `quack` are the parts of the `Duck` class that vary across ducks.
+- To separate these behaviors from the `Duck` class, we’ll pull both methods out of the `Duck` class and create a new set of classes to represent each behavior.
+
+## Designing the Duck Behaviors
+- First we'll try to address the issue of not exposing implementation of `fly` and `quack` to each class and rather than we want to abstract this out from the type of Ducks
+- Also, we'd like to keep thing flexible; how about if we can change the behavior of a duck at runtime. This is also in parallel to first point. If you have hardcoded implmentation in each subclass, changing it at runtime not possible
+
+- From now on, the Duck behaviors will live in separate class - a class that implements a particular **behavior interface**.
+
+>[!NOTE]
+> Program to an interface, not an implementation 
+
+<details>
+<summary> What is diff b/w Programming to an implementation vs inteface/supertype</summary>
+
+```java
+
+// Programming to an Implementation 
+
+Dog d = new Dog(); // Declaring variable as type 'Dog' forces us to code to a concrete implementation
+d.bark();
+
+// Programming to an interface
+
+Animal animal = new Dog(); // polymorphism, method dispatch according to the type at runtime 
+animal.makeSound();
+
+// And even better, rather than hardcoding the instantiation of the subtype (like new Dog()) into the code, assign the concrete type 
+
+a = getAnimal();
+a.makeSound();
+
+// We don’t know WHAT the actual animal subtype is... all we care about is that it knows how to respond to makeSound().
+
+```
+</details>
+
+
+<details>
+<summary> Behavior interfaces </summary>
+
+```java
+public interface FlyBehavior {
+    void fly()
+}
+
+
+public class FlyWithWings implements FlyBehavior {
+    void fly() {
+        log.info("Fly with wings");
+    }
+}
+
+public class FlyNoWay implements FlyBehavior {
+    void fly() {
+        log.info("Can't fly");
+    }
+}
+```
+
+</details>
+
+
+<img src="./images/1-duck-behavior.png" alt="description" width="800" height="500">
+
+- Ab yeh design ke sath: Fly aur Quack behaviors kisi aur type ke objects (like planes or robots) bhi reuse kar sakte hain, kyunki yeh behaviors ab Duck class se directly attached nahi hain.
+- Aur sabse bada fayda: Agar hum ek naya behavior add karna chaahein (like FlyWithJetPack ya DanceWhileFlying), toh na purane behavior classes ko change karna padega, na hi Ducks ke code ko chhedna padega.
+- Ekdum flexible aur mast reusable design ban gaya hai!
+
+
+<details>
+<summary> Question from book </summary>
+
+Q: It feels a little weird to have a class that’s just a behavior. Aren’t classes supposed to represent things? Aren’t classes supposed to have both state AND behavior?
+
+A: In an OO system, yes, classes represent things that generally have both state (instance variables) and methods. And in this case, the thing happens to be a behavior. But even a behavior can still have state and methods; a flying behavior might have instance variables representing the attributes for the flying (wing beats per minute, max altitude, and speed, etc.) behavior.
+
+</details>
+
+
+### Integrating the Duck Behavior with Duck 
+
+- Ab Duck apne fly aur quack karne ka kaam khud nahi karega, balki yeh kaam alag behavior classes ko delegate karega. Matlab, Duck class ya uske subclass ke andar fly aur quack methods nahi honge; woh alag se define kiye behaviors ko use karega.
+- First we'll add two instance variables to the `Duck` class called *flyBehavior* and *quackBehavior*
+
+    <img src="./images/2-integrating-duck-bb.png" alt="description" width="800" height="300">
+
+
+</details>
+
+
+<details>
+<summary> Integrating the Duck Behavior with Duck </summary>
+
+```java
+public class Duck 
+    QuackBehavior quackBehavior;
+    // delegate the handling of quack to object referenced by quackBehavior
+    public void performQuack() {
+        // In this part of the code we don’t care what kind of object it is, all we care about is that it knows how to quack()!
+        quackBehavior.quack();
+    }
+}
+```
+
+</details>
+
+### More Integration 
+
+<details>
+<summary> Integrating the Duck Behavior with Duck </summary>
+
+```java
+
+public class Duck {}
+
+public class MallardDuck extends Duck {
+    
+    public MallardDuck () {
+        quackBehavior = new Quack();
+        flyBehavior = new FlyWithWings();
+    }
+
+    public void display() {
+
+    }
+}
+```
+
+</details>
+
+- But wait a second. Didn't you say we should NOT program to an implementation ? But what we are doing in that constructor ? We're making a new instance of concrete Quack implementation class!
+  - That is right.  Later we’ll have more patterns in our toolbox that can help us fix it.
+
+
+<details>
+<summary> Duck Class </summary>
+
+```java
+
+public class Duck {
+    FlyBehavior flyBehavior;
+    QuackBehavior quackBehavior;
+
+    void swim()
+    void display()
+
+    void performQuack()
+    void performFly()
+
+    void setFlyBehavior()
+    void setQuackBehavior()
+
+}
+```
+
+</details>
+
+
+### The Big Picture on encapsulated behaviors 
+
+
+   <img src="./images/3-full-picture.png" alt="description" width="900" height="500">
+
+- Notice also that we’ve started to describe things a little differently. Instead of thinking of the duck behaviors as a set of behaviors, we’ll start thinking of them as a *family of algorithms*.
+
+### HAS-A can be better than IS-A
+- The HAS-A relationship is an interesting one: each duck has a FlyBehavior and a QuackBehavior to which it delegates flying and quacking.
+- When you put two classes together like this you’re using composition. Instead of inheriting their behavior, the ducks get their behavior by being composed with the right behavior object.
+
+>[!NOTE]
+> This is an important technique; in fact, we’ve been using our third design principle. Favor composition over inheritance. 
+
+- As you’ve seen, creating systems using composition gives you a lot more flexibility
+- You just applied your first design pattern—the STRATEGY Pattern. That’s right, you used the Strategy Pattern to rework the SimUDuck app. Thanks to this pattern
+
+>[!INFO]
+> The Strategy Pattern defines a family of algorithms, encapsulates each one, and makes them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
+> Use THIS definition when you need to impress friends and influence key executives.
+
 ## Decorator Pattern : Structural Design Pattern
 - attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
   - a wrapper is an object that can be linked with some target object. The wrapper contains the same set of methods as the target and delegates to it all requests it receives
