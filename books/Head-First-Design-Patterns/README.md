@@ -6,6 +6,7 @@
     - [More Integration](#more-integration)
     - [The Big Picture on encapsulated behaviors](#the-big-picture-on-encapsulated-behaviors)
     - [HAS-A can be better than IS-A](#has-a-can-be-better-than-is-a)
+    - [Applicability](#applicability)
     - [One more Example](#one-more-example)
   - [Chapter 2. The Observer Pattern: Keeping your Objects in the know](#chapter-2-the-observer-pattern-keeping-your-objects-in-the-know)
     - [Publisher + Subscriber = Observer Pattern](#publisher--subscriber--observer-pattern)
@@ -25,9 +26,17 @@
     - [One more Example](#one-more-example-1)
   - [Chapter 3. Decorator Pattern: Structural Design Pattern](#chapter-3-decorator-pattern-structural-design-pattern)
     - [Welcome to Starbuzz Coffee](#welcome-to-starbuzz-coffee)
+    - [The Open-Closed Principle](#the-open-closed-principle)
+    - [Meet the Decorator Pattern](#meet-the-decorator-pattern)
+    - [The Decorator Pattern defined](#the-decorator-pattern-defined)
+    - [Decorating our Beverages](#decorating-our-beverages)
+    - [Some Confusion over Inheritance versus Composition](#some-confusion-over-inheritance-versus-composition)
+    - [Writing the Starbuzz code](#writing-the-starbuzz-code)
+    - [If interface was used ...](#if-interface-was-used-)
+    - [Summary](#summary)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
-  - [Factory Design Pattern](#factory-design-pattern)
+  - [Chapter 4. Factory Design Pattern](#chapter-4-factory-design-pattern)
   - [Singleton Design Pattern](#singleton-design-pattern)
   - [Command Pattern](#command-pattern)
   - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
@@ -43,7 +52,8 @@
 
 # Head First Design Patterns
 
-Book - Head First Design Patterns (Eric Freeman et. al.)
+- Book - Head First Design Patterns (Eric Freeman et. al.)
+- [Refactoring Guru](https://refactoring.guru/)
 
 ## Introduction to Design Patterns
 - Why should I use design patterns ? 
@@ -319,7 +329,12 @@ public class Duck {
 > The Strategy Pattern defines a family of algorithms, encapsulates each one, and makes them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
 > Use THIS definition when you need to impress friends and influence key executives.
 
-
+### Applicability 
+- Use the Strategy pattern when you want to use different variants of an algorithm within an object and be able to switch from one algorithm to another during runtime.
+- Use the Strategy when you have a lot of similar classes that only differ in the way they execute some behavior.
+- Use the pattern to isolate the business logic of a class from the implementation details of algorithms that may not be as important in the context of that logic.
+- Use the pattern when your class has a massive conditional statement that switches between different variants of the same algorithm.
+- 
 ### One more Example
 <details>
 <summary> One more Example </summary>
@@ -919,7 +934,10 @@ public class ObserverPatternExample {
 </details>
 
 ## Chapter 3. Decorator Pattern: Structural Design Pattern
+
 - Remember, power of extension at runtime is way more powerful than at compile time (i.e., subclass)
+
+    <img src="https://refactoring.guru/images/patterns/content/decorator/decorator-2x.png" alt="description" width="750" height="500">
 
 ### Welcome to Starbuzz Coffee
 
@@ -935,18 +953,290 @@ public class ObserverPatternExample {
 - That is a maintenance nightmare
 - What happens when the price of milk goes up? What do they do when they add a new caramel topping?
 
+### The Open-Closed Principle 
 
-- attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
-  - a wrapper is an object that can be linked with some target object. The wrapper contains the same set of methods as the target and delegates to it all requests it receives
-- attach responsibilities to an object dynamically, provides flexible alternative to subclassing for extending functionality
-- based on **open-closed principal**
+>[!IMPORTANT]
+> Classes should be open for extension, but closed for modification.
+> we’re open. Feel free to extend our classes with any new behavior you like. If your needs or requirements change (and we know they will), just go ahead and make your own extensions.
+> Sorry, we’re closed. That’s right, we spent a lot of time getting this code correct and bug free, so we can’t let you alter the existing code. It must remain closed to modification. 
+
+- Our goal is to allow classes to be easily extended to incorporate new behavior without modifying existing code
+
+
+### Meet the Decorator Pattern 
+- Okay, we’ve seen that representing our beverage plus condiment pricing scheme with inheritance has not worked out very well—we get class explosions and rigid designs, or we add functionality to the base class that isn’t appropriate for some of the subclasses.
+- So, here’s what we’ll do instead: we’ll start with a beverage and “decorate” it with the condiments at runtime. For example, if the customer wants a Dark Roast with Mocha and Whip, then we’ll:
+  - Take a DarkRoast object
+  - Decorate it with a Mocha object
+  - Decorate it with a Whip object
+  - Call the cost() method and rely on delegation to add on the condiment costs
+
+- **How we'll achieve this ?**
+  - Decorators have the same supertype as the objects they decorate.
+  - You can use one or more decorators to wrap an object.
+  - Given that the decorator has the same supertype as the object it decorates, we can pass around a decorated object in place of the original (wrapped) object.
+  - The decorator adds its own behavior either before and/or after delegating to the object it decorates to do the rest of the job.
+
+### The Decorator Pattern defined
+
+>[!IMPORTANT]
+> The Decorator Pattern attaches additional responsibilities to an object dynamically. Decorators provide a flexible alternative to subclassing for extending functionality.
+
+<img src="./images/9-decorator.png" alt="description" width="750" height="600">
+
+### Decorating our Beverages
+
+<img src="./images/10-decorator-beverages.png" alt="description" width="750" height="600">
+
+
+### Some Confusion over Inheritance versus Composition
+- Why does `CondimentDecorator` extending `Beverage`, we discussed that inheritance should be avoided (tight coupling) ? 
+  - True. I think the point is that it’s vital that the decorators have the same type as the objects they are going to decorate. So here we’re using inheritance to achieve the type matching, but we aren’t using inheritance to get behavior.
+- Although we can still use interface instead of abstract class 
+
+
+### Writing the Starbuzz code
+<details>
+<summary> Code </summary>
+
+```java
+public abstract class Beverage {
+    String description = "Unknown Beverage";
+    public enum Size { TALL, GRANDE, VENTI };
+    Size size = Size.TALL;
+
+    public String getDescription() {
+        return description;
+    }
+
+    public abstract double cost();
+    }
+
+    public void setSize(Size size) {
+        this.size = size;
+    }
+
+    public Size getSize() {
+        return this.size;
+    }
+}
+
+```
+
+```java
+public abstract class CondimentDecorator extends Beverage {
+    public abstract String getDescription();
+    public Beverage beverage;
+
+    public Size getSize() {
+        return beverage.getSize();
+    }
+}
+
+public class Soy extends CondimentDecorator {
+    public Soy(Beverage beverage) {
+        this.beverage = beverage;
+    }
+
+    public String getDescription() {
+        return beverage.getDescription() + ", Soy";
+    }
+
+    public float cost() {
+
+        double cost = beverage.cost();
+        if (beverage.getSize() == Size.TALL) {
+            cost += 0.10;
+        } else if (beverage.getSize() == Size.GRANDE) {
+            cost += 0.15;
+        } else if (beverage.getSize() == Size.VENTI) {
+            cost += 0.20;
+        }
+        return cost;
+    }
+}
+```
+
+```java
+public class Espresso extends Beverage {
+
+    public Espresso() {
+        description = "Espresso";
+    }
+
+    public double cost() {
+        return 1.99;
+    }
+}
+
+public class HouseBlend extends Beverage {
+
+    public HouseBlend() {
+        description = "HouseBlend";
+    }
+
+    public double cost() {
+        return 1.99;
+    }
+}
+```
+
+```java
+
+public class Mocha extends CondimentDecorator {
+    Beverage beverage;
+
+    public Mocha (Beverage beverage) {
+        this.beverage = beverage;
+    }
+
+    public String getDescription() {
+        return beverage.getDescription() + ", Mocha";
+    }
+
+    public double cost() {
+        return beverage.cost() + 0.28;
+    }
+}
+```
+
+```java
+
+public class StarbuzzCoffee {
+    
+    public static void main(String[] args) {
+        Beverage beverage = new Espresso();
+
+        Beverage beverage2 = new DarkRoast();
+
+        beverage = new Mocha(beverage);
+        beverage = new Mocha(beverage);
+        beverage = new Whip(beverage);
+
+    }
+}
+```
+</details>
+
+
+### If interface was used ...
+
+<details>
+<summary> Alternate world </summary>
+
+```java
+public interface Beverage {
+    String getDescription();
+    double cost(); 
+}
+
+public class Espresso implements Beverage {
+    @Override
+    public String getDescription() {
+        return "Espresso";
+    }
+
+    @Override
+    public double cost() {
+        return 1.99;
+    }
+}
+
+public class HouseBlend implements Beverage {
+    @Override
+    public String getDescription() {
+        return "House Blend Coffee";
+    }
+
+    @Override
+    public double cost() {
+        return 0.89;
+    }
+}
+
+```
+
+```java
+public interface BeverageDecorator extends Beverage {
+    // No extra methods; just ensures type consistency
+}
+
+public class Milk implements BeverageDecorator {
+    private final Beverage beverage;
+
+    public Milk(Beverage beverage) {
+        this.beverage = beverage; // Wrap the beverage
+    }
+
+    @Override
+    public String getDescription() {
+        return beverage.getDescription() + ", Milk";
+    }
+
+    @Override
+    public double cost() {
+        return beverage.cost() + 0.10;
+    }
+}
+
+public class Mocha implements BeverageDecorator {
+    private final Beverage beverage;
+
+    public Mocha(Beverage beverage) {
+        this.beverage = beverage; // Wrap the beverage
+    }
+
+    @Override
+    public String getDescription() {
+        return beverage.getDescription() + ", Mocha";
+    }
+
+    @Override
+    public double cost() {
+        return beverage.cost() + 0.20;
+    }
+}
+
+
+```
+
+```java
+public class CoffeeShop {
+    public static void main(String[] args) {
+        // Start with Espresso
+        Beverage beverage = new Espresso();
+        System.out.println(beverage.getDescription() + " $" + beverage.cost());
+
+        // Add Milk
+        beverage = new Milk(beverage);
+        System.out.println(beverage.getDescription() + " $" + beverage.cost());
+
+        // Add Mocha
+        beverage = new Mocha(beverage);
+        System.out.println(beverage.getDescription() + " $" + beverage.cost());
+
+        // Add another Mocha
+        beverage = new Mocha(beverage);
+        System.out.println(beverage.getDescription() + " $" + beverage.cost());
+    }
+}
+
+```
+</details>
+
+### Summary
+
+- Attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
+  - A wrapper is an object that can be linked with some target object. The wrapper contains the same set of methods as the target and delegates to it all requests it receives
+- Attach responsibilities to an object dynamically, provides flexible alternative to subclassing for extending functionality
+- Based on **open-closed principal**
   - class should remain open to extension and closed to modification
-- decorator have the **same supertype** as the object they decorate
-  - pass in decorated object in place of original object
-  - implement same **interface** or **abstract class** as the component they are going to decorate
-  - decorator adds its own behaviour either before or after delegating to the object it decorates to do the rest of the job
-- extending functionality by either **subclassing** (inheritance) or **composition**
-- we are subclassing the same interface or abstract class to have the correct type (type matching), not to inherit its behaviour
+- Decorator have the **same supertype** as the object they decorate
+  - Pass in decorated object in place of original object
+  - Implement same **interface** or **abstract class** as the component they are going to decorate
+  - Decorator adds its own behaviour either before or after delegating to the object it decorates to do the rest of the job
+- Extending functionality by either **subclassing** (inheritance) or **composition**
+- We are subclassing the same interface or abstract class to have the correct type (type matching), not to inherit its behaviour
   - behaviour comes in through **composition** of decorators with the base components as well as other decorators
 - **Problems :** 
   - sometimes add a lot of small classes to a design, which makes it difficult for others to understand. For eg: if we saw the classes as wrappers around an InputStream life would be much easier
@@ -964,6 +1254,10 @@ public class ObserverPatternExample {
   - subclasses can have just one parent, in most languages 
 
 ### Diagram
+
+<details>
+<summary> Mermaid Diagram </summary>
+
 ```mermaid
   graph TD;
     cc[concrete_components] --implements--> ac[abstract_components];
@@ -972,7 +1266,9 @@ public class ObserverPatternExample {
     cd --composition--> cc
 ```
 
-## Factory Design Pattern
+</details>
+
+## Chapter 4. Factory Design Pattern
 - encapsulate object creation and allows us to decouple our code from concrete types 
 - encapsulate behaviour of instantiations, area of frequent change -> client depend only on abstraction / interface
 - `new` culprit : real culprit is our old friend **CHANGE**, and how change impacts our use of `new`
