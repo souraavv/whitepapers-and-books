@@ -6,6 +6,7 @@
     - [More Integration](#more-integration)
     - [The Big Picture on encapsulated behaviors](#the-big-picture-on-encapsulated-behaviors)
     - [HAS-A can be better than IS-A](#has-a-can-be-better-than-is-a)
+    - [One more Example](#one-more-example)
   - [Chapter 2. The Observer Pattern: Keeping your Objects in the know](#chapter-2-the-observer-pattern-keeping-your-objects-in-the-know)
     - [Publisher + Subscriber = Observer Pattern](#publisher--subscriber--observer-pattern)
     - [The Observer Pattern defined](#the-observer-pattern-defined)
@@ -21,7 +22,9 @@
     - [The dark side of java.util.Observable](#the-dark-side-of-javautilobservable)
     - [Bullet Point](#bullet-point)
     - [So, far](#so-far)
-  - [Decorator Pattern : Structural Design Pattern](#decorator-pattern--structural-design-pattern)
+    - [One more Example](#one-more-example-1)
+  - [Chapter 3. Decorator Pattern: Structural Design Pattern](#chapter-3-decorator-pattern-structural-design-pattern)
+    - [Welcome to Starbuzz Coffee](#welcome-to-starbuzz-coffee)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
   - [Factory Design Pattern](#factory-design-pattern)
@@ -316,6 +319,106 @@ public class Duck {
 > The Strategy Pattern defines a family of algorithms, encapsulates each one, and makes them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
 > Use THIS definition when you need to impress friends and influence key executives.
 
+
+### One more Example
+<details>
+<summary> One more Example </summary>
+
+```java      
+
+// Strategy Interface
+public interface PaymentStrategy {
+    void pay(int amount);
+}
+
+// Concrete Strategy 1: Credit Card Payment
+public class CreditCardPayment implements PaymentStrategy {
+    private String cardNumber;
+
+    public CreditCardPayment(String cardNumber) {
+        this.cardNumber = cardNumber;
+    }
+
+    @Override
+    public void pay(int amount) {
+        System.out.println("Paid ₹" + amount + " using Credit Card (Card Number: " + cardNumber + ").");
+    }
+}
+
+// Concrete Strategy 2: PayPal Payment
+public class PayPalPayment implements PaymentStrategy {
+    private String email;
+
+    public PayPalPayment(String email) {
+        this.email = email;
+    }
+
+    @Override
+    public void pay(int amount) {
+        System.out.println("Paid ₹" + amount + " using PayPal (Email: " + email + ").");
+    }
+}
+
+// Concrete Strategy 3: UPI Payment
+public class UpiPayment implements PaymentStrategy {
+    private String upiId;
+
+    public UpiPayment(String upiId) {
+        this.upiId = upiId;
+    }
+
+    @Override
+    public void pay(int amount) {
+        System.out.println("Paid ₹" + amount + " using UPI (UPI ID: " + upiId + ").");
+    }
+}
+
+
+```
+
+
+```java
+// Context Class
+public class PaymentContext {
+    private PaymentStrategy paymentStrategy;
+
+    // Inject Strategy dynamically
+    public void setPaymentStrategy(PaymentStrategy paymentStrategy) {
+        this.paymentStrategy = paymentStrategy;
+    }
+
+    public void payAmount(int amount) {
+        if (paymentStrategy == null) {
+            throw new IllegalStateException("Payment strategy is not set!");
+        }
+        paymentStrategy.pay(amount);
+    }
+}
+
+```
+
+```java
+public class StrategyPatternExample {
+    public static void main(String[] args) {
+        PaymentContext context = new PaymentContext();
+
+        // Use Credit Card payment
+        context.setPaymentStrategy(new CreditCardPayment("1234-5678-9012-3456"));
+        context.payAmount(1500);
+
+        // Use PayPal payment
+        context.setPaymentStrategy(new PayPalPayment("user@example.com"));
+        context.payAmount(2500);
+
+        // Use UPI payment
+        context.setPaymentStrategy(new UpiPayment("user@upi"));
+        context.payAmount(1000);
+    }
+}
+
+```
+</details>
+
 ## Chapter 2. The Observer Pattern: Keeping your Objects in the know
 
 ### Publisher + Subscriber = Observer Pattern 
@@ -530,33 +633,34 @@ public class WeatherStation {
     - `notifyObservers(Object arg)` : Based on Push model  
     - On the observer side we have `update(Observable o, Object arg)`
 - The `setChanged()` method is used to signify that the state has changed and that `notifyObservers()`, when it is called, should update its observers.
-    > [!IMPORTANT]
-    > If notifyObservers() is called without first calling setChanged(), the observers will NOT be notified.
 
-    <details>
-    <summary> Behind the scene </summary>
+> [!IMPORTANT]
+> If notifyObservers() is called without first calling setChanged(), the observers will NOT be notified.
 
-    ```java
-    setChanged() {
-        changed = true;
-    }
+<details>
+<summary> Behind the scene </summary>
 
-    notifyObservers(Object arg) {
-        if (changed) {
-            for every observer on the list {
-                call update(this, arg)
-            }
-            changed = false
+```java
+setChanged() {
+    changed = true;
+}
+
+notifyObservers(Object arg) {
+    if (changed) {
+        for every observer on the list {
+            call update(this, arg)
         }
+        changed = false
     }
+}
 
-    notifyObserver() {
-        notifyObservers(null);
-    }
+notifyObserver() {
+    notifyObservers(null);
+}
 
-    ```
+```
 
-    </details>
+</details>
 
 - Why `setChanged()` method ? 
   - It gives you more flexibility in how to update observers by allowing you to optimize the notifications 
@@ -674,8 +778,164 @@ public class CurrentConditionsDisplay implements Observer, DisplayElement {
 > Favor composition over inheritance.
 
 
+### One more Example
 
-## Decorator Pattern : Structural Design Pattern
+<details>
+<summary> One more Example - Observer Pattern </summary>
+
+```java
+
+import java.util.*;
+
+public interface Observer {
+    void update(String stockName, double stockPrice);
+}
+
+```
+
+```java
+public interface Subject {
+    void registerObserver(Observer observer);
+
+    void removeObserver(Observer observer);
+
+    void notifyObservers();
+}
+```
+
+```java
+import java.util.*;
+
+public class Stock implements Subject {
+    private String stockName;
+    private double stockPrice;
+    private List<Observer> observers; // List of registered observers
+
+    public Stock(String stockName, double stockPrice) {
+        this.stockName = stockName;
+        this.stockPrice = stockPrice;
+        this.observers = new ArrayList<>();
+    }
+
+    public void setStockPrice(double newPrice) {
+        this.stockPrice = newPrice;
+        System.out.println("Stock Price updated: " + stockName + " -> ₹" + stockPrice);
+        notifyObservers(); // Notify all observers whenever price changes
+    }
+
+    @Override
+    public void registerObserver(Observer observer) {
+        observers.add(observer);
+    }
+
+    @Override
+    public void removeObserver(Observer observer) {
+        observers.remove(observer);
+    }
+
+    @Override
+    public void notifyObservers() {
+        for (Observer observer : observers) {
+            observer.update(stockName, stockPrice);
+        }
+    }
+}
+```
+
+```java
+public class MobileAppNotifier implements Observer {
+    private String user;
+
+    public MobileAppNotifier(String user) {
+        this.user = user;
+    }
+
+    @Override
+    public void update(String stockName, double stockPrice) {
+        System.out.println("[Mobile App] Hey " + user + ", stock price updated! " + stockName + ": ₹" + stockPrice);
+    }
+}
+```
+
+```java
+public class DesktopNotifier implements Observer {
+    private String machineName;
+
+    public DesktopNotifier(String machineName) {
+        this.machineName = machineName;
+    }
+
+    @Override
+    public void update(String stockName, double stockPrice) {
+        System.out.println("[Desktop Alert] On " + machineName + ", stock update: " + stockName + " -> ₹" + stockPrice);
+    }
+}
+```
+
+```java
+public class EmailNotifier implements Observer {
+    private String email;
+
+    public EmailNotifier(String email) {
+        this.email = email;
+    }
+
+    @Override
+    public void update(String stockName, double stockPrice) {
+        System.out.println("[Email Notification] Sent to " + email + ": " + stockName + " is now ₹" + stockPrice);
+    }
+}
+```
+
+```java
+public class ObserverPatternExample {
+    public static void main(String[] args) {
+        // Create Subject
+        Stock appleStock = new Stock("APPLE", 150);
+
+        // Create Observers
+        Observer mobileUser1 = new MobileAppNotifier("Investor1");
+        Observer desktopNotifier = new DesktopNotifier("Workstation-101");
+        Observer emailNotifier = new EmailNotifier("investor@example.com");
+
+        // Register Observers
+        appleStock.registerObserver(mobileUser1);
+        appleStock.registerObserver(desktopNotifier);
+        appleStock.registerObserver(emailNotifier);
+
+        // Update stock price and see notifications
+        appleStock.setStockPrice(155); // Price change #1
+        appleStock.setStockPrice(160); // Price change #2
+
+        // Remove an Observer
+        appleStock.removeObserver(desktopNotifier);
+
+        // Update stock price again
+        appleStock.setStockPrice(165); // Price change #3
+    }
+}
+```
+
+</details>
+
+## Chapter 3. Decorator Pattern: Structural Design Pattern
+- Remember, power of extension at runtime is way more powerful than at compile time (i.e., subclass)
+
+### Welcome to Starbuzz Coffee
+
+- Starbuzz Coffee has made a name for itself as the fastest growing coffee shop around. If you’ve seen one on your local corner, look across the street; you’ll see another one. Because they’ve grown so quickly, they’re scrambling to update their ordering systems to match their beverage offerings.
+
+<img src="./images/7-starbucks.png" alt="description" width="750" height="500">
+
+- In addition to your coffee, you can also ask for several condiments like steamed milk, soy, and mocha (otherwise known as chocolate), and have it all topped off with whipped milk. Starbuzz charges a bit for each of these, so they really need to get them built into their order system.
+- Here’s their first attempt...
+
+<img src="./images/8-nighmare.png" alt="description" width="750" height="600">
+
+- That is a maintenance nightmare
+- What happens when the price of milk goes up? What do they do when they add a new caramel topping?
+
+
 - attaching new behaviours to object by placing these objects into a special **wrapper** objects that contain the behaviour
   - a wrapper is an object that can be linked with some target object. The wrapper contains the same set of methods as the target and delegates to it all requests it receives
 - attach responsibilities to an object dynamically, provides flexible alternative to subclassing for extending functionality
