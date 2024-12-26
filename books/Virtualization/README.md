@@ -226,6 +226,7 @@ Ref: [Prof-Mythilli-Xen-Notes](https://www.cse.iitb.ac.in/~mythili/virtcc/slides
 
 #### Virtio
 
+
 Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-to-virtio)
 
 The VirtIO spec defines standard requirements that VirtIO devices and drivers must meet. This is important as this means that, regardless of the OS/environment using VirtIO, the core framework of its implementation must be the same.
@@ -268,6 +269,8 @@ Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-t
 - For the VM to access the host’s NIC, and therefore access the internet, a VirtIO device called virtio-net can be created.
 - In a nutshell, it’s main purpose is to send and receive network data to and from the host.
 
+    <img src="./images/3-virtio-net.png" alt="description" width="650" height="500">
+
 <details>
 <summary> Simple Interaction (high-level) </summary>
 
@@ -279,6 +282,7 @@ Ref: [Introduction-to-virtio](https://blogs.oracle.com/linux/post/introduction-t
 
 </details>
 
+<img src="./images/1-virtio-net.png" alt="description" width="650" height="500">
 
 > [!TIP]
 > So hardware industry is catching up with the virtualization, CPU with more rings and instruction with vt-x or be it memory - Extended Page Table
@@ -338,6 +342,9 @@ Intel’s virtualization technology
 - Similarly guest can also register to changes in FD
 - The guest driver can listen for those changes
 - An interrupt is generated to the guest when rx buffer is full via `irqfd` . From the host the thread which are associated with the tap devices redirect this data to the right buffers.
+
+
+<img src="./images/2-vhost-net.png" alt="description" width="650" height="500">
 
 ### Alternative Virtualization Mechanism
 - Namespace and c-group based mechanism that Docker uses
