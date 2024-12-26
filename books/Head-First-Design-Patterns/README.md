@@ -16,6 +16,11 @@
     - [Implementing the Subject interface in WeatherData](#implementing-the-subject-interface-in-weatherdata)
     - [Now, let’s build those display elements](#now-lets-build-those-display-elements)
     - [Test](#test)
+    - [How Java's built-in Observer Pattern works](#how-javas-built-in-observer-pattern-works)
+    - [Reworking the Weather Station with the built-in support](#reworking-the-weather-station-with-the-built-in-support)
+    - [The dark side of java.util.Observable](#the-dark-side-of-javautilobservable)
+    - [Bullet Point](#bullet-point)
+    - [So, far](#so-far)
   - [Decorator Pattern : Structural Design Pattern](#decorator-pattern--structural-design-pattern)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
@@ -508,6 +513,166 @@ public class WeatherStation {
 ```
 
 </details>
+
+### How Java's built-in Observer Pattern works 
+- Java provides `Observer` interface and `Observable` class in `java.util.package`, these are quite similar to our `Subject` and `Observer` interfaces
+- With this we can implement either a push or pull style of update to your observer. Till now in our `Subject` and `Observer` is based on push model, where `Subject` push all the data every time to each observer. But we might not require that all the time. May be some observer only require a subset and also they might want to pull data instead waiting for a push
+
+    <img src="./images/6-Java-observable-observer.png" alt="description" width="750" height="500">
+
+- For an Object to become an observer...
+  - Implement the Observer interface and call `addObserver()`. Likewise, to remove yourself as an observer, just call `deleteObserver()` 
+- For the Observable to send notifications...
+  - Extend the `java.util.Observable` superclass. From there it is two step process
+  - You first must call the `setChanged()` method to signify that the state has changed in your object.
+  - Then, call one of two `notifyObservers()` methods: 
+    - `notifyObserver()`: Based on Pull model, or 
+    - `notifyObservers(Object arg)` : Based on Push model  
+    - On the observer side we have `update(Observable o, Object arg)`
+- The `setChanged()` method is used to signify that the state has changed and that `notifyObservers()`, when it is called, should update its observers.
+    > [!IMPORTANT]
+    > If notifyObservers() is called without first calling setChanged(), the observers will NOT be notified.
+
+    <details>
+    <summary> Behind the scene </summary>
+
+    ```java
+    setChanged() {
+        changed = true;
+    }
+
+    notifyObservers(Object arg) {
+        if (changed) {
+            for every observer on the list {
+                call update(this, arg)
+            }
+            changed = false
+        }
+    }
+
+    notifyObserver() {
+        notifyObservers(null);
+    }
+
+    ```
+
+    </details>
+
+- Why `setChanged()` method ? 
+  - It gives you more flexibility in how to update observers by allowing you to optimize the notifications 
+  - e.g., in our weather station, imagine if our measurements were so sensitive that the temperature readings were constantly fluctuating by a few tenths of a degree. That might cause the WeatherData object to send out notifications constantly. Instead, we might want to send out notifications only if the temperature changes more than half a degree and we could call setChanged() only after that happened.
+
+### Reworking the Weather Station with the built-in support
+
+<details>
+<summary> First, let’s rework WeatherData to use java.util.Observable </summary>
+
+```java
+
+import java.util.Observable;
+
+public class WeatherData extends Observable {
+    private float temperature;
+    private float humidity;
+    private float pressure;
+
+    public WeatherData() {}
+
+    public void measurementChanged() {
+        setChanged();
+        notifyObservers();
+    }
+
+    public void setMeasurements(float temperature, float humidity,
+            float pressure) {
+        this.temperature = temperature;
+        this.pressure = pressure;
+        this.humidity = humidity;
+        measurementChanged();
+    }
+
+    public float getTemperature() {
+        return temperature;
+    }
+
+    public float getHumidity() {
+        return humidity;
+    }
+
+    public float getPressure() {
+        return pressure;
+    }
+}
+
+```
+
+</details>
+
+
+<details>
+<summary> Now, let’s rework the CurrentConditionsDisplay </summary>
+
+```java
+import java.util.Observable;
+import java.util.Observer;
+
+public class CurrentConditionsDisplay implements Observer, DisplayElement {
+    Observable observable;
+
+    private float temperature;
+    private float pressure;
+
+    public CurrentConditionsDisplay(Observable observable) {
+        this.observalbe = observable;
+        observable.addObserver(this);
+    }
+
+    public void update(Observable obs, Object arg) {
+        if (arg instanceof WeatherData) {
+            WeatherData weatherData = (WeatherData)obj;
+            this.temperature = temperature;
+            this.pressure = pressure;
+            display();
+        }
+    }
+
+    public void display() {
+        log.info("Display the current screen");
+    }
+}
+```
+
+</details>
+
+### The dark side of java.util.Observable
+- As you’ve noticed, Observable is a class, not an interface, and worse, it doesn’t even implement an interface.
+-  Unfortunately, the java.util.Observable implementation has a number of problems that limit its usefulness and reuse. That’s not to say it doesn’t provide some utility, but there are some large potholes to watch out for.
+
+- Observable is a class
+  - You already know from our principles this is a bad idea, but what harm does it really cause?
+  - First, because Observable is a class, you have to subclass it. That means you can’t add on the Observable behavior to an existing class that already extends another superclass (In Java you can only extend to one class). This limits its reuse potential (and isn’t that why we are using patterns in the first place?).
+
+### Bullet Point 
+
+- The Observer Pattern defines a one-to-many relationship between objects.
+- Subjects, or as we also know them, Observables, update Observers using a common interface.
+- Observers are loosely coupled in that the Observable knows nothing about them, other than that they implement the Observer interface.
+- You can push or pull data from the Observable when using the pattern (pull is considered more “correct”).
+- Don’t depend on a specific order of notification for your Observers.
+- Java has several implementations of the Observer Pattern, including the general purpose java.util.Observable.
+- Watch out for issues with the java.util.Observable implementation.
+- Don’t be afraid to create your own Observable implementation if needed.
+
+
+### So, far
+
+> [!IMPORTANT]
+> Identify the aspects of your application that vary and separate them from what stays the same.
+> 
+> Program to an interface, not an implementation.
+> 
+> Favor composition over inheritance.
+
 
 
 ## Decorator Pattern : Structural Design Pattern
