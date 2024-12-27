@@ -63,6 +63,10 @@
     - [Comparision b/w similar looking pattern](#comparision-bw-similar-looking-pattern)
     - [Facade Pattern](#facade-pattern)
       - [The Principle of Least Knowledge](#the-principle-of-least-knowledge)
+  - [Chapter 8i. The Builder Pattern](#chapter-8i-the-builder-pattern)
+  - [Chapter 9i. The Bridge Pattern](#chapter-9i-the-bridge-pattern)
+  - [Chapter 10i. The Chain of Responsibility Pattern](#chapter-10i-the-chain-of-responsibility-pattern)
+  - [Chapter 11. The Proxy Pattern](#chapter-11-the-proxy-pattern)
 
 
 # Head First Design Patterns
@@ -1707,44 +1711,45 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
   - Object invoking the computation doesn't need to worry about how to do things
   - Reuse them to implement undo in the code
 - Command pattern
-  - separation of concern : decouple the requester of an action from the object that actually performs the action
-  - command object encapsulates a request to do something on a specific object (vendor specific) along with the object that needs to do it
-  - can also help in undoing an action
-- definition
-  - command pattern ensures class has only one instance and provides global point of access to it
-  - command object is a way to package a piece of computation
-    - specific receiver
-    - set of actions on specific receiver
-    - pass it around as a first-class object
-  - supports decoupling of the invoker of a request and the receiver of the request
-- null object
-  - useful when you don't have a meaningful object to return
-  - want to remove the responsibility for handling null from the client
-- 2. undo button
-  - whatever `execute()` method of Command object did last, `undo()` reverses it
+  - Separation of concern : decouple the requester of an action from the object that actually performs the action
+  - Command object encapsulates a request to do something on a specific object (vendor specific) along with the object that needs to do it
+  - Can also help in undoing an action
+- Definition
+  - Command pattern ensures class has only one instance and provides global point of access to it
+  - Command object is a way to package a piece of computation
+    - Specific receiver
+    - Set of actions on specific receiver
+    - Pass it around as a first-class object
+  - Supports decoupling of the invoker of a request and the receiver of the request
+- Null object
+  - Useful when you don't have a meaningful object to return
+  - Want to remove the responsibility for handling null from the client
+- 2. Undo button
+  - Whatever `execute()` method of Command object did last, `undo()` reverses it
     - Command interface will have two abstract methods namely `undo()` and `execute()`
-  - storing previous state into the Command object itself, used by the `undo()` method
-- 3. macro command
-  - new kind of Command that executes other Command's
-  - decide dynamically which commands you want to go into the macro command, which results in more flexibility
+  - Storing previous state into the Command object itself, used by the `undo()` method
+- 3. Macro command
+  - New kind of Command that executes other Command's
+  - Decide dynamically which commands you want to go into the macro command, which results in more flexibility
 - Command pattern needs a lot of Command classes (Lambda Expressions)
-  - two Command classes for each receiver class
-  - take out the bits of computation from inside the concrete Command implementations and use them directly instead (Lambda Expressions)
-  - for lambda expressions to work : 
-    - as long as the interface of the parameter we’re passing the lambda expression to has one (and only one!) method, 
-    - and that method has a compatible signature with the lambda expression (arguments and return value)
-  - lambda expressions captures variables from the surrounding scope
-  - functional interface : interface that has just one method, lambda expressions are meant to be used with functional interfaces
-  - lambda expressions is a replacement for a single method, not an entire object
-> **first class object** :   
-> i. entity that can be dynamically created, destroyed  
-> ii. passed to a function, returned as a value
-- 4. logging requests
-  - log all actions and recover after a crash by invoking those actions
+  - Two Command classes for each receiver class
+  - Take out the bits of computation from inside the concrete Command implementations and use them directly instead (Lambda Expressions)
+  - For lambda expressions to work : 
+    - As long as the interface of the parameter we’re passing the lambda expression to has one (and only one!) method, 
+    - And that method has a compatible signature with the lambda expression (arguments and return value)
+  - Lambda expressions captures variables from the surrounding scope
+  - Functional Interface : interface that has just one method, lambda expressions are meant to be used with functional interfaces
+  - Lambda expressions is a replacement for a single method, not an entire object
+    > [!NOTE]
+    > **first class object** :   
+    > i. entity that can be dynamically created, destroyed  
+    > ii. passed to a function, returned as a value
+- 4. Logging requests
+  - Log all actions and recover after a crash by invoking those actions
 - 5. Queuing of requests
   - Job Queues, Thread Pools, Schedulers
-  - you add commands to the queue on one end, and on the other end sits a group of threads
-  - threads run the following script: they remove a command from the queue, call its execute() method, wait for the call to finish, then discard the command object and retrieve a new one.
+  - You add commands to the queue on one end, and on the other end sits a group of threads
+  - Threads run the following script: they remove a command from the queue, call its execute() method, wait for the call to finish, then discard the command object and retrieve a new one.
 
 
 
@@ -1988,3 +1993,12 @@ Facade | Makes an interface simpler
     > Design Principle: Principle of Least Knowledge: talk only to your immediate friends.
 - This principle prevents us from creating designs that have a large number of classes coupled together so that changes in one part of the system cascade to other parts
 - When you build a lot of dependencies between many classes, you are building a fragile system that will be costly to maintain and complex for others to understand.
+
+
+## Chapter 8i. The Builder Pattern 
+
+## Chapter 9i. The Bridge Pattern
+
+## Chapter 10i. The Chain of Responsibility Pattern 
+
+## Chapter 11. The Proxy Pattern 
