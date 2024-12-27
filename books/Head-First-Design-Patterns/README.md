@@ -36,7 +36,20 @@
     - [Summary](#summary)
     - [Inheritance vs Composition](#inheritance-vs-composition)
     - [Diagram](#diagram)
-  - [Chapter 4. Factory Design Pattern](#chapter-4-factory-design-pattern)
+  - [Chapter 4. The Factory Pattern: Baking the OO Goodness](#chapter-4-the-factory-pattern-baking-the-oo-goodness)
+    - [Example - Pizza Shop](#example---pizza-shop)
+    - [Encapsulating object creation](#encapsulating-object-creation)
+    - [Reworking the PizzaStore class](#reworking-the-pizzastore-class)
+    - [Franchising the pizza store](#franchising-the-pizza-store)
+    - [But you’d like a little more quality control...](#but-youd-like-a-little-more-quality-control)
+    - [A framework for the pizza store](#a-framework-for-the-pizza-store)
+    - [Allowing the subclasses to decide](#allowing-the-subclasses-to-decide)
+    - [Let’s make a PizzaStore](#lets-make-a-pizzastore)
+    - [Let’s see how it works: ordering pizzas with the pizza factory method](#lets-see-how-it-works-ordering-pizzas-with-the-pizza-factory-method)
+    - [Parallel Class Hierarchies](#parallel-class-hierarchies)
+    - [The Dependency Inversion Principle](#the-dependency-inversion-principle)
+    - [Building the ingredient factories](#building-the-ingredient-factories)
+    - [Summary](#summary-1)
   - [Singleton Design Pattern](#singleton-design-pattern)
   - [Command Pattern](#command-pattern)
   - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
@@ -1268,54 +1281,320 @@ public class CoffeeShop {
 
 </details>
 
-## Chapter 4. Factory Design Pattern
-- encapsulate object creation and allows us to decouple our code from concrete types 
-- encapsulate behaviour of instantiations, area of frequent change -> client depend only on abstraction / interface
-- `new` culprit : real culprit is our old friend **CHANGE**, and how change impacts our use of `new`
-  - instantiation is an activity that shouldn't always be done in public and can often leads to coupling problems
-  - coupling problems : when time comes for changes / extensions we have to reopen the code (instantiation) & examine what needs to be added (or deleted)
-  - moreover it voilates design principal which states that our code should be __**closed for modification**__
-  - coding to an interface, insulate ourselves from lot of changes that happens to a system down the road (decoupling high level components i.e abstract creator classes from the concrete implementations of lower level components i.e concrete products)
-- another design principal for the resque : __**identify the aspects that vary and separates them from what stays the same**__
-  1. creation code is moved out into another object (varies in future) that is going to be concerned with only creation of objects (i.e factory)
-  2. replace concrete instantiations with factory methods
+## Chapter 4. The Factory Pattern: Baking the OO Goodness
+- Creational Design Pattern 
+- There is more to making objects than just using `new` operator 
+- This concept may seem unconventional at the moment, but we will revisit it later. For now, consider this key principle as the foundation of the pattern: Instantiation should not always be a public activity, as it often leads to coupling issues.
+- Remember when we said NO to program to an implementation, but if you notice using `new` is exactly we doing what we said not to do.
+- So Yes, when you use `new` you are certainly instantiating a concrete class, so that’s definitely an implementation, not an interface. And it’s a good question; you’ve learned that tying your code to a concrete class can make it more fragile and less flexible.
+- There are no issues with `new` but issues are with the our old friend **CHANGE**
+- By coding to an interface, you know you can insulate yourself from a lot of changes that might happen to a system down the road. Why? If your code is written to an interface, then it will work with any new classes implementing that interface through polymorphism. So, in other words, your code will not be “closed for modification.” To extend it with new concrete types, you’ll have to reopen it.
 
-1. **simple factory** : not a design pattern but a programming idiom (reusable code snippets that solves common problems in an elegant and efficient ways)
-  - class which contain single method that is going to be concerned with only creation of objects (encapsulate all creation code in one object)
-  - not gives you flexibility to vary the products that you are creating (extending behaviour via inheritance or composition)
-  - **static factory** : simple factory + static method
+### Example - Pizza Shop
+
+<details>
+<summary> Pizza </summary>
+
+```java
+
+Pizza orderPizza() {
+    Pizza pizza = new Pizza(); // For flexibilty ideally we want this as interface / abstract class
+    // But :) both can be init, only concrete type can be init using new
+    pizza.prepare();
+    pizza.bake();
+    pizza.cut();
+    pizza.box();
+    return pizza;
+}
+```
+- Next Step 
+
+```java
+
+Pizza orderPizza(String type) {
+    Pizza pizza;
+
+    if (type.equals("cheese")) {
+        pizza = new CheesePizza();
+    } else if (type.equals("greek")) {
+        pizza = new GreekPizza();
+    }
+
+    pizza.prepare();
+    pizza.bake();
+    pizza.cut();
+    pizza.box();
+}
+```
+
+- But the pressure is on to add more pizza types or remove pizza
+  - This will break the "CLOSED for MODIFICATION" 
+</details>
+
+### Encapsulating object creation
+
+<img src="./images/11-factory.png" alt="description" width="500" height="450">
+
+- We’ve got a name for this new object: we call it a *Factory*.
+- Factories handle the details of object creation
+
+<details>
+<summary> SimplePizzaFactory </summary>
+
+```java
+
+public class SimplePizzaFactory {
+
+    public Pizza createPizza(String type) {
+        Pizza pizza = null;
+        if (type.equals("cheese")) {
+            pizza = new CheesePizza();
+        } else if (type.equals("greek")) {
+            pizza = new GreekPizza();
+        }
+        return pizza;
+    }
+}
+```
+</details>
+
+- The above may seems like moving problem off to another object, isn't ? 
+  - One thing to remember is that the SimplePizzaFactory may have many clients. We’ve only seen the orderPizza() method;  
+  - So, by encapsulating the pizza creating in one class, we now have only one place to make modifications when the implementation changes.
+
+### Reworking the PizzaStore class
+
+<details>
+<summary> SimplePizzaFactory  - Again </summary>
+
+```java
+public class PizzaStore {
+    SimplePizzaFactory factory;
+
+    public PizzaStore(SimplePizzaFactory factory) {
+        this.factory = factory;
+    }
+
+    public Pizza orderPizza(String type) {
+        Pizza pizza = factory.createPizza(type);
+        pizza.prepare();
+        pizza.bake();
+        pizza.cut();
+        pizza.box();
+
+        return pizza;
+    }
+}
+```
+</details>
+
+
+### Franchising the pizza store
+- `NYPizzaFactory`, `ChicagoPizzaFactory`
+    ```java
+    NYPizzaFactory nyFactory = new NYPizzaFactory();
+    PizzaStore nyStore = new PizzaStore(nyFactory);
+    nyStore.orderPizza("Veggie");
+
+    ChicagoPizzaFactory chicagoFactory = new ChicagoPizzaFactory();
+    PizzaStore chicagoStore = new PizzaStore(chicagoFactory);
+    chicagoStore.orderPizza("Veggie");
+
+    ```
+
+### But you’d like a little more quality control...
+- So you test-marketed the SimpleFactory idea, and what you found was that the franchises were using your factory to create pizzas, but starting to employ their own home-grown procedures for the rest of the process: they’d bake things a little differently, they’d forget to cut the pizza and they’d use third-party boxes.
+- Rethinking the problem a bit, you see that what you’d really like to do is create a framework that ties the store and the pizza creation together, yet still allows things to remain flexible.
+- In our early code, before the SimplePizzaFactory, we had the pizza-making code tied to the PizzaStore, but it wasn’t flexible. So, how can we have our pizza and eat it too?
+
+### A framework for the pizza store
+
+<details>
+<summary> PizzaStore </summary>
+
+```java
+public abstract class PizzaStore {
+
+    public Pizza orderPizza(String type) {
+        Pizza pizza;
+        pizza = createPizza(type);
+
+        pizza.prepare();
+        pizza.bake();
+        pizza.cut();
+        pizza.box();
+
+        return pizza;
+    }
+
+    abstract Pizza createPizza(String type);
+}
+```
+
+</details>
+
+
+- Now we’ve got a store waiting for subclasses; we’re going to have a subclass for each regional type (NYPizzaStore, ChicagoPizzaStore, CaliforniaPizzaStore) and each subclass is going to make the decision about what makes up a pizza
+
+
+### Allowing the subclasses to decide
+
+<img src="./images/12-factory.png" alt="description" width="750" height="600">
+
+- `orderPizza()` is defined in the `abstract PizzaStore`, not the subclasses. So, the method has no idea which subclasses is actually running the code and making the pizza
+- Now, to take this a little further, the orderPizza() method does a lot of things with a Pizza object (like prepare, bake, cut, box), but because Pizza is abstract, orderPizza() has no idea what real concrete classes are involved. In other words, it’s **decoupled!**
+- When orderPizza() calls createPizza(), one of your subclasses will be called into action to create a pizza. Which kind of pizza will be made? Well, that’s decided by the choice of pizza store you order from, NYStylePizzaStore or ChicagoStylePizzaStore.
+  
+
+### Let’s make a PizzaStore
+
+<details>
+<summary> PizzaStore </summary>
+
+```java
+
+public abstract class PizzaStore {
+
+    public Pizza orderPizza(String type) {
+        Pizza pizza;
+        pizza = createPizza(type);
+
+        pizza.prepare();
+        pizza.bake();
+        pizza.cut();
+        pizza.box();
+
+        return pizza;
+    }
+
+    // All the responsibility for init Pizzas has been moved into a method that acts as factory
+    abstract Pizza createPizza(String type);
+}
+
+// Subclass of PizzaStore handle object init for us in the creatPizza method
+public class NYPizzaStore extends PizzaStore {
+
+    Pizza createPizza(String item) {
+        if (item.equals("cheese")) {
+            return new NYStyleCheesePizza();
+        } else if (item.equals("veggie")) {
+            return new NYStyleVeggiePizza();
+        } else {
+            return null;
+        }
+    }
+}
+```
+
+</details>
+
+- A factory method handles object creation and encapsulates it in a subclass. This decouples the client code in the superclass from the object creation code in the subclass.
+
+### Let’s see how it works: ordering pizzas with the pizza factory method
+
+```java
+PizzaStore nyPizzaStore = new NYPizzaStore();
+nyPizzaStore.orderPizza("cheese");
+
+```
+
+### Parallel Class Hierarchies
+
+<img src="./images/13-factory.png" alt="description" width="750" height="550">
+
+
+>[!NOTE]
+> The Factory Method Pattern defines an interface for creating an object, but lets subclasses decide which class to instantiate. Factory Method lets a class defer instantiation to subclasses.
+
+
+Q: I’m still a bit confused about the difference between Simple Factory and Factory Method. They look very similar, except that in Factory Method, the class that returns the pizza is a subclass. Can you explain?
+
+A: You’re right that the subclasses do look a lot like Simple Factory; however, think of Simple Factory as a one-shot deal, while with Factory Method you are creating a framework that lets the subclasses decide which implementation will be used. For example, the orderPizza() method in the Factory Method provides a general framework for creating pizzas that relies on a factory method to actually create the concrete classes that go into making a pizza. By subclassing the PizzaStore class, you decide what concrete products go into making the pizza that orderPizza() returns. Compare that with SimpleFactory, which gives you a way to encapsulate object creation, but doesn’t give you the flexibility of the Factory Method because there is no way to vary the products you’re creating.
+
+
+### The Dependency Inversion Principle
+
+- It should be pretty clear that reducing dependencies to concrete classes in our code is a “good thing.” 
+- In fact, we’ve got an OO design principle that formalizes this notion; it even has a big, formal name: **Dependency Inversion Principle**
+
+>[!IMPORTANT]
+> Depend upon abstractions. Do not depend upon concrete classes.
+
+- At first, this principle sounds a lot like “Program to an interface, not an implementation,” right? 
+  - It is similar; however, the Dependency Inversion Principle makes an even stronger statement about abstraction. 
+  - It suggests that our high-level components should not depend on our low-level components; rather, they should both depend on abstractions.
+  - "high level" = PizzaStore because its behavior is defined in terms of pizzas
+  - "low level" = Pizza 
+
+- A few guidelines to help you follow the Principle...
+  - No variable should hold a reference to a concrete class.
+    - If you use new, you’ll be holding a reference to a concrete class. Use a factory to get around that!
+  - No class should derive from a concrete class.
+    - Always Derive from an abstraction, like an interface or an abstract class.
+  - No method should override an implemented method of any of its base classes.
+    - If you override an implemented method, then your base class wasn’t really an abstraction to start with. 
+- So, Does this means when every time I do `new String()` in Java, I'm breaking the rule ?
+  - Well Yes. But that is okay, why ? because `String` is very unlikely to change.
+  - If, on the other hand, a class you write is likely to change, you have some good techniques like Factory Method to encapsulate that change.
+
+### Building the ingredient factories
+- For more details, check the folder '4-The-Factory-Pattern' in the repo
+
+<img src="./images/14-factory.png" alt="description" width="700" height="550">
+
+<img src="./images/15-factory.png" alt="description" width="580" height="700">
+
+
+### Summary
+
+- Encapsulate object creation and allows us to decouple our code from concrete types 
+- Encapsulate behaviour of instantiations, area of frequent change -> client depend only on abstraction / interface
+- `new` culprit : real culprit is our old friend **CHANGE**, and how change impacts our use of `new`
+  - Instantiation is an activity that shouldn't always be done in public and can often leads to coupling problems
+  - Coupling problems : when time comes for changes / extensions we have to reopen the code (instantiation) & examine what needs to be added (or deleted)
+  - Moreover it voilates design principal which states that our code should be __**closed for modification**__
+  - Coding to an interface, insulate ourselves from lot of changes that happens to a system down the road (decoupling high level components i.e abstract creator classes from the concrete implementations of lower level components i.e concrete products)
+- Another design principal for the resque : __**identify the aspects that vary and separates them from what stays the same**__
+  1. Creation code is moved out into another object (varies in future) that is going to be concerned with only creation of objects (i.e factory)
+  2. Replace concrete instantiations with factory methods
+
+1. **Simple Factory** : Not a design pattern but a programming idiom (reusable code snippets that solves common problems in an elegant and efficient ways)
+  - Class which contain single method that is going to be concerned with only creation of objects (encapsulate all creation code in one object)
+  - Not gives you flexibility to vary the products that you are creating (extending behaviour via inheritance or composition)
+  - **Static factory** : simple factory + static method
     - pros, don't have to instantiate an object to make use of create method
     - cons, we can't subclass and change **behaviour** of the create method
-2. **factory method pattern** : allowing the subclasses to decide
-  > **decide :** creation of actual products is not decided by the subclasses at runtime but by the decision of the subclass that is used
-  - handles object creation & encapsulates it in a subclass (encapsulation)
-  - decouples the client code in the superclass from the object creation code in the subclass (decoupling)
-  a. **the creator classes :** abstract factory method that the subclasses implements to produce products
-  b. **the product classes :** factories produces products and product itself is an interface
-  - another perspective i.e factory method is a framework that encapsulates product knowledge into each creator
-  - both product and creator classes have parallel heirarchies where the abstract classes of both are extended by the concrete classes which knew about specific implementation
-- **dependency inversion principal :** __**depend on abstractions & do not depend on concrete classes**__
-  - helps in avoiding dependencies on concrete types and to strive for abstractions
-  - high level components should not depend on low level components rather they should **both** depend on abstractions
-    - high level component is a class with behaviour defined in terms of other low-level components
+  - **Factory method pattern** : allowing the subclasses to decide
+  > **Decide :** creation of actual products is not decided by the subclasses at runtime but by the decision of the subclass that is used
+  - Handles object creation & encapsulates it in a subclass (encapsulation)
+  - Decouples the client code in the superclass from the object creation code in the subclass (decoupling)
+  a. **The creator classes :** abstract factory method that the subclasses implements to produce products
+  b. **The product classes :** factories produces products and product itself is an interface
+  - Another perspective i.e factory method is a framework that encapsulates product knowledge into each creator
+  - Both product and creator classes have parallel heirarchies where the abstract classes of both are extended by the concrete classes which knew about specific implementation
+- **Dependency inversion principal :** __**depend on abstractions & do not depend on concrete classes**__
+  - Helps in avoiding dependencies on concrete types and to strive for abstractions
+  - High level components should not depend on low level components rather they should **both** depend on abstractions
+    - High level component is a class with behaviour defined in terms of other low-level components
     ```mermaid
     graph TD;
     high-level-components --> abstraction;
     low-level-components --> abstraction;
     ```
-  - inversion : 
-    - top down dependency chart from high-level components to low-level components inverted itself, with both high-level & low-level modules now depending upon the abstractions
-    - inversion in thinking : both high-level components and low-level coomponents depend upon an abstraction
-  - rules for following dependency inversion principal :
-    - no variable should hold reference to concrete class, use factory is we are using `new`
-    - no class should derive from a concrete class, as it means that we are dependent on a concrete class
-    - no method should override an implemented method of any of its base classes, as it means our base class wasn't really an abstraction to start with
-  > **every single java program ever written voilates these guidelines** but they have a good reason for doing so. Eg : if a class is never suppose to be change like `String` then it might be ok to init it always, but on other hand if you class change, you have some good technique like Factory Method to encapsulate the change
-3. **abstract factory pattern**
-  - interface for creating families of related or dependent objects without having to depend on their concrete classes
-  - each method in an abstract factory looks like a factory method i.e subclasses override it to create some object
-- factory method relied on inheritance whereas abstract factory relies on object composition
-- all factory patterns promotes loose coupling by reducing dependency of our application on concrete classes
+  - Inversion : 
+    - Top down dependency chart from high-level components to low-level components inverted itself, with both high-level & low-level modules now depending upon the abstractions
+    - Inversion in thinking : both high-level components and low-level coomponents depend upon an abstraction
+  - Rules for following dependency inversion principal :
+    - No variable should hold reference to concrete class, use factory is we are using `new`
+    - No class should derive from a concrete class, as it means that we are dependent on a concrete class
+    - No method should override an implemented method of any of its base classes, as it means our base class wasn't really an abstraction to start with
+  > **Every single java program ever written voilates these guidelines** but they have a good reason for doing so. Eg : if a class is never suppose to be change like `String` then it might be ok to init it always, but on other hand if you class change, you have some good technique like Factory Method to encapsulate the change
+- **Abstract factory pattern**
+  - Interface for creating families of related or dependent objects without having to depend on their concrete classes
+  - Each method in an abstract factory looks like a factory method i.e subclasses override it to create some object
+- Factory method relied on inheritance whereas abstract factory relies on object composition
+- All factory patterns promotes loose coupling by reducing dependency of our application on concrete classes
+
 
 ## Singleton Design Pattern
 - Ensures : 
