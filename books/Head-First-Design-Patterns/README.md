@@ -17,7 +17,7 @@
     - [Implementing the Weather Station](#implementing-the-weather-station)
     - [Implementing the Subject interface in WeatherData](#implementing-the-subject-interface-in-weatherdata)
     - [Now, let’s build those display elements](#now-lets-build-those-display-elements)
-    - [Test](#test)
+    - [Test WeatherStation](#test-weatherstation)
     - [How Java's built-in Observer Pattern works](#how-javas-built-in-observer-pattern-works)
     - [Reworking the Weather Station with the built-in support](#reworking-the-weather-station-with-the-built-in-support)
     - [The dark side of java.util.Observable](#the-dark-side-of-javautilobservable)
@@ -630,8 +630,7 @@ A: True, but in the future we may want to un-register ourselves as an observer a
 
 </details>
 
-### Test 
-
+### Test WeatherStation 
 
 <details>
 <summary> Test WeatherStation </summary>
@@ -2002,6 +2001,137 @@ Facade | Makes an interface simpler
 
 
 ## Chapter 8i. The Builder Pattern 
+- Builder is a creational design pattern that lets you construct complex object step by step.
+- This will let you produce different type and representation of an object using the same construction code. It is like hook.
+
+<details>
+<summary> Builder Pattern </summary>
+
+```java
+// Product Class: Immutable CloudDeployment Object
+public class CloudDeployment {
+    private final String name;
+    private final String region;
+    private final boolean autoScalingEnabled;
+    private final int maxInstances;
+    private final String loggingLevel;
+    private final String deploymentType;
+
+    // Private Constructor to enforce Builder usage
+    private CloudDeployment(Builder builder) {
+        this.name = builder.name;
+        this.region = builder.region;
+        this.autoScalingEnabled = builder.autoScalingEnabled;
+        this.maxInstances = builder.maxInstances;
+        this.loggingLevel = builder.loggingLevel;
+        this.deploymentType = builder.deploymentType;
+    }
+
+    // Static Nested Builder Class
+    public static class Builder {
+        private final String name;      // Required
+        private final String region;    // Required
+        private boolean autoScalingEnabled = false; // Default Value
+        private int maxInstances = 1;                // Default Value
+        private String loggingLevel = "INFO";        // Default Value
+        private String deploymentType = "BASIC";     // Default Value
+
+        public Builder(String name, String region) {
+            if (name == null || region == null) {
+                throw new IllegalArgumentException("Name and Region are required fields.");
+            }
+            this.name = name;
+            this.region = region;
+        }
+
+        public Builder enableAutoScaling(int maxInstances) {
+            this.autoScalingEnabled = true;
+            if (maxInstances < 1) {
+                throw new IllegalArgumentException("maxInstances must be greater than 0.");
+            }
+            this.maxInstances = maxInstances;
+            return this;
+        }
+
+        public Builder setLoggingLevel(String loggingLevel) {
+            if (!loggingLevel.equals("DEBUG") && !loggingLevel.equals("INFO") 
+                    && !loggingLevel.equals("ERROR")) {
+                throw new IllegalArgumentException("");
+            }
+            this.loggingLevel = loggingLevel;
+            return this;
+        }
+
+        public Builder setDeploymentType(String deploymentType) {
+            if (!deploymentType.equals("BASIC") && !deploymentType.equals("ADVANCED")) {
+                throw new IllegalArgumentException("");
+            }
+            this.deploymentType = deploymentType;
+            return this;
+        }
+
+        public CloudDeployment build() {
+            if (autoScalingEnabled && maxInstances <= 1) {
+                throw new IllegalStateException("Auto-scaling requires maxInstances > 1.");
+            }
+            return new CloudDeployment(this);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "CloudDeployment{" +
+                "name='" + name + '\'' +
+                ", region='" + region + '\'' +
+                ", autoScalingEnabled=" + autoScalingEnabled +
+                ", maxInstances=" + maxInstances +
+                ", loggingLevel='" + loggingLevel + '\'' +
+                ", deploymentType='" + deploymentType + '\'' +
+                '}';
+    }
+}
+
+
+```
+- Using the Builder Pattern
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        CloudDeployment advancedDeployment = new CloudDeployment
+                .Builder("MyApp", "us-east-1")
+                .enableAutoScaling(5)
+                .setLoggingLevel("DEBUG")
+                .setDeploymentType("ADVANCED")
+                .build();
+
+        System.out.println(advancedDeployment);
+
+        CloudDeployment basicDeployment = new CloudDeployment
+                .Builder("BasicApp", "us-west-2")
+                .setDeploymentType("BASIC")
+                .build();
+
+        System.out.println(basicDeployment);
+    }
+}
+```
+
+</details>
+
+- Required and Optional Parameters:
+   - The Builder takes mandatory fields in the constructor.
+   - Optional configurations (`autoScalingEnabled`, `loggingLevel`, etc.) are methods on the Builder.
+-  Use the Builder pattern to get rid of a “telescoping constructor”.
+    ```java
+    class Pizza {
+        Pizza(int size) { ... }
+        Pizza(int size, boolean cheese) { ... }
+        Pizza(int size, boolean cheese, boolean pepperoni) { ... }
+        // ...
+    ```
+- Use the Builder pattern when you want your code to be able to create different representations of some product
+- Single Responsibility Principle. You can isolate complex construction code from the business logic of the product.
 
 ## Chapter 9i. The Bridge Pattern
 
