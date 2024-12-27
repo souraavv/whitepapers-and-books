@@ -54,6 +54,9 @@
     - [The Little Singleton](#the-little-singleton)
     - [Optimization for multiple threads.](#optimization-for-multiple-threads)
   - [Chapter 6. The Command Pattern: Encapsulating Invocation](#chapter-6-the-command-pattern-encapsulating-invocation)
+    - [Encapsulate method invocation,](#encapsulate-method-invocation)
+    - [Command pattern](#command-pattern)
+    - [Definition](#definition)
   - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
     - [Adaptor Pattern](#adaptor-pattern)
     - [Object Adaptor and Class Adaptor](#object-adaptor-and-class-adaptor)
@@ -1707,28 +1710,31 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 >It may be difficult to unit test the client code of the Singleton because many test frameworks rely on inheritance when producing mock objects. Since the constructor of the singleton class is private and overriding static methods is impossible in most languages, you will need to think of a creative way to mock the singleton. Or just don’t write the tests. Or don’t use the Singleton pattern.
 
 ## Chapter 6. The Command Pattern: Encapsulating Invocation
-- 1. Encapsulate method invocation, 
-  - Object invoking the computation doesn't need to worry about how to do things
-  - Reuse them to implement undo in the code
-- Command pattern
-  - Separation of concern : decouple the requester of an action from the object that actually performs the action
-  - Command object encapsulates a request to do something on a specific object (vendor specific) along with the object that needs to do it
-  - Can also help in undoing an action
-- Definition
-  - Command pattern ensures class has only one instance and provides global point of access to it
-  - Command object is a way to package a piece of computation
-    - Specific receiver
-    - Set of actions on specific receiver
-    - Pass it around as a first-class object
-  - Supports decoupling of the invoker of a request and the receiver of the request
+
+### Encapsulate method invocation, 
+- Object invoking the computation doesn't need to worry about how to do things
+- Reuse them to implement undo in the code
+
+### Command pattern
+- Separation of concern : decouple the requester of an action from the object that actually performs the action
+- Command object encapsulates a request to do something on a specific object (vendor specific) along with the object that needs to do it
+- Can also help in undoing an action
+
+### Definition
+- Command pattern ensures class has only one instance and provides global point of access to it
+- Command object is a way to package a piece of computation
+  - Specific receiver
+  - Set of actions on specific receiver
+  - Pass it around as a first-class object
+- Supports decoupling of the invoker of a request and the receiver of the request
 - Null object
   - Useful when you don't have a meaningful object to return
   - Want to remove the responsibility for handling null from the client
-- 2. Undo button
+- Undo button
   - Whatever `execute()` method of Command object did last, `undo()` reverses it
     - Command interface will have two abstract methods namely `undo()` and `execute()`
   - Storing previous state into the Command object itself, used by the `undo()` method
-- 3. Macro command
+- Macro command
   - New kind of Command that executes other Command's
   - Decide dynamically which commands you want to go into the macro command, which results in more flexibility
 - Command pattern needs a lot of Command classes (Lambda Expressions)
@@ -1744,9 +1750,9 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
     > **first class object** :   
     > i. entity that can be dynamically created, destroyed  
     > ii. passed to a function, returned as a value
-- 4. Logging requests
+- Logging requests
   - Log all actions and recover after a crash by invoking those actions
-- 5. Queuing of requests
+- Queuing of requests
   - Job Queues, Thread Pools, Schedulers
   - You add commands to the queue on one end, and on the other end sits a group of threads
   - Threads run the following script: they remove a command from the queue, call its execute() method, wait for the call to finish, then discard the command object and retrieve a new one.
