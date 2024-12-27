@@ -52,7 +52,7 @@
     - [Summary](#summary-1)
   - [Chapter 5. The Singleton Pattern: One of a Kind Objects](#chapter-5-the-singleton-pattern-one-of-a-kind-objects)
     - [The Little Singleton](#the-little-singleton)
-    - [Optimization for multiple threads (multi-threading) :](#optimization-for-multiple-threads-multi-threading-)
+    - [Optimization for multiple threads.](#optimization-for-multiple-threads)
   - [Chapter 6. The Command Pattern: Encapsulating Invocation](#chapter-6-the-command-pattern-encapsulating-invocation)
   - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
     - [Adaptor Pattern](#adaptor-pattern)
@@ -1259,14 +1259,14 @@ public class CoffeeShop {
   - complexity of code needed to instantiate the component
 
 ### Inheritance vs Composition
-- common : work almost the same way
-  - composition : one object has a reference to another & delegate it some work
-  - inheritance : object itself is able to do that work, inherting behaviour from it's superclass
-- diff : through inhertance gets behaviour at compile time, gets whatever behaviour superclass gives us or that we override
-  - compiler analyzes the class hierarchy and determines the methods from the superclass and any overridden methods defined in the subclass
-- diff : through composition we can mix and match decorators at runtime
-  - program creates instances of the composed objects and interacts with their methods based on the specific objects involved
-  - subclasses can have just one parent, in most languages 
+- Common : Work almost the same way
+  - Composition : One object has a reference to another & delegate it some work
+  - Inheritance : Object itself is able to do that work, inherting behaviour from it's superclass
+- Diff : Through inhertance gets behaviour at compile time, gets whatever behaviour superclass gives us or that we override
+  - Compiler analyzes the class hierarchy and determines the methods from the superclass and any overridden methods defined in the subclass
+- Diff : Through composition we can mix and match decorators at runtime
+  - Program creates instances of the composed objects and interacts with their methods based on the specific objects involved
+  - Subclasses can have just one parent, in most languages 
 
 ### Diagram
 
@@ -1603,6 +1603,8 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 >[!NOTE]
 > The Singleton Pattern ensures a class has only one instance, and provides a global point of access to it.
 
+- Singleton is a creational design pattern that lets you ensure that a class has only one instance, while providing a global access point to this instance.
+
 ### The Little Singleton
 - Ensures : 
   1. Ensures class has only one instance
@@ -1628,7 +1630,7 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
     - BTW, Is above code thread safe ? Is this actually singleton in case if multiple threads calls Singleton.getInstance();
       - No it is not.
 
-### Optimization for multiple threads (multi-threading) :
+### Optimization for multiple threads.
 1. Synchronized `getInstance()` method
    - Synchronizing a method can decrease performance by a factor of 100, so if a high-traffic part of your code begins using getInstance(), you may have to reconsider
    ```java
@@ -1663,7 +1665,7 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
     }
     } 
     ```
-3. **Double checking locking** to reduce use of synchronization in `getInstance()`
+1. **Double checking locking** to reduce use of synchronization in `getInstance()`
 - Double-checked locking, we first check to see if an instance is created, and if not, THEN we synchronize over the class and again check if an instance got created in the meantime.
 - Instance creation will never take place without synchronization
     ```java
@@ -1697,6 +1699,8 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 
 - Home Work / Interview Question - Discuss why Singleton pattern is better than using global variables. List out the disadvantage.
 
+>[!WARNING]
+>It may be difficult to unit test the client code of the Singleton because many test frameworks rely on inheritance when producing mock objects. Since the constructor of the singleton class is private and overriding static methods is impossible in most languages, you will need to think of a creative way to mock the singleton. Or just don’t write the tests. Or don’t use the Singleton pattern.
 
 ## Chapter 6. The Command Pattern: Encapsulating Invocation
 - 1. Encapsulate method invocation, 
@@ -1747,6 +1751,9 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 ## Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern
 
 ### Adaptor Pattern
+
+<img src="https://refactoring.guru/images/patterns/content/adapter/adapter-en-2x.png" alt="description" width="700" height="400">
+
 
 - Let say if you project is using an interface A from some vendor X; Now you are planning to shift to a vendor Y. But vendor Y has designed their interfaces different from vendor X
 - Now you are not willing to change your code (and you can't change the vendors code)
