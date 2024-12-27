@@ -50,8 +50,10 @@
     - [The Dependency Inversion Principle](#the-dependency-inversion-principle)
     - [Building the ingredient factories](#building-the-ingredient-factories)
     - [Summary](#summary-1)
-  - [Singleton Design Pattern](#singleton-design-pattern)
-  - [Command Pattern](#command-pattern)
+  - [Chapter 5. The Singleton Pattern: One of a Kind Objects](#chapter-5-the-singleton-pattern-one-of-a-kind-objects)
+    - [The Little Singleton](#the-little-singleton)
+    - [Optimization for multiple threads (multi-threading) :](#optimization-for-multiple-threads-multi-threading-)
+  - [Chapter 6. The Command Pattern: Encapsulating Invocation](#chapter-6-the-command-pattern-encapsulating-invocation)
   - [Chapter 7. Adaptor and Facade (मुखौटा) Design Pattern](#chapter-7-adaptor-and-facade-मुखौटा-design-pattern)
     - [Adaptor Pattern](#adaptor-pattern)
     - [Object Adaptor and Class Adaptor](#object-adaptor-and-class-adaptor)
@@ -1596,34 +1598,111 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 - All factory patterns promotes loose coupling by reducing dependency of our application on concrete classes
 
 
-## Singleton Design Pattern
+## Chapter 5. The Singleton Pattern: One of a Kind Objects
+
+>[!NOTE]
+> The Singleton Pattern ensures a class has only one instance, and provides a global point of access to it.
+
+### The Little Singleton
 - Ensures : 
-  1. ensures class has only one instance
-    - taking class and letting it manage a single instance of itself
-  2. provides a global point of access to it
-    - query class and it will hand you back the single instance
-  3. singleton object is initialized only when it's requested for the first time (`lazy initialization` of resource-intensive objects) 
-- Optimization for multiple threads (multi-threading) :
-  1. synchronized `getInstance()` method
-    - synchronizing a method can decrease performance by a factor of 100, so if a high-traffic part of your code begins using getInstance(), you may have to reconsider
-  2. eagerly creating instance rather than lazily created one
-    - static references to objects, always going to initialize instance in our code
-    - rely on the JVM to create the unique instance of the Singleton when the class is loaded
-    - JVM guarantees that the instance would be created before any thread accesses the static `uniqueInstance` variable
-  3. `double checking locking` to reduce use of synchronization in `getInstance()`
-    - double-checked locking, we first check to see if an instance is created, and if not, THEN we synchronize over the class and again check if an instance got created in the meantime.
-    - instance creation will never take place without synchronization
+  1. Ensures class has only one instance
+    - Taking class and letting it manage a single instance of itself
+  2. Provides a global point of access to it
+    - Query class and it will hand you back the single instance
+  3. Singleton object is initialized only when it's requested for the first time (lazy initialization of resource-intensive objects) 
+    ```java
+    public class Singleton {
+        private static Singleton uniqueInstance;
+
+        private Singleton() {}
+
+        public static Singleton getInstance() {
+            if (uniqueInstance == null) {
+                uniqueInstance = new Singleton();
+            }
+            return uniqueInstance;
+        }
+    }
+
+    ```
+    - BTW, Is above code thread safe ? Is this actually singleton in case if multiple threads calls Singleton.getInstance();
+      - No it is not.
+
+### Optimization for multiple threads (multi-threading) :
+1. Synchronized `getInstance()` method
+   - Synchronizing a method can decrease performance by a factor of 100, so if a high-traffic part of your code begins using getInstance(), you may have to reconsider
+   ```java
+
+   public class Singleton {
+     private static Singleton uniqueInstance;
+
+     private Singleton() {}
+
+     public static synchronized Singleton getInstance() {
+         if (uniqueInstance == null) {
+             uniqueInstance = new Singleton();
+         }
+         return uniqueInstance;
+     }
+   }
+   ```
+   - But in above code, we have no further need to synchronize this method once we’ve set the uniqueInstance variable. After the first time through, synchronization is totally unneeded overhead!
+2. **Move to an eagerly created instance rather than a lazily created one**
+- Static references to objects, always going to initialize instance in our code
+- Rely on the JVM to create the unique instance of the Singleton when the class is loaded
+- JVM guarantees that the instance would be created before any thread accesses the static `uniqueInstance` variable
+    ```java
+    public class Singleton {
+
+    private static Singleton uniqueInstance = new Singleton();
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        return uniqueInstance;
+    }
+    } 
+    ```
+3. **Double checking locking** to reduce use of synchronization in `getInstance()`
+- Double-checked locking, we first check to see if an instance is created, and if not, THEN we synchronize over the class and again check if an instance got created in the meantime.
+- Instance creation will never take place without synchronization
+    ```java
+    public class Singleton {
+    // volatile force that NO optimization are applied to the variable
+    // like storing it in register. This is to avoid the stale read and every
+    // read to variable must go to memory and same for write and thus producing
+    // as consistent view for every one
+
+    private volatile static Singleton uniqueInstance;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (uniqueInstance == null) {
+            synchronized (Singleton.class) {
+                if (uniqueInstance == null) {
+                    uniqueInstance = new Singleton();
+                }
+            }
+        }
+        return uniqueInstance;
+    }
+    }
+    ```
 - Identification : 
   - Singleton can be recognized by a static creation method, which returns the same cached object
 - Problems with subclassing a Singleton
-  1. cannot extend class with private constructor
-  2. all derived classes will share the same instance variable
+  1. Cannot extend class with private constructor
+  2. All derived classes will share the same instance variable
 
-## Command Pattern
-- 1. encapsulate method invocation, 
-  - object invoking the computation doesn't need to worry about how to do things
-  - reuse them to implement undo in the code
-- command pattern
+- Home Work / Interview Question - Discuss why Singleton pattern is better than using global variables. List out the disadvantage.
+
+
+## Chapter 6. The Command Pattern: Encapsulating Invocation
+- 1. Encapsulate method invocation, 
+  - Object invoking the computation doesn't need to worry about how to do things
+  - Reuse them to implement undo in the code
+- Command pattern
   - separation of concern : decouple the requester of an action from the object that actually performs the action
   - command object encapsulates a request to do something on a specific object (vendor specific) along with the object that needs to do it
   - can also help in undoing an action
