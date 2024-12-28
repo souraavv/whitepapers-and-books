@@ -75,8 +75,8 @@ The text in the book revolves around Java (pre-req)
 - The transient state for a particular computation exists solely in local variables that are stored on the thread's stack and are accessible only to the executing thread.
 - One thread accessing a StatelessFactorizer cannot influence the result of another thread accessing the same StatelessFactorizer; because the two threads do not share state, it is as if they were accessing different instances.
 
-    >[!NOTE]
-    > Stateless objects are always thread-safe.
+>[!INFO]
+> Stateless objects are always thread-safe.
 
 
 ### Atomicity
@@ -103,14 +103,13 @@ The text in the book revolves around Java (pre-req)
 - While `++count`, may look like a single action because of compact syntax, it is not *atomic*, it is a set of three discrete operations: fetch the current value, add one to it, and write the new value back.
   - Example of *read-modify-write* 
 - The possibility of incorrect results in the presence of unlucky timing is so important in concurrent programming that it has a name: a **race condition**.
+>[!INFO]
+> A race condition occurs when the correctness of a computation depends on the relative timing or interleaving of multiple threads by the runtime; in other words, when getting the right answer relies on lucky timing.
+>
+> The most common type of race condition is *check-then-act*, where a potentially stale observation is used to make a decision
 
-    >[!NOTE]
-    > A race condition occurs when the correctness of a computation depends on the relative timing or interleaving of multiple threads by the runtime; in other words, when getting the right answer relies on lucky timing.
-    >
-    > The most common type of race condition is *check-then-act*, where a potentially stale observation is used to make a decision
-
-    >[!WARNING]
-    > The term race condition is often confused with the related term data race, which arises when synchronization is not used to coordinate all access to a shared nonfinal field.
+>[!WARNING]
+> The term race condition is often confused with the related term data race, which arises when synchronization is not used to coordinate all access to a shared nonfinal field.
 
 #### Example: Race Conditions in Lazy Initialization
 - Race Condition in Lazy Initialization. Don't do this.
@@ -133,9 +132,8 @@ The text in the book revolves around Java (pre-req)
 #### Compound Actions
 - Both `LazyInitRace` and `UnsafeCountingFactorizer` contained a sequence of operations that needed to be atomic, or indivisible, relative to other operations on the same state.
 - To avoid race conditions, there must be a way to prevent other threads from using a variable while we're in the middle of modifying it, so we can ensure that other threads can observe or modify the state only before we start or after we finish, but not in the middle.
-
-    >[!IMPORTANT]
-    > Operations A and B are atomic with respect to each other if, from the perspective of a thread executing A, when another thread executes B, either all of B has executed or none of it has. An atomic operation is one that is atomic with respect to all operations, including itself, that operate on the same state.
+>[!IMPORTANT]
+> Operations A and B are atomic with respect to each other if, from the perspective of a thread executing A, when another thread executes B, either all of B has executed or none of it has. An atomic operation is one that is atomic with respect to all operations, including itself, that operate on the same state.
 
 #### Java's builtin mechanism for ensuring atomicity.
 
@@ -160,9 +158,8 @@ public class UnsafeCountingFactorizer implements Servlet {
 
 - The `java.util.concurrent.atomic` package contains atomic variable classes for effecting atomic state transitions on numbers and object references.
 - By replacing the `long` counter with an `AtomicLong`, we ensure that all actions that access the counter state are atomic
-
-    >[!NOTE]
-    > When a single element of state is added to a stateless class, the resulting class will be thread-safe if the state is entirely managed by a thread-safe object. 
+>[!INFO]
+> When a single element of state is added to a stateless class, the resulting class will be thread-safe if the state is entirely managed by a thread-safe object. 
 
 ### Locking
 
@@ -194,8 +191,8 @@ public class UnsafeCountingFactorizer implements Servlet {
 - Unfortunately, this approach does not work. Even though the atomic references are individually thread-safe, UnsafeCachingFactorizer has race conditions that could make it produce the wrong answer, why ?
   - When multiple variables participate in an invariant, they are not independent: the value of one constrains the allowed value(s) of the others. Thus when updating one, you must update the others in the same atomic operation.
 
-    >[!IMPORTANT]
-    > To preserve state consistency, update related state variables in a single atomic operation.
+>[!IMPORTANT]
+> To preserve state consistency, update related state variables in a single atomic operation.
 
 #### Intrinsic Locks
 - Java provides a built-in locking mechanism for enforcing atomicity: the `synchronized` block. 
@@ -240,10 +237,10 @@ public class UnsafeCountingFactorizer implements Servlet {
 #### Reentracy
 - When a thread requests a lock that is already held by another thread, the requesting thread blocks.
 - But because intrinsic locks are reentrant, if a thread tries to acquire a lock that it already holds, the request succeeds.
-    >[!IMPORTATNT]
-    > Reentrancy means that locks are acquired on a per-thread rather than per-invocation basis.
-    > 
-    > This differs from the default locking behavior for pthreads (POSIX threads) mutexes, which are granted on a per-invocation basis.
+>[!IMPORTANT]
+> Reentrancy means that locks are acquired on a per-thread rather than per-invocation basis.
+> 
+> This differs from the default locking behavior for pthreads (POSIX threads) mutexes, which are granted on a per-invocation basis.
 - Reentrancy is implemented by associating with each lock an acquisition count and an owning thread. 
 - When the count is zero, the lock is considered unheld.
 - When a thread acquires a previously unheld lock, the JVM records the owner and sets the acquisition count to one
@@ -264,10 +261,10 @@ public class UnsafeCountingFactorizer implements Servlet {
     }
     ```
 
-    > [!WARNING]
-    > Without reentrant locks, the very natural-looking code, in which a subclass overrides a synchronized method and then calls the superclass method, would deadlock. Because the doSomething methods in Widget and LoggingWidget are both synchronized, each tries to acquire the lock on the Widget before proceeding. 
-    > 
-    > But if intrinsic locks were not reentrant, the call to super.doSomething would never be able to acquire the lock because it would be considered already held, and the thread would permanently stall waiting for a lock it can never acquire. Reentrancy saves us from deadlock in situations like this.
+> [!WARNING]
+> Without reentrant locks, the very natural-looking code, in which a subclass overrides a synchronized method and then calls the superclass method, would deadlock. Because the doSomething methods in Widget and LoggingWidget are both synchronized, each tries to acquire the lock on the Widget before proceeding. 
+> 
+> But if intrinsic locks were not reentrant, the call to super.doSomething would never be able to acquire the lock because it would be considered already held, and the thread would permanently stall waiting for a lock it can never acquire. Reentrancy saves us from deadlock in situations like this.
 
 ### Guarding State with Locks
 
@@ -277,10 +274,10 @@ public class UnsafeCountingFactorizer implements Servlet {
 - For each mutable state variable that may be accessed by more than one thread, all accesses to that variable must be performed with the same lock held. In this case, we say that the variable is guarded by that lock.
 - Every shared, mutable variable should be guarded by exactly one lock. Make it clear to maintainers which lock that is.
 
-    >[!IMPORTANT]
-    > Each object in Java has built-in intrinsic lock 
-    > 
-    > The fact that every object has a built-in lock is just a convenience so that you needn't explicitly create lock objects. 
+>[!IMPORTANT]
+> Each object in Java has built-in intrinsic lock 
+> 
+> The fact that every object has a built-in lock is just a convenience so that you needn't explicitly create lock objects. 
 
 - When a variable is guarded by a lock—meaning that every access to that variable is performed with that lock held—you've ensured that only one thread at a time can access that variable. 
 - When a class has invariants that involve more than one state variable, there is an additional requirement: each variable participating in the invariant must be guarded by the same lock. 
