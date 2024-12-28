@@ -75,7 +75,7 @@ The text in the book revolves around Java (pre-req)
 - The transient state for a particular computation exists solely in local variables that are stored on the thread's stack and are accessible only to the executing thread.
 - One thread accessing a StatelessFactorizer cannot influence the result of another thread accessing the same StatelessFactorizer; because the two threads do not share state, it is as if they were accessing different instances.
 
->[!NOTE]
+>[!INFO]
 > Stateless objects are always thread-safe.
 
 
@@ -103,7 +103,7 @@ The text in the book revolves around Java (pre-req)
 - While `++count`, may look like a single action because of compact syntax, it is not *atomic*, it is a set of three discrete operations: fetch the current value, add one to it, and write the new value back.
   - Example of *read-modify-write* 
 - The possibility of incorrect results in the presence of unlucky timing is so important in concurrent programming that it has a name: a **race condition**.
->[!NOTE]
+>[!INFO]
 > A race condition occurs when the correctness of a computation depends on the relative timing or interleaving of multiple threads by the runtime; in other words, when getting the right answer relies on lucky timing.
 >
 > The most common type of race condition is *check-then-act*, where a potentially stale observation is used to make a decision
@@ -158,7 +158,7 @@ public class UnsafeCountingFactorizer implements Servlet {
 
 - The `java.util.concurrent.atomic` package contains atomic variable classes for effecting atomic state transitions on numbers and object references.
 - By replacing the `long` counter with an `AtomicLong`, we ensure that all actions that access the counter state are atomic
->[!NOTE]
+>[!INFO]
 > When a single element of state is added to a stateless class, the resulting class will be thread-safe if the state is entirely managed by a thread-safe object. 
 
 ### Locking
