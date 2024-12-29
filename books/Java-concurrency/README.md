@@ -708,7 +708,7 @@ public class SafePublishDemo {
 
 
 ### Summary
-- The most useful policies for using and sharing objects in a concurrent program are:
+The most useful policies for using and sharing objects in a concurrent program are:
 - **Thread-confined**. A thread-confined object is owned exclusively by and confined to one thread, and can be modifled by its owning thread.
 - **Shared read-only**. A shared read-only object can be accessed concurrently by multiple threads without additional synchronization, but cannot be modified by any thread. Shared read-only objects include immutable and effectively immutable objects.
 - **Shared thread-safe**. A thread-safe object performs synchronization internally, so multiple threads can freely access it through its public interface without further synchronization.
