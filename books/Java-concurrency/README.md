@@ -25,6 +25,15 @@
       - [Locking and Visibility](#locking-and-visibility)
       - [Volatile Variables](#volatile-variables)
     - [Publication and Escape](#publication-and-escape)
+    - [Thread Confinement](#thread-confinement)
+      - [Stack Confinement](#stack-confinement)
+      - [ThreadLocal](#threadlocal)
+    - [Immutability](#immutability)
+      - [Final Fields](#final-fields)
+    - [Safe Publication](#safe-publication)
+      - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
+      - [Safe Publication Idioms](#safe-publication-idioms)
+    - [Summary](#summary)
 
 
 # Java Concurrency in Practice
@@ -493,9 +502,11 @@ public class UnsafeCountingFactorizer implements Servlet {
     }
     ```
     - When `ThisEscape` publishes the `EventListener`, it implicitly publishes the enclosing `ThisEscape` instance as well, because inner class instances contain a hidden reference to the enclosing instance.
-    - `ThisEscape` instance. But an object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an incompletely constructed object. This is true even if the publication is the last statement in the constructor. If the `this` reference escapes during construction, the object is considered not properly constructed.
+    - `ThisEscape` instance. But an object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an incompletely constructed object. 
+    - This is true even if the publication is the last statement in the constructor. If the `this` reference escapes during construction, the object is considered not properly constructed.
   - Do not allow the this reference to escape during construction.
-  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the `Thread` or `Runnable` is an inner class of the owning object).
+  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. 
+  - When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the `Thread` or `Runnable` is an inner class of the owning object).
    - The new thread might then be able to see the owning object before it is fully constructed. There's nothing wrong with creating a thread in a constructor, but it is best not to start the thread immediately.
 - If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in `SafeListener`
     ```java
@@ -519,5 +530,186 @@ public class UnsafeCountingFactorizer implements Servlet {
     }
     ```
 
+### Thread Confinement
+
+>[!INFO]
+> Accessing shared, mutable data requires using synchronization; one way to avoid this requirement is to not share. 
+> 
+> If data is only accessed from a single thread, no synchronization is needed. This technique, **thread confinement**
+>
+>  This technique, thread confinement, is one of the simplest ways to achieve thread safety. When an object is confined to a thread, such usage is automatically thread-safe even if the confined object itself is not 
+
+- Thread confinement is commonly used in pooled JDBC `Connection` objects, as they are not thread-safe. A thread acquires a connection from the pool, processes a request synchronously, and returns it. The pool ensures the connection isn't shared with other threads during its usage, maintaining confinement.
+  - The connection pool implementations provided by application servers are thread-safe; connection pools are necessarily accessed from multiple threads, so a non-thread-safe implementation would not make sense.
+
+#### Stack Confinement
+- Local variables are intrinsically confined to the executing thread;
+- They exist on the executing thread's stack, which is not accessible to other threads.
+- Stack confinement is a special case of thread confinement in which an object can only be reached through local variables.
+- Stack confinement also called *within-thread* or *thread-local usage*
+    ```java
+
+    public int loadTheArk(Collection<Animal> candidates) {
+        SortedSet<Animal> animals;
+        int numPairs = 0;
+        Animal candidate = null;
+
+        animals = new TreeSet<Animal> (new SpeciesGenderComparator());
+        animals.addAll(candidates);
+        for (Animal a: animals) {
+            if (candidate == null || !candidate.isPotentialMate(a)) {
+                candidate = a;
+            } else {
+                ark.load(new AnimalPair(candidate, a));
+                ++numPairs;
+                candidate = null;
+            }
+        }
+        return numPairs;
+    }
+    ```
+    - However, if we were to publish a reference to the Set (or any of its internals), the confinement would be violated and the animals would escape.
+
+#### ThreadLocal
+
+### Immutability
+- The other end-run around the need to synchronize is to use immutable objects
+- If an object's state cannot be modified, these risks and complexities simply go away.
+- An immutable object is one whose state cannot be changed after construction.
+- Immutable objects are inherently thread-safe; their invariants are established by the constructor
+>[!NOTE]
+> Immutable objects are always thread-safe.
+- There is a difference between an object being immutable and the reference to it being immutable
+#### Final Fields
+- The `final` keyword, a more limited version of the `const` mechanism from C++
+- Final fields can't be modified (although the objects they refer to can be modified if they are mutable), but they also have special semantics under the Java Memory Model
+- Just as it is a good practice to make all fields private unless they need greater visibility [EJ Item 12], it is a good practice to make all fields final unless they need to be mutable.
+
+### Safe Publication
+- So far we have focused on ensuring that an object not be published, such as when it is supposed to be confined to a thread or within another object. 
+- Of course, sometimes we do want to share objects across threads, and in this case we must do so safely.
+    
+
+#### Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.
+```java
+@Immutable
+Class OneValueCache {
+    private final BigInteger lastNumber;
+    private final BigInteger[] lastFactors;
+
+    public OneValueCache(BigInteger i, BigInteger[] factors) {
+        lastNumber = i
+        lastFactors = Arrays.copyOf(factors, factors.length);
+    }
+
+    public BigInteger[] getFactors(BigInteger i) {
+        if (lastNumber == null || !lastNumber.equals(i)) {
+            return null;
+        } else {
+            return Arrays.copyOf(lastFactors, lastFactors.length);
+        }
+    }
+}
+
+@ThreadSafe 
+public class VolatileCacheFactorizer implements Servlet {
+
+    private volatile OneValueCache cache = 
+            new OneValueCache(null, null);
+
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigIntger[] factors = cache.getFactors(i);
+
+        if (factor == null) {
+            factors = factor(i);
+            cache = new OneValueCache(i, factors);
+        }
+        return factors;
+    }
+}
+```
+
+#### Safe Publication Idioms
+- Objects that are mutable must be safely published, which usually entails synchronization by both the publishing and the consuming thread.
+<details>
+<summary> Example </summary>
+
+```java
+class UnsafePublishExample {
+    // Shared mutable object (NOT safely published)
+    private MutableObject mutableObject;
+
+    public void publishObject() {
+        mutableObject = new MutableObject(42); // Publisher thread initializes the object
+    }
+
+    public MutableObject getObject() {
+        return mutableObject; // Consumer thread retrieves the object
+    }
+}
+
+class MutableObject {
+    private int value;
+
+    public MutableObject(int value) {
+        this.value = value; // Initialize the value
+    }
+
+    public int getValue() {
+        return value;
+    }
+}
 
 
+```
+
+- Safe Publication 
+
+```java
+class SafePublishExample {
+    private MutableObject mutableObject;
+    private final Object lock = new Object();
+
+    // Publisher thread
+    public void publishObject(int value) {
+        synchronized (lock) {
+            mutableObject = new MutableObject(value); // Object is published safely
+        }
+    }
+
+    // Consumer thread
+    public MutableObject getObject() {
+        synchronized (lock) {
+            return mutableObject; // Access is synchronized
+        }
+    }
+}
+
+public class SafePublishDemo {
+    public static void main(String[] args) {
+        SafePublishExample example = new SafePublishExample();
+
+        // Publisher thread
+        new Thread(() -> example.publishObject(42)).start();
+
+        // Consumer thread
+        new Thread(() -> {
+            MutableObject obj = example.getObject();
+            if (obj != null) {
+                System.out.println(obj.getValue()); // Safely reads the value
+            }
+        }).start();
+    }
+}
+
+```
+</detials>
+
+
+### Summary
+- The most useful policies for using and sharing objects in a concurrent program are:
+- **Thread-confined**. A thread-confined object is owned exclusively by and confined to one thread, and can be modifled by its owning thread.
+- **Shared read-only**. A shared read-only object can be accessed concurrently by multiple threads without additional synchronization, but cannot be modified by any thread. Shared read-only objects include immutable and effectively immutable objects.
+- **Shared thread-safe**. A thread-safe object performs synchronization internally, so multiple threads can freely access it through its public interface without further synchronization.
+- **Guarded**. A guarded object can be accessed only with a specific lock held. Guarded objects include those that are encapsulated within other thread-safe objects and published objects that are known to be guarded by a specific lock.
