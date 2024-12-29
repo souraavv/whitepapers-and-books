@@ -353,8 +353,8 @@ public class UnsafeCountingFactorizer implements Servlet {
 - In chapter 2. we learned primarily about managing **access** to shared, mutable state.
   - We used `synchronized` to prevent multiple threads from accessing the same data at the same time.
 - This chapter examines techniques for **sharing and publishing** objects so they can be safely accessed by multiple threads
-- We have seen how synchronized blocks and methods can ensure that operations execute atomically, but it is a common misconception that synchronized is only about atomicity or demarcating “critical sections”. 
-- Synchronization also has another significant, and subtle, aspect: memory visibility. 
+- We have seen how `synchronized` blocks and methods can ensure that operations execute atomically, but it is a common misconception that `synchronized` is only about atomicity or demarcating “critical sections”. 
+- Synchronization also has another significant, and subtle, aspect: **memory visibility**. 
 >[!IMPORTANT]
 > We want not only to prevent one thread from modifying the state of an object when another is using it, but also to ensure that when a thread modifies the state of an object, other threads can actually see the changes that were made
 
@@ -385,8 +385,9 @@ public class UnsafeCountingFactorizer implements Servlet {
     ```
 
 - `NoVisibility` could loop forever because the value of ready might never become visible to the reader thread. 
-- Even more strangely, `NoVisibility` could print zero because the write to ready might be made visible to the reader thread before the write to `number`, a phenomenon known as reordering. 
-- This may seem like a broken design, but it is meant to allow JVMs to take full advantage of the performance of modern multiprocessor hardware. For example, in the absence of synchronization, the Java Memory Model permits the compiler to reorder operations and cache values in registers, and permits CPUs to reorder operations and cache values in processor-specific caches. 
+- Even more strangely, `NoVisibility` could print zero because the write to ready might be made visible to the reader thread before the write to `number`, a phenomenon known as **reordering**. 
+- This may seem like a broken design, but it is meant to allow JVMs to take full advantage of the performance of modern multiprocessor hardware. 
+- For example, in the absence of synchronization, the Java Memory Model permits the compiler to reorder operations and cache values in registers, and permits CPUs to reorder operations and cache values in processor-specific caches. 
 
 #### Stale Data
 - Last example shows insufficiently synchronized programs can cause surprising results: *stale data*
@@ -419,13 +420,13 @@ public class UnsafeCountingFactorizer implements Servlet {
 >[!IMPORTANT]
 > We can now give the other reason for the rule requiring all threads to synchronize on the same lock when accessing a shared mutable variable—to guarantee that values written by one thread are made visible to other threads. Otherwise, if a thread reads a variable without holding the appropriate lock, it might see a stale value.
 >
-> Locking is not just about mutual exclusion; it is also about memory visibility. To ensure that all threads see the most up-to-date values of shared mutable variables, the reading and writing threads must synchronize on a common lock.
+> Locking is not just about mutual exclusion; it is also about **memory visibility**. To ensure that all threads see the most up-to-date values of shared mutable variables, the reading and writing threads must synchronize on a common lock.
 
 #### Volatile Variables
 - The Java language also provides an alternative, weaker form of synchronization, *volatile variables*, to ensure that updates to a variable are propagated predictably to other threads.
   
 >[!NOTE]
->  When a field is declared volatile, the compiler and runtime are put on notice that this variable is shared and that operations on it should not be reordered with other memory operations
+>  When a field is declared `volatile`, the compiler and runtime are put on notice that this variable is shared and that operations on it should not be reordered with other memory operations
 >
 > Volatile variables are not cached in registers or in caches where they are hidden from other processors, so a read of a volatile variable always returns the most recent write by any thread.
 
@@ -435,8 +436,8 @@ public class UnsafeCountingFactorizer implements Servlet {
 > Use volatile variables only when they simplify implementing and verifying your synchronization policy; avoid using volatile variables when veryfing correctness would require subtle reasoning about visibility. Good uses of volatile variables include ensuring the visibility of their own state, that of the object they refer to, or indicating that an important lifecycle event (such as initialization or shutdown) has occurred.
 
 - Volatile variables are convenient, but they have limitations
-- The semantics of volatile are not strong enough to make the increment operation (count++) atomic, unless you can guarantee that the variable is written only from a single thread.
-- Atomic variables do provide atomic read-modify-write support and can often be used as **“better volatile variables”**
+- The semantics of volatile are not strong enough to make the increment operation (`count++`) atomic, unless you can guarantee that the variable is written only from a single thread.
+- Atomic variables do provide atomic *read-modify-write* support and can often be used as **“better volatile variables”**
 
 >[!IMPORTANT]
 > Locking can guarantee both visibility and atomicity; volatile variables can only guarantee visibility.
