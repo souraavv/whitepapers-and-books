@@ -18,6 +18,13 @@
       - [Reentracy](#reentracy)
     - [Guarding State with Locks](#guarding-state-with-locks)
     - [Liveness and Performance](#liveness-and-performance)
+  - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
+    - [Visibility](#visibility)
+      - [Stale Data](#stale-data)
+      - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
+      - [Locking and Visibility](#locking-and-visibility)
+      - [Volatile Variables](#volatile-variables)
+    - [Publication and Escape](#publication-and-escape)
 
 
 # Java Concurrency in Practice
@@ -292,9 +299,224 @@ public class UnsafeCountingFactorizer implements Servlet {
     ```
 - This attempt at a put-if-absent operation has a race condition, even though both contains and add are atomic. 
 - While synchronized methods can make individual operations atomic, additional locking is requiredwhen multiple operations are combined into a compound action.
-- 
-### Liveness and Performance
 
+### Liveness and Performance
+- Using `synchronized` block at the function method can hurt the liveness and performance
+- Operations that do not impact the shared state and consume a lot of CPU cycles can be optimized by using fine-grained control over the synchronized block.
+- At the same time, we don’t want a synchronization block to be so small that it breaks the isolation of the shared state.
+
+    ```java
+
+    @ThreadSafe
+    public class CacheFactorizer implements Servlet {
+        @GuardedBy("this") private BigInteger lastNumber;
+        @GuardedBy("this") private BigInteger[] lastFactors;
+        @GuardedBy("this") private long hits;
+        @GuardedBy("this") private long cacheHits;
+
+        public synchronized long getHits() {
+            return hits;
+        }
+        public synchronized double getCacheHitRatio() {
+            return (double) cacheHits / (double) hits;
+        }
+
+        public void service(ServletRequest req, ServletResponse resp) {
+            BigInteger i = extraFromRequest(req);
+            BigInteger[] factors = null;
+            synchronized(this) {
+                ++hits;
+                if (i.equals(lastNumber)) {
+                    ++cacheHits;
+                    factors = lastFactors.clones();
+                }
+            }
+            if (factors == null) {
+                factors = factor(i);
+                synchronized(this) {
+                    lastNumber = i;
+                    lastFactors = factors.clone();
+                }
+            }
+            encodeIntoResponse(resp, factors);
+        }
+    }
+    ```
+
+- There is frequently a tension between simplicity and performance. When implementing a synchronization policy, resist the temptation to prematurely sacriflce simplicity (potentially compromising safety) for the sake of performance.
+- Whenever you use locking, you should be aware of what the code in the block is doing and how likely it is to take a long time to execute. Holding a lock for a long time, either because you are doing something compute-intensive or because you execute a potentially blocking operation, introduces the **risk of liveness** or **performance** problems.
+>[!IMPORTANT]
+> Avoid holding locks during lengthy computations or operations at risk of not completing quickly such as network or console I/O.
+
+
+## Chapter 3. Sharing Objects
+- In chapter 2. we learned primarily about managing **access** to shared, mutable state.
+  - We used `synchronized` to prevent multiple threads from accessing the same data at the same time.
+- This chapter examines techniques for **sharing and publishing** objects so they can be safely accessed by multiple threads
+- We have seen how synchronized blocks and methods can ensure that operations execute atomically, but it is a common misconception that synchronized is only about atomicity or demarcating “critical sections”. 
+- Synchronization also has another significant, and subtle, aspect: memory visibility. 
+>[!IMPORTANT]
+> We want not only to prevent one thread from modifying the state of an object when another is using it, but also to ensure that when a thread modifies the state of an object, other threads can actually see the changes that were made
+
+### Visibility
+- Visibility is subtle because the things that can go wrong are so counterintuitive.
+-  In a single-threaded environment, if you write a value to a variable and later read that variable with no intervening writes, you can expect to get the same value back. 
+   - But when the reads and writes occur in different threads, this is simply not the case
+    ```java
+    public class NoVisibility {
+        private static boolean ready;
+        private static int number;
+
+        private static class ReaderThread extends Thread {
+            public void run() {
+                while (!ready) {
+                    Thread.yield();
+                }
+                log.info(number);
+            }
+        }
+
+        public static void main(String[] args) {
+            new ReaderThread().start();
+            number = 42;
+            ready = true;
+        }
+    }
+    ```
+
+- `NoVisibility` could loop forever because the value of ready might never become visible to the reader thread. 
+- Even more strangely, `NoVisibility` could print zero because the write to ready might be made visible to the reader thread before the write to `number`, a phenomenon known as reordering. 
+- This may seem like a broken design, but it is meant to allow JVMs to take full advantage of the performance of modern multiprocessor hardware. For example, in the absence of synchronization, the Java Memory Model permits the compiler to reorder operations and cache values in registers, and permits CPUs to reorder operations and cache values in processor-specific caches. 
+
+#### Stale Data
+- Last example shows insufficiently synchronized programs can cause surprising results: *stale data*
+- Stale data can cause serious and confusing failures such as unexpected exceptions, corrupted data structures, inaccurate computations, and infinite loops.
+- Reading data without synchronization is analogous to using the `READ_UNCOMMITTED` isolation level in a database, where you are willing to trade accuracy for performance.
+    ```java
+    @ThreadSafe
+    public class SyncInteger {
+        @GuardedBy("this") private int value;
+
+        public synchronized int get() {
+            return value;
+        }
+        public synchronized void set(int value) {
+            this.value = value;
+        }
+    }
+    ```
+#### Nonatomic 64-bit Operations
+- When a thread reads a variable without synchronization, it may see a stale value, but at least it sees a value that was actually placed there by some thread rather than some random value. 
+- This safety guarantee is called *out-of-thin-air* safety.
+- Out-of-thin-air safety applies to all variables, with one exception: 64-bit numeric variables (`double` and `long`) that are not declared volatile
+    >[!WARNING]
+    > The Java Memory Model requires fetch and store operations to be atomic, but for nonvolatile long and double variables, the JVM is permitted to treat a 64-bit read or write as two separate 32-bit operations. If the reads and writes occur in different threads, it is therefore possible to read a nonvolatile long and get back the high 32 bits of one value and the low 32 bits of another.
+    >
+    > When the Java Virtual Machine Specification was written, many widely used processor architectures could not efficiently provide atomic 64-bit arithmetic operations.
+
+#### Locking and Visibility
+
+>[!IMPORTANT]
+> We can now give the other reason for the rule requiring all threads to synchronize on the same lock when accessing a shared mutable variable—to guarantee that values written by one thread are made visible to other threads. Otherwise, if a thread reads a variable without holding the appropriate lock, it might see a stale value.
+>
+> Locking is not just about mutual exclusion; it is also about memory visibility. To ensure that all threads see the most up-to-date values of shared mutable variables, the reading and writing threads must synchronize on a common lock.
+
+#### Volatile Variables
+- The Java language also provides an alternative, weaker form of synchronization, *volatile variables*, to ensure that updates to a variable are propagated predictably to other threads.
+  
+>[!NOTE]
+>  When a field is declared volatile, the compiler and runtime are put on notice that this variable is shared and that operations on it should not be reordered with other memory operations
+>
+> Volatile variables are not cached in registers or in caches where they are hidden from other processors, so a read of a volatile variable always returns the most recent write by any thread.
+
+- Yet accessing a `volatile` variable performs no locking and so cannot cause the executing thread to block, making `volatile` variables a lighter-weight synchronization mechanism than `synchronized`
+
+>[!WARNING]
+> Use volatile variables only when they simplify implementing and verifying your synchronization policy; avoid using volatile variables when veryfing correctness would require subtle reasoning about visibility. Good uses of volatile variables include ensuring the visibility of their own state, that of the object they refer to, or indicating that an important lifecycle event (such as initialization or shutdown) has occurred.
+
+- Volatile variables are convenient, but they have limitations
+- The semantics of volatile are not strong enough to make the increment operation (count++) atomic, unless you can guarantee that the variable is written only from a single thread.
+- Atomic variables do provide atomic read-modify-write support and can often be used as **“better volatile variables”**
+
+>[!IMPORTANT]
+> Locking can guarantee both visibility and atomicity; volatile variables can only guarantee visibility.
+
+- You can use volatile variables only when all the following criteria are met:
+  - Writes to the variable do not depend on its current value, or you can ensure that only a single thread ever updates the value;
+  - The variable does not participate in invariants with other state variables; and
+  - Locking is not required for any other reason while the variable is being accessed.
+
+### Publication and Escape
+- Publishing an object means making it available to code outside of its current scope, such as by storing a reference to it where other code can find it, returning it from a nonprivate method, or passing it to a method in another class.
+- In many situations, we want to ensure that objects and their internals are not published. 
+  - In other situations, we do want to publish an object for general use, but doing so in a thread-safe manner may require synchronization. 
+- Publishing internal state variables can compromise encapsulation and make it more difficult to preserve invariants;
+- Publishing objects before they are fully constructed can compromise thread safety. 
+- An object that is published when it should not have been is said to have *escaped*.
+- The most blatant form of publication is to store a reference in a public static field, where any class and thread could see it
+    ```java
+    public static Set<Secret> knownSecrets;
+    
+    public void initialize() {
+        knownSecrets = new HashSet<Secret>();
+    }
+    ```
+- Publishing one object may indirectly publish others. If you add a `Secret` to the published `knownSecrets` set, you've also published that `Secret`, because any code can iterate the `Set` and obtain a reference to the new `Secret`.
+- Similarly, returning a reference from a nonprivate method also publishes the returned object. 
+    ```java
+    class UnsafeStates {
+        private String[] states = new String[] {
+            "AK", "AL", ...
+        };
+        public String[] getState() {
+            return states;
+        }
+    }
+    ```
+- UnsafeStates publishes the supposedly private array of state abbreviations.
+- Publishing states in this way is problematic because any caller can modify its contents.
+- In this case, the states array has escaped its intended scope, because what was supposed to be private state has been effectively made public.
+- Publishing an object also publishes any objects referred to by its nonprivate fields. Or more general this can be a long chain
+-  Implicitly Allowing the `this` Reference to Escape. Don't do this.
+    ```java
+    public class ThisEscape {
+        public ThisEscape(EventSource source) {
+            source.registerListener(
+                new EventListener() {
+                    public void onEvent(Event e) {
+                        doSomething(e);
+                    }
+                });
+            )
+        }
+    }
+    ```
+    - When `ThisEscape` publishes the `EventListener`, it implicitly publishes the enclosing `ThisEscape` instance as well, because inner class instances contain a hidden reference to the enclosing instance.
+    - `ThisEscape` instance. But an object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an incompletely constructed object. This is true even if the publication is the last statement in the constructor. If the `this` reference escapes during construction, the object is considered not properly constructed.
+  - Do not allow the this reference to escape during construction.
+  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the Thread or Runnable is an inner class of the owning object).
+   - The new thread might then be able to see the owning object before it is fully constructed. There's nothing wrong with creating a thread in a constructor, but it is best not to start the thread immediately.
+- If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in SafeListener
+    ```java
+    public class SafeListener {
+
+        private final EventListener listener;
+
+        private SafeListener() {
+            listener = new EventListener() {
+                public void onEvent(Event e) {
+                    doSomething(e);
+                }
+            }
+        }
+
+        public static SafeListener newInstance(EventSource source) {
+            SafeListener safe = new SafeListener();
+            source.registerListener(source);
+            return safe;
+        }
+    }
+    ```
 
 
 
