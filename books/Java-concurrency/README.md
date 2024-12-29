@@ -532,7 +532,7 @@ public class UnsafeCountingFactorizer implements Servlet {
 
 ### Thread Confinement
 
->[!INFO]
+>[!NOTE]
 > Accessing shared, mutable data requires using synchronization; one way to avoid this requirement is to not share. 
 > 
 > If data is only accessed from a single thread, no synchronization is needed. This technique, **thread confinement**
