@@ -704,7 +704,7 @@ public class SafePublishDemo {
 }
 
 ```
-</detials>
+</details>
 
 
 ### Summary
