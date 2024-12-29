@@ -474,7 +474,7 @@ public class UnsafeCountingFactorizer implements Servlet {
         }
     }
     ```
-- UnsafeStates publishes the supposedly private array of state abbreviations.
+- `UnsafeStates` publishes the supposedly `private` array of state abbreviations.
 - Publishing states in this way is problematic because any caller can modify its contents.
 - In this case, the states array has escaped its intended scope, because what was supposed to be private state has been effectively made public.
 - Publishing an object also publishes any objects referred to by its nonprivate fields. Or more general this can be a long chain
@@ -495,9 +495,9 @@ public class UnsafeCountingFactorizer implements Servlet {
     - When `ThisEscape` publishes the `EventListener`, it implicitly publishes the enclosing `ThisEscape` instance as well, because inner class instances contain a hidden reference to the enclosing instance.
     - `ThisEscape` instance. But an object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an incompletely constructed object. This is true even if the publication is the last statement in the constructor. If the `this` reference escapes during construction, the object is considered not properly constructed.
   - Do not allow the this reference to escape during construction.
-  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the Thread or Runnable is an inner class of the owning object).
+  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the `Thread` or `Runnable` is an inner class of the owning object).
    - The new thread might then be able to see the owning object before it is fully constructed. There's nothing wrong with creating a thread in a constructor, but it is best not to start the thread immediately.
-- If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in SafeListener
+- If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in `SafeListener`
     ```java
     public class SafeListener {
 
