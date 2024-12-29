@@ -41,6 +41,8 @@
       - [Instance Confinement](#instance-confinement)
       - [The Java Monitor Pattern](#the-java-monitor-pattern)
       - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
+      - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
+      - [When Delegation Fails](#when-delegation-fails)
 
 
 # Java Concurrency in Practice
@@ -804,7 +806,7 @@ The most useful policies for using and sharing objects in a concurrent program a
 #### The Java Monitor Pattern
 - Java's built-in (intrinsic) locks are sometimes called monitor locks or monitors. 
   - The Java monitor pattern is inspired by Hoare's work on monitors
-- The Java monitor pattern is used by many library classes, such as Vector and Hashtable
+- The Java monitor pattern is used by many library classes, such as `Vector` and `Hashtable`
 - The Java monitor pattern is merely a convention; any lock object could be used to guard an object's state so long as it is used consistently
 
     ```java
@@ -962,4 +964,101 @@ public static Map<String, Point> deepCopy(Map<String, Point> original) {
 </details>
 
 
+#### Example: Vehicle Tracker Using Delegation
 
+- Delegating Thread Safety to a `ConcurrentHashMap`
+- The example does not use any explicit synchronization; 
+  - All access to state is managed by ConcurrentHashMap, 
+  - And all the keys and values of the Map are immutable.
+
+```java
+
+@Immutable 
+public class Point {
+    public final int x, y;
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+```java
+@ThreadSafe
+public class DelegatingVehicleTracker {
+    
+    private final ConcurrentMap<String, Point> locations;
+    private final Map<String, Point> unmodifiableMap;
+    
+    public DelegatingVehicleTracker(Map<String, Point> points) {
+        locations = new ConcurrentMap<String, Point>(points);
+        unmodifidedMap = Collections.unmodifiedMap(locations);
+    }
+
+    public Map<String, Point> getLocations() {
+        return unmodifiedMap;
+    }
+
+    public Point getLocation(String id) {
+        return locations.get(id);
+    }
+
+    public void setLocation(String id, int x, int y) {
+        if (locations.replace(id, new Point(x, y)) == null) {
+            throw new IllegalArgumentException("invalid ID: " + id);
+        }
+    }
+}
+```
+- `Point` is thread-safe because it is immutable. Immutable values can be freely shared and published, so we no longer need to copy the locations when returning them.
+- The delegating version returns an unmodifiable but “live” view of the vehicle locations, while the monitor version returned a snapshot of the locations
+  - This means that if thread A calls getLocations and thread B later modifies the location of some of the points, those changes are reflected in the `Map` returned to thread A. As we remarked earlier, this can be a benefit (more up-to-date data) or a liability (potentially inconsistent view of the fleet), depending on your requirements.
+- If an unchanging view of the fleet is required, getLocations could instead return a shallow copy of the locations map.
+    ```java
+    public Map<String, Point> getLocations() {
+        return Collections.unmodifiableMap(
+            new HashMap<String, Point>(locations)
+        );
+    }
+    ```
+    - Since the contents of the `Map` are immutable, only the structure of the Map, not the contents, must be copied
+
+>[!IMPORTANT]
+> The delegation examples so far delegate to a single, thread-safe state variable. 
+> 
+> We can also delegate thread safety to more than one underlying state variable as long as those underlying state variables are independent, meaning that the composite class does not impose any invariants involving the multiple state variables.
+
+#### When Delegation Fails
+
+```java
+@NotThreadSafe
+public class NumberRange {
+    private final AtomicInteger lower = new AtomicInteger(0);
+    private final AtomicInteger upper = new AtomicInteger(0);
+
+    public void setLower(int i) {
+        if (i > upper.get()) {
+            throw new IllegalArgumentException("l < r");
+        }
+        lower.set(i);
+    }
+
+    public void setUpper(int i) {
+        if (i < lower.get()) {
+            throw new IllegalArgumentException("r > l");
+        }
+        upper.set(i);
+    }
+
+    public boolean inRange(int i) {
+        return (i >= lower.get() && i <= upper.get());
+    }
+}
+```
+
+- `NumberRange` is not thread-safe;
+- It does not preserve the invariant that constrains `lower` and `upper`. 
+- The `setLower` and `setUpper` methods attempt to respect this invariant, but do so poorly.
+
+>[!IMPORTANT]
+> If a class is composed of multiple independent thread-safe state variables and has no operations that have any invalid state transitions, then it can delegate thread safety to the underlying state variables.
