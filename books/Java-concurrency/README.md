@@ -34,6 +34,13 @@
       - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
       - [Safe Publication Idioms](#safe-publication-idioms)
     - [Summary](#summary)
+  - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
+    - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
+      - [State-dependent Operations](#state-dependent-operations)
+      - [State Ownership](#state-ownership)
+      - [Instance Confinement](#instance-confinement)
+      - [The Java Monitor Pattern](#the-java-monitor-pattern)
+      - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
 
 
 # Java Concurrency in Practice
@@ -713,3 +720,246 @@ The most useful policies for using and sharing objects in a concurrent program a
 - **Shared read-only**. A shared read-only object can be accessed concurrently by multiple threads without additional synchronization, but cannot be modified by any thread. Shared read-only objects include immutable and effectively immutable objects.
 - **Shared thread-safe**. A thread-safe object performs synchronization internally, so multiple threads can freely access it through its public interface without further synchronization.
 - **Guarded**. A guarded object can be accessed only with a specific lock held. Guarded objects include those that are encapsulated within other thread-safe objects and published objects that are known to be guarded by a specific lock.
+
+
+## Chapter 4. Composing Objects
+- So far, we've covered the low-level basics of thread safety and synchronization
+- But we don't want to have to analyze each memory access to ensure that our program is thread-safe; we want to be able to take thread-safe components and safely compose them into larger components or programs. 
+- This chapter covers patterns for structuring classes that can make it easier to make them thread-safe and to maintain them without accidentally undermining their safety guarantees.
+
+### Designing a Thread-safe Class
+- Encapsulation makes it possible to determine that a class is thread-safe without having to examine the entire program.
+- You cannot ensure thread safety without understanding an object's invariants and postconditions.
+
+>[!IMPORTANT]
+> The design process for a thread-safe class should include these three basic elements:
+>
+> Identify the variables that form the object's state;
+>
+> Identify the invariants that constrain the state variables;
+>
+> Establish a policy for managing concurrent access to the object's state.
+
+- The synchronization policy defines how an object coordinates access to its state without violating its invariants or postconditions. 
+    ```java
+    @ThreadSafe 
+    public final class Counter {
+        @GuardedBy("this") private long value = 0;
+
+        public synchronized long getValue() {
+            return value;
+        }
+
+        public synchronized long increment() {
+            if (value == Long.MAX_VALUE) {
+                throw new IllegalStateException("counter overlfow");
+            }
+            return ++value;
+        }
+    }
+    ```
+
+>[!NOTE]
+>Making a class thread-safe means ensuring that its invariants hold under concurrent access;
+
+- Objects and variables have a *state space*: the range of possible states they can take on. The smaller this state space, the easier it is to reason about.
+- By using final fields wherever practical, you make it simpler to analyze the possible states an object can be in. (In the extreme case, immutable objects can only be in a single state.)
+- E.g.,  The state space of a long ranges from `Long.MIN_VALUE` to `Long.MAX_VALUE`, but `Counter` places constraints on value; negative values are not allowed.
+
+####  State-dependent Operations
+- Example: You cannot remove an item from an empty queue; a queue must be in the “nonempty” state before you can remove an element. Operations with state-based preconditions are called state-dependent
+- In a single-threaded program, if a precondition does not hold, the operation has no choice but to fail. 
+- But in a concurrent program, the precondition may become true later due to the action of another thread.
+- The built-in mechanisms for efficiently waiting for a condition to become true: `wait` and `notify` are tightly bound to intrinsic locking, and can be difficult to use correctly.
+- To create operations that wait for a precondition to become true before proceeding, it is often easier to use existing library classes, such as `BlockingQueue` or `Semaphore`, to provide the desired state-dependent behavior.
+
+#### State Ownership
+- Ownership is not embodied explicitly in the language, but is instead an element of class design. (Rust - hold my coffee)
+  - Java Garbage Collection enabling less-than-precise thinking about ownership.
+- In many cases, ownership and encapsulation go together—the object encapsulates the state it owns and owns the state it encapsulates.
+- Ownership implies control, but once you publish a reference to a mutable object, you no longer have exclusive control;
+
+#### Instance Confinement 
+- Encapsulating data within an object confines access to the data to the object's methods, making it easier to ensure that the data is always accessed with the appropriate lock held.
+    ```java
+    @ThreadSafe
+    public class PersonSet {
+        @GuardedBy("this")
+        private final Set<Person> mySet = new HashSet<Person>();
+
+        public synchronized void addPerson(Person p) {
+            mySet.add(p);
+        }
+
+        public synchronized boolean containsPerson(Person p) {
+            return mySet.contains(p);
+        }
+    }
+    ```
+- The state of `PersonSet` is managed by a `HashSet`, which is not thread-safe. But because `mySet` is `private` and not allowed to escape, the HashSet is confined to the `PersonSet`.
+- The only code paths that can access `mySet` are `addPerson` and `containsPerson`, and each of these acquires the lock on the `PersonSet`. 
+- All its state is guarded by its intrinsic lock, making `PersonSet` thread-safe.
+- Of course, it is still possible to violate confinement by publishing a supposedly confined object;
+
+#### The Java Monitor Pattern
+- Java's built-in (intrinsic) locks are sometimes called monitor locks or monitors. 
+  - The Java monitor pattern is inspired by Hoare's work on monitors
+- The Java monitor pattern is used by many library classes, such as Vector and Hashtable
+- The Java monitor pattern is merely a convention; any lock object could be used to guard an object's state so long as it is used consistently
+
+    ```java
+    public class PrivateLock {
+        private final Object myLock = new Object();
+        @GuardedBy("myLock") Widget widget;
+
+        void someMethod() {
+            synchronized(myLock) {
+
+            }
+        }
+    }
+    ```
+- There are advantages to using a private lock object instead of an object's intrinsic lock
+- Making the lock object private encapsulates the lock so that client code cannot acquire it and thus avoiding liveness problems (if public then client code can also access lock and thus can cause liveness issues by acquiring it)
+
+#### Example: Tracking Fleet Vehicles
+- Let's build a slightly less trivial example: a “vehicle tracker” for dispatching fleet vehicles such as taxicabs, police cars, or delivery trucks.
+- We'll build it first using the monitor pattern, and then see how to relax some of the encapsulation requirements while retaining thread safety.
+- Each `vehicle` is identified by a `String` and has a location represented by (x, y) coordinates
+
+```java
+@ThreadSafe
+public class MonitorVehicleTracker {
+    @GuardedBy("this")
+    private final Map<String, MutablePoint> locations;
+
+    public MonitorVehicleTracker(Map<String, MutablePoint> locations) {
+        this.locations = locations;
+    }
+
+    public synchronized Map<String, MutablePoint> getLocations() {
+        return deepCopy(locations);
+    }
+
+    public synchronized MutablePoint getLocation(String id) {
+        MutablePoint loc = locations.get(id);
+        return loc == null ? null: new MutablePoint(loc);
+    }
+
+    public synchronized void setLocation(String id, int x, int y) {
+        MutablePoint loc = locations.get(id);
+        if (loc == null) {
+            throw new IllegalArgumentException("No such ID: " + id);
+        }
+        loc.x = x;
+        loc.y = y;
+    }
+
+    private static Map<String, MutablePoint> deepCopy(
+            Map<String, MutablePoint> m) {
+        Map<String, MutablePoint> result = 
+                new HashMap<String, MutablePoint>();
+        for (String id: m.keySet()) {
+            result.put(id, new MutablePoint(m.get(id)));
+        }
+        return Collections.unmodifiableMap(result);
+    }
+}
+
+
+@NotThreadSafe
+public class MutablePoint {
+    public int x, y;
+    public MutablePoint() {
+        x = 0;
+        y = 0;
+    }
+
+    public MutablePoint(MutablePoint p) {
+        this.x = p.x;
+        this.y = p.y;
+    }
+}
+```
+
+- This implementation maintains thread safety in part by copying mutable data before returning it to the client. 
+  - This is usually not a performance issue, but could become one if the set of vehicles is very large.
+- You might have observed that `deepCopy` is called from a `synchronized` method, the tracker's intrinsic lock is held for the duration of what might be a long-running copy operation, and this could degrade the responsiveness
+
+>[!NOTE]
+> Note that deepCopy can't just wrap the Map with an unmodifiableMap, because that protects only the collection from modification; it does not prevent callers from modifying the mutable objects stored in it. For the same reason, populating the HashMap in deepCopy via a copy constructor wouldn't work either, because only the references to the points would be copied, not the point objects themselves.
+
+<details>
+<summary> EXTRA: Deep Copy vs Shallow Copy - Java </summary>
+
+Shallow Copy:
+- Creates a new collection object, but the elements inside are still the same (shared references).
+- Changes to the elements in one collection affect the other.
+
+Deep Copy:
+- Creates a new collection object, and also creates new copies of the elements inside it, ensuring complete independence.
+
+
+Problem
+- If you use `Collections.unmodifiableMap(map)`, it only makes the Map unmodifiable (e.g., you cannot add/remove items to/from it), but does not make the individual objects (values) stored in the Map immutable. Mutable objects can still be modified.
+
+- Similarly, using a copy constructor like `new HashMap<>(originalMap)` only copies the references to the objects, not the actual objects themselves. It still points to the same underlying objects.
+
+```java
+
+import java.awt.Point;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DeepCopyExample {
+    public static void main(String[] args) {
+        // Original map with mutable Point objects
+        Map<String, Point> originalMap = new HashMap<>();
+        originalMap.put("A", new Point(1, 1));
+        originalMap.put("B", new Point(2, 2));
+
+        // Attempt 1: Unmodifiable map
+        Map<String, Point> unmodifiableMap = Collections
+                .unmodifiableMap(originalMap);
+
+        // Attempt 2: Shallow copy using HashMap copy constructor
+        Map<String, Point> shallowCopy = new HashMap<>(originalMap);
+
+        // Modify the Point object in the original map
+        originalMap.get("A").setLocation(5, 5);
+
+        // Observe effects
+        System.out.println("Original Map: " + originalMap);
+        System.out.println("Unmodifiable Map: " + unmodifiableMap);
+        System.out.println("Shallow Copy: " + shallowCopy);
+    }
+}
+
+
+/** Ouput: 
+ * 
+ * Original Map: {A=java.awt.Point[x=5,y=5], B=java.awt.Point[x=2,y=2]}
+ * Unmodifiable Map: {A=java.awt.Point[x=5,y=5], B=java.awt.Point[x=2,y=2]}
+ * Shallow Copy: {A=java.awt.Point[x=5,y=5], B=java.awt.Point[x=2,y=2]}
+ * /
+
+```
+
+- Solution: Deep Copy
+
+```java
+public static Map<String, Point> deepCopy(Map<String, Point> original) {
+    Map<String, Point> deepCopy = new HashMap<>();
+    for (Map.Entry<String, Point> entry : original.entrySet()) {
+        // Create a new Point object for each entry
+        deepCopy.put(entry.getKey(), new Point(entry.getValue()));
+    }
+    return deepCopy;
+}
+```
+
+</details>
+
+
+
