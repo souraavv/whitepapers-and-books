@@ -43,6 +43,12 @@
       - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
       - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
       - [When Delegation Fails](#when-delegation-fails)
+    - [Publishing underlying state variables](#publishing-underlying-state-variables)
+    - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
+      - [Client-side Locking](#client-side-locking)
+  - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
+    - [Synchronized Collections](#synchronized-collections)
+      - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
 
 
 # Java Concurrency in Practice
@@ -825,9 +831,9 @@ The most useful policies for using and sharing objects in a concurrent program a
 - Making the lock object private encapsulates the lock so that client code cannot acquire it and thus avoiding liveness problems (if public then client code can also access lock and thus can cause liveness issues by acquiring it)
 
 #### Example: Tracking Fleet Vehicles
-- Let's build a slightly less trivial example: a “vehicle tracker” for dispatching fleet vehicles such as taxicabs, police cars, or delivery trucks.
+- Let's build a slightly less trivial example: a **vehicle tracker** for dispatching fleet vehicles such as taxicabs, police cars, or delivery trucks.
 - We'll build it first using the monitor pattern, and then see how to relax some of the encapsulation requirements while retaining thread safety.
-- Each `vehicle` is identified by a `String` and has a location represented by (x, y) coordinates
+- Each `vehicle` is identified by a `String` and has a location represented by (x, y)$ coordinates
 
 ```java
 @ThreadSafe
@@ -889,7 +895,7 @@ public class MutablePoint {
 - You might have observed that `deepCopy` is called from a `synchronized` method, the tracker's intrinsic lock is held for the duration of what might be a long-running copy operation, and this could degrade the responsiveness
 
 >[!NOTE]
-> Note that deepCopy can't just wrap the Map with an unmodifiableMap, because that protects only the collection from modification; it does not prevent callers from modifying the mutable objects stored in it. For the same reason, populating the HashMap in deepCopy via a copy constructor wouldn't work either, because only the references to the points would be copied, not the point objects themselves.
+> Note that `deepCopy` can't just wrap the Map with an `unmodifiableMap`, because that protects only the collection from modification; it does not prevent callers from modifying the mutable objects stored in it. For the same reason, populating the `HashMap` in `deepCopy` via a copy constructor wouldn't work either, because only the references to the points would be copied, not the point objects themselves.
 
 <details>
 <summary> EXTRA: Deep Copy vs Shallow Copy - Java </summary>
@@ -1062,3 +1068,196 @@ public class NumberRange {
 
 >[!IMPORTANT]
 > If a class is composed of multiple independent thread-safe state variables and has no operations that have any invalid state transitions, then it can delegate thread safety to the underlying state variables.
+
+### Publishing underlying state variables
+- Only if a class is thread-safe and doesn't participate in any class invariants can it be published outside its scope.
+
+```java
+@ThreadSafe 
+public class SafePoint {
+    @GuardedBy("this") private int x, y;
+
+    private SafePoint(int[] a) {
+        this(a[0], a[1]);
+    }
+
+    public SafePoint(SafePoint p) {
+        this(p.get());
+    }
+
+    public synchronized int[] get() {
+        return new int[] {x, y};
+    }
+
+    public synchronized void set(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+```
+
+- `SafePoint` provides a getter that retrieves both the `x` and `y` values at once by returning a two-element array. If we provided separate getters for `x` and `y`, then the values could change between the time one coordinate is retrieved and the other, resulting inconsistent state
+
+```java
+
+@ThreadSafe 
+public class PublishingVehicleTracker {
+    private final Map<String, SafePoint> locations;
+    private final Map<String, SafePoint> unmodifiableMap;
+
+    public PublishingVehicleTracker(Map<String, SafePoint> locations) {
+        this.location = new ConcurrentHashMap<String, SafePoint>(locations);
+        this.unmodifiableMap = Collecitons.unmodifiableMap(this.locations);
+    }
+
+    public Map<String, SafPoint> getLocations() {
+        return this.unmodifableMap;
+    }
+
+    public SafePoint getLocation(String id) {
+        return locations.get(id);
+    }
+
+    public void setLocation(String id, int x, int y) {
+        if (!locations.containsKey(id)) {
+            throw new IllegalArgumentException("invalid vehicle id" + id);
+        }
+        SafePoint p = locations.get(id)
+        p.set(x, y);
+    }
+}
+
+```
+
+<details>
+<summary> Java Unmodifiable Map </summary> 
+
+- An unmodifiable map may still change. It is only a view on a modifiable map, and changes in the backing map will be visible through the unmodifiable map. The unmodifiable map only prevents modifications for those who only have the reference to the unmodifiable view
+
+- Ref: https://stackoverflow.com/questions/22636575/unmodifiablemap-java-collections-vs-immutablemap-google
+
+```java
+
+
+Map<String, String> realMap = new HashMap<String, String>();
+realMap.put("A", "B");
+
+Map<String, String> unmodifiableMap = Collections.unmodifiableMap(realMap);
+
+// This is not possible: It would throw an 
+// UnsupportedOperationException
+//unmodifiableMap.put("C", "D");
+
+// This is still possible:
+realMap.put("E", "F");
+
+// The change in the "realMap" is now also visible
+// in the "unmodifiableMap". So the unmodifiableMap
+// has changed after it has been created.
+unmodifiableMap.get("E"); // Will return "F". 
+
+```
+
+</details>
+
+- `PublishingVehicleTracker` derives its thread safety from delegation to an underlying `ConcurrentHashMap`, but this time the contents of the Map are thread-safe mutable points rather than immutable ones.
+- The `getLocation` method returns an unmodifiable copy of the underlying `Map`. Callers cannot add or remove vehicles, but could change the location of one of the vehicles by mutating the `SafePoint` values in the returned `Map`
+
+
+### Adding Functionality to Existing Thread-safe Classes
+
+```java
+
+@ThreadSafe
+public class BetterVector<E> extends Vector<E>  {
+    public synchronized boolean putIfAbsent(E x) {
+        boolean absent = !contains(x);
+        if (absent) {
+            add(x);
+        }
+        return absent;
+    }
+}
+```
+
+#### Client-side Locking
+
+- Don't do this 
+```java
+@NotThreadSafe
+public class ListHelper<E> {
+    public List<E> list = Collections.synchronizedList(new ArrayList<>());
+
+    public synchronized boolean putIfAbsent(E x) {
+        boolean absent = !list.contains(x);
+        if (absent) {
+            list.add(x);
+        }
+        return absent;
+    }
+}
+```
+
+- Why wouldn't this work? 
+  - After all, `putIfAbsent` is `synchronized`, right? 
+  - The problem is that it synchronizes on the wrong lock. Whatever lock the `List` uses to guard its state, it sure isn't the lock on the `ListHelper`. 
+  - `ListHelper` provides only the illusion of synchronization; the various list operations, while all `synchronized`, use different locks, which means that `putIfAbsent` is not atomic relative to other operations on the `List`
+  - It’s like locking someone else’s door and expecting no robbery to happen in my own room.
+  - So there is no guarantee that another thread won't modify the list while putIfAbsent is executing.
+
+- After reading documentation 
+```java
+@ThreadSafe
+public class ListHelper<E> {
+    public List<E> list = Collections.synchronizedList(new ArrayList<>());
+
+    public boolean putIfAbsent(E x) {
+        synchronized(list) {
+            boolean absent = !list.contains(x);
+            if (absent) {
+                list.add(x);
+            }
+            return absent;
+        }
+    }
+}
+
+```
+
+- A general recommendation - Avoid above wherever possible. Later if policy change for `List` your code will stop working. Refrain your self from writing this kind of code
+
+>[!IMPORTANT]
+> Document a class's thread safety guarantees for its clients; document its synchronization policy for its maintainers.
+>
+> If you don't want to commit to supporting client-side locking, that's fine, but say so
+
+
+
+## Chapter 5. Building Blocks
+
+- The last chapter explored several techniques for constructing thread-safe classes, including delegating thread safety to existing thread-safe classes. 
+- This chapter covers the most useful concurrent building blocks, especially those introduced in Java 5.0 and Java 6, and some patterns for using them to structure concurrent applications.
+
+### Synchronized Collections
+The `synchronized` wrapper classes created by the `Collections.synchronizedXxx` factory methods
+
+#### Problems with Synchronized Collections
+- The synchronized collections are thread-safe
+  - But you may sometimes need to use additional client-side locking to guard compound actions. 
+- Common compound actions on collections include iteration, navigation (finding an element after current), and conditional operations such as `putIfAbsent`  
+- With a `synchronized` collection, these compound actions are still technically thread-safe even without client-side locking, but they may not **behave** as you might expect when other threads can concurrently modify the collection.
+
+```java
+public static Object getLast(Vector list) {
+    int lastIndex = list.size() - 1;
+    return list.get(lastIndex);
+}
+
+public static Object deleteLast(Vector list) {
+    int lastIndex = list.size() - 1;
+    list.remove(lastIndex);
+}
+```
+
+- Two methods that operate on a `Vector`, `getLast` and `deleteLast`, both of which are check-then-act sequences. 
