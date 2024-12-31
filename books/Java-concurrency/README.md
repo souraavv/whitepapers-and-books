@@ -49,6 +49,20 @@
   - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
     - [Synchronized Collections](#synchronized-collections)
       - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
+      - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
+      - [Hidden Iterators](#hidden-iterators)
+    - [Concurrent collections](#concurrent-collections)
+      - [ConcurrentHashMap](#concurrenthashmap)
+      - [Additional Atomic Map Operations](#additional-atomic-map-operations)
+      - [CopyOnWriteArrayList](#copyonwritearraylist)
+    - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
+      - [Serial thread confinement](#serial-thread-confinement)
+      - [Deques and work stealing](#deques-and-work-stealing)
+    - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
+    - [Synchronizers](#synchronizers)
+      - [Latches](#latches)
+      - [FutureTask](#futuretask)
+      - [Semaphores](#semaphores)
 
 
 # Java Concurrency in Practice
@@ -1261,3 +1275,322 @@ public static Object deleteLast(Vector list) {
 ```
 
 - Two methods that operate on a `Vector`, `getLast` and `deleteLast`, both of which are check-then-act sequences. 
+
+Correct way to do it:
+
+```java
+public static Object getLast(Vector list) {
+    synchronized (list) {
+        int lastIndex = list.size() - 1;
+        return list.get(lastIndex);
+    }
+}
+
+public static void deleteLast(Vector list) {
+    synchronized (list) {
+        int lastIndex = list.size() - 1;
+        list.remove(lastIndex);
+    }
+}
+```
+
+- Traditional iteration could still produce an `ArrayIndexOutOfBounds` exception:
+
+```java
+for (int i = 0; i < vector.size(); i++)
+    doSomething(vector.get(i));
+```
+
+- A way to handle this is to lock the list while iterating over it. This, however, prevents other threads from accessing it:
+
+```java
+synchronized (vector) {
+    for (int i = 0; i < vector.size(); i++)
+        doSomething(vector.get(i));
+}
+```
+
+
+#### Iterators and ConcurrentModificationException
+- Modern concurrent collections still have the problem with modification during iteration.
+- If you iterate a concurrent list & a modification happens meanwhile, you will get a `ConcurrentModificationException`. Iterator follow *fail-fast* meaning that if they detect that the collection has changed since iteration began, they throw the unchecked exception
+- The solution here is also to lock the collection while iterating it, but this introduces risks of deadlock.
+- An alternative is to clone the collection & iterate the clone. The cloning operation will still need to be locked.
+
+#### Hidden Iterators
+
+
+```java
+public class HiddenIterator {
+    @GuardedBy("this")
+    private final Set<Integer> set = new HashSet<Integer>();
+
+    public synchronized void add(Integer i) {
+        set.add(i);
+    }
+
+    public synchronized void remove(Integer i) {
+        set.remove(i);
+    }
+
+    public void addTenThings() {
+        Random r = new Random();
+        for (int i = 0; i < 10; ++i) {
+            add(r.nextInt());
+        }
+        System.out.println("DEBUG: " + set); // culprit line.. but why ?
+    }
+}
+
+```
+
+- Normally we tends to skip the checking the debugging part because we think what can go wrong there. And there we miss the important part
+  - Although the real problem is that `HiddenIterator` is not thread-safe; the `HiddenIterator` lock should be acquired before using set in the `println` call, but debugging and logging code commonly neglect to do this.
+  - Iteration could also be invoked when invoking the hashCode method, when passing the collection as a constructor to another object, etc.
+
+### Concurrent collections
+- The problem with synchronized collections is that throughput suffers due to their excessive synchronization.
+- Use `ConcurrentHashMap` instead of a `synchronized` map and `CopyOnWriteArrayList` instead of a synchronized list.
+- Additionally, the new `Queue` class is added along with its `BlockingQueue` derivative and `PriorityQueue`.
+  - The blocking queue is very useful in producer-consumer designs.
+
+#### ConcurrentHashMap
+- This collection uses a sophisticated locking strategy, which improves performance and throughput compared to its synchronized map counterpart.
+- It also doesn't throw a `ConcurrentModificationException` upon modification while iterating. Instead, it offers a weakly consistent iterator, which may or may not reflect modifications in the map. The iterators returned by `ConcurrentHashMap` are weakly consistent instead of fail-fast
+  - It uses a finer-grained locking mechanism called *lock striping*
+  - Arbitrarily many reading threads can access the map concurrently, readers can access the map concurrently with writers, and a limited number of writers can modify the map concurrently.
+- Additionally, `size()` and `isEmpty()` are no longer strongly consistent, but are instead approximations.
+  - More focus is on put and get
+
+#### Additional Atomic Map Operations
+
+- Since client-side locking is not supported in concurrent maps, commonly used compound actions (such as putIfAbsent) are explicitly implemented:
+
+```java
+public interface ConcurrentMap<K, V> extends Map<K, V> {
+    // Insert into map only if no value is mapped from K
+    V putIfAbsent(K key, V value);
+    // Remove only if K is mapped to V
+    boolean remove(K key, V value);
+    // Replace value only if K is mapped to oldValue
+    boolean replace(K key, V oldValue, V newValue);
+    // Replace value only if K is mapped to some value
+    V replace(K key, V newValue);
+}
+```
+
+#### CopyOnWriteArrayList
+
+- This is a concurrent replacement to synchronized list, which derives its thread-safety by relying on an effectively immutable object.
+- Whenever modification happens in such an array list, the whole list is copied.
+- Hence, when iterating such a list, the iterated collection will not change since the time the iterator was created, even if there are concurrent modifications.
+- This, of course, has some additional cost due to the underlying copying. This class was designed for use-cases where iteration is more common than modification.
+
+
+### Blocking Queues & The Producer-Consumer pattern
+- Blocking queues support the operation a normal queue does, but they block on take() if the queue is empty and on put() if the queue is full.
+- They are useful for implementing producer-consumer designs where there are a number of producers and a number of consumers as it allows producers and consumers to be decoupled from one another.
+- The class library offers several implementations of this interface - `LinkedBlockingQueue` and `ArrayBlockingQueue` are standard concurrent FIFO queues. `PriorityBlockingQueue` allows elements to be ordered.
+```java
+
+public class FileCrawler implements Runnable {
+
+    public void run() {
+        try {
+            crawl(root);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void crawl(File file) throws InterruptedException {
+        File[] entries = root.listFiles(fileFilter);
+        if (entries != null) {
+            for (File entry: entries) {
+                if (entry.isDirectory()) {
+                    crawl(entry);
+                } else if (!alreadyIndexed(entry)) {
+                    fileQueue.put(entry);
+                }
+            }
+        }
+    }
+}
+
+public class Indexer implements Runnable {
+
+    private final BlockingQueue<File> queue;
+
+    public Indexer(BlockingQueue<File> queue) {
+        this.queue = queue;
+    }
+
+    public void run() {
+        try {
+            while (true) {
+                indexFile(queue.take());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+}
+
+
+public static void startIndexing(File[] roots) {
+    BlockingQueue<File> queue = new LinkedBlockingQueue<File>(BOUND);
+
+    FileFilter filter = new FileFilter() {
+        public boolean accept(File file) {
+            return true;
+        }
+    }
+
+    for (File root: roots) {
+        new Thread(new FileCrawler(queue, filter, root)).start();
+    }
+
+    for (int i = 0; i < N_CONSUMERS; ++i) {
+        new Thread(new Indexer(queue)).start();
+    }
+}
+```
+
+#### Serial thread confinement
+- This is a technique, used by blocking queues, for transferring non-thread-safe objects in a thread-safe way between producer and consumer threads.
+- What this means is that object ownership is confined to one thread.
+- What a blocking queue does is it transfers ownership of a given object to a given thread by ensuring safe publication & by not using it anymore or making it available to other threads.
+- As long as a thread doesn't use an object anymore after putting it in a queue, transfer will be thread-safe.
+
+
+#### Deques and work stealing
+- Two more classes are added - `Deque` and `BlockingDeque` which extend `Queue` and `BlockingQueue`.
+- These are queues, which support taking work from both the tail and the head.
+- They are used in a pattern, related to producer-consumer called work stealing.
+- In this design, every worker has his own deque he takes work from. But if his deque is exhausted, a worker will "steal" work from the tail of the deque of another worker.
+- This is often more scalable than a standard producer-consumer design as workers are working off their own work queue, instead of using a shared one.
+
+
+### Blocking and interruptible methods
+
+
+### Synchronizers
+- A synchronizer is a class which manages control flow between multiple threads based on its own state. Blocking queues are an example of a synchronizers but there are more.
+#### Latches
+- A latch is a synchronizer which makes all threads waiting on it block until a given condition is met.
+- Example use-cases:
+  - A service is dependent on other services starting beforehand
+  - A service is waiting on some resource to get initialized
+
+- The most commonly used latch is the `CountDownLatch`. It allows you to enqueue N events you are waiting for to complete before proceeding.
+
+```java
+
+public class TestHarness {
+    public long timeTasks(int nThreads, final Runnable task) 
+            throws InterruptedException {
+        final CountDownLatch startGate = new CountDownLatch(1);
+        final CountDownLatch endGate = new CountDownLatch(nThreads);
+
+        for (int i = 0; i < nThreads; ++i) {
+            Thread t = new Thread() {
+                public void run() {
+                    try {
+                        startGate.await();
+                        try {
+                            task.run();
+                        } finally {
+                            endGate.countDown();
+                        }
+                    } catch (InterruptedException ignored) {
+
+                    }
+                }
+            };
+            t.start();
+        }
+        long start = System.nanoTime();
+        startGate.countDown();
+        endGate.await();
+        long end = System.nanoTime();
+        return end - start;
+    }
+}
+
+```
+
+
+#### FutureTask
+- A `FutureTask` is a synchronizer where a thread waits on the completion of a given task & safely receives the result from it.
+- This is used when you want to start a lengthy task before you need the result from it & block on receiving the result (if not received already) when you need it.
+
+```java
+public class Preloader {
+    private final FutureTask<ProductInfo> future = 
+        new FutureTask<ProductInfo>(
+            new Callable<ProductInfo>() {
+                public ProductInfo call() throw DataLoadException {
+                    return loadProductInfo();
+                }
+    });
+
+    private final Thread thread = new Thread(future);
+
+    public void start() {
+        thread.start();
+    }
+
+    public ProductInfo get() throws DataLoadException, InterruptedException {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof DataLoadException) {
+                throw (DataLoadException) cause;
+            } else {
+                throw launderThrowable(cause);
+            }
+        }
+    }
+}
+```
+
+#### Semaphores
+
+- A semaphore allows one to specify the maximum number of simultaneous threads accessing a given resource. 
+- The semaphore works by giving out permits which can be returned when they are not used anymore.
+- Whenever someone attempts to get a permit, but the maximum allowed permits are already given out, the operation blocks.
+- Semaphores can be used to implement resource pools, such as a database connection pool.
+
+```java
+public class BoundedHashSet<T> {
+    private final Set<T> set;
+    private final Semaphore sem;
+
+    public BoundedHashSet(int bound) {
+        this.set = Collections.synchronizedSet(new HashSet<T>);
+        sem = new Semaphore(bound);
+    }
+
+    public boolean add(T o) throws InterruptedException {
+        sem.acquire();
+        boolean wasAdded = false;
+        try {
+            wasAdded = set.add(o);
+            return wasAdded;
+        } finally {
+            if (!wasAdded) 
+                sem.release();
+        }
+    }
+
+    public boolean remove(T o) {
+        boolean wasRemoved = set.remove(o);
+        if (wasRemoved) {
+            sem.release();
+        }
+        return wasRemoved;
+    }
+}
+
+```
