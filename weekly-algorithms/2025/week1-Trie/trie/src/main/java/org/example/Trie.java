@@ -22,7 +22,8 @@ public class Trie {
         TrieNode currentNode = root;
 
         for (char c : word.toCharArray()) {
-            currentNode = currentNode.children.computeIfAbsent(c, k -> new TrieNode());
+            currentNode.children.putIfAbsent(c, new TrieNode());
+            currentNode = currentNode.children.get(c);
         }
         currentNode.isEndOfWord = true;
     }
