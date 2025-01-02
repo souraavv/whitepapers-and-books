@@ -2135,6 +2135,8 @@ public class Main {
 
 ## Chapter 9i. The Bridge Pattern
 
+
+
 ## Chapter 10i. The Chain of Responsibility Pattern 
 
 ## Chapter 11. The Proxy Pattern 

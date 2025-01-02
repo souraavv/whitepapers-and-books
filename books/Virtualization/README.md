@@ -343,9 +343,9 @@ Intel’s virtualization technology
 - An interrupt is generated to the guest when rx buffer is full via `irqfd` . From the host the thread which are associated with the tap devices redirect this data to the right buffers.
 
 
-<img src="./images/2-vhost-net.png" alt="description" width="750" height="480">
+    <img src="./images/2-vhost-net.png" alt="description" width="750" height="480">
 
-<img src="./images/1-virtio-net.png" alt="description" width="650" height="500">
+    <img src="./images/1-virtio-net.png" alt="description" width="650" height="500">
 
 
 ### Alternative Virtualization Mechanism
