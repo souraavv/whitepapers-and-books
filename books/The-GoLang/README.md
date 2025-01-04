@@ -2,86 +2,86 @@
 - [Resources](#resources)
 - [Chapter 1 - Introduction to GoLang](#chapter-1---introduction-to-golang)
 - [Chapter 2 - Basics](#chapter-2---basics)
-  - [Literals](#literals)
-  - [Explicit Type Conversion](#explicit-type-conversion)
-  - [`var` Vs `:=`](#var-vs-)
-  - [Short Declaration \& Assignment Format](#short-declaration--assignment-format)
-  - [Constants \& Variables](#constants--variables)
+    - [Literals](#literals)
+    - [Explicit Type Conversion](#explicit-type-conversion)
+    - [`var` Vs `:=`](#var-vs-)
+    - [Short Declaration \& Assignment Format](#short-declaration--assignment-format)
+    - [Constants \& Variables](#constants--variables)
 - [Chapter 3 : Composite Types in GoLang](#chapter-3--composite-types-in-golang)
-  - [Array](#array)
-  - [Slices](#slices)
-  - [Maps](#maps)
-  - [Struct in Go](#struct-in-go)
+    - [Array](#array)
+    - [Slices](#slices)
+    - [Maps](#maps)
+    - [Struct in Go](#struct-in-go)
 - [Chapter 4 : Blocks, Shadows, and Control Structure](#chapter-4--blocks-shadows-and-control-structure)
-  - [Blocks](#blocks)
-  - [Shadowing variable](#shadowing-variable)
-  - [If](#if)
-  - [for, four ways](#for-four-ways)
-  - [Switch](#switch)
-  - [goto](#goto)
+    - [Blocks](#blocks)
+    - [Shadowing variable](#shadowing-variable)
+    - [If](#if)
+    - [for, four ways](#for-four-ways)
+    - [Switch](#switch)
+    - [goto](#goto)
 - [Chapter 5 : Functions](#chapter-5--functions)
-  - [Functions in Go](#functions-in-go)
-  - [Variadic Input Parameters and Slices](#variadic-input-parameters-and-slices)
-  - [Multiple Return Values](#multiple-return-values)
-  - [Named Return Values](#named-return-values)
-  - [Functions are Values](#functions-are-values)
-  - [Function Type Declarations](#function-type-declarations)
-  - [Anonymous Functions](#anonymous-functions)
-  - [Closures](#closures)
-  - [Defer](#defer)
-  - [Go is Call By Value](#go-is-call-by-value)
+    - [Functions in Go](#functions-in-go)
+    - [Variadic Input Parameters and Slices](#variadic-input-parameters-and-slices)
+    - [Multiple Return Values](#multiple-return-values)
+    - [Named Return Values](#named-return-values)
+    - [Functions are Values](#functions-are-values)
+    - [Function Type Declarations](#function-type-declarations)
+    - [Anonymous Functions](#anonymous-functions)
+    - [Closures](#closures)
+    - [Defer](#defer)
+    - [Go is Call By Value](#go-is-call-by-value)
 - [Chapter 6 : Pointers in GO](#chapter-6--pointers-in-go)
-  - [Pointer Primer](#pointer-primer)
-  - [Don't Fear the Pointer](#dont-fear-the-pointer)
-  - [Pointers indicate Mutable Parameters](#pointers-indicate-mutable-parameters)
-  - [Pointers are a Last Resort](#pointers-are-a-last-resort)
-  - [Zero Value v/s No Value](#zero-value-vs-no-value)
-  - [Difference b/w Maps \& Slices](#difference-bw-maps--slices)
-  - [Using Slices as Buffers](#using-slices-as-buffers)
+    - [Pointer Primer](#pointer-primer)
+    - [Don't Fear the Pointer](#dont-fear-the-pointer)
+    - [Pointers indicate Mutable Parameters](#pointers-indicate-mutable-parameters)
+    - [Pointers are a Last Resort](#pointers-are-a-last-resort)
+    - [Zero Value v/s No Value](#zero-value-vs-no-value)
+    - [Difference b/w Maps \& Slices](#difference-bw-maps--slices)
+    - [Using Slices as Buffers](#using-slices-as-buffers)
 - [Chapter 7 : Type, Methods, and Interfaces](#chapter-7--type-methods-and-interfaces)
-  - [Types](#types)
-  - [Methods](#methods)
-  - [Method Receivers](#method-receivers)
-  - [Code you method for `nil` Instances](#code-you-method-for-nil-instances)
-  - [Using Methods as Functions](#using-methods-as-functions)
-  - [When should we declare Method vs Function](#when-should-we-declare-method-vs-function)
-  - [Type declarations aren't inheritance](#type-declarations-arent-inheritance)
-  - [Types Are Executable Documentation](#types-are-executable-documentation)
-  - [Enumerations in Go : `iota`](#enumerations-in-go--iota)
-  - [Embedded fields](#embedded-fields)
-  - [Embedding is not Inheritance](#embedding-is-not-inheritance)
-  - [Quick Introduction to Interface](#quick-introduction-to-interface)
-  - [Interface are Type-Safe Duck Typing](#interface-are-type-safe-duck-typing)
-  - [Embeddings and Interfaces](#embeddings-and-interfaces)
-  - [Accept Interfaces, Return Structs](#accept-interfaces-return-structs)
-  - [Interfaces and nil](#interfaces-and-nil)
-  - [Interfaces Are Comparable](#interfaces-are-comparable)
-  - [Empty Interface `Interface{}` or `any`](#empty-interface-interface-or-any)
-  - [Type Assertion and Type Switches : Uncovering Concrete Types](#type-assertion-and-type-switches--uncovering-concrete-types)
-  - [Function Type are Bridge to Interfaces](#function-type-are-bridge-to-interfaces)
-  - [Implicit Interface makes Dependency Injection Easier](#implicit-interface-makes-dependency-injection-easier)
+    - [Types](#types)
+    - [Methods](#methods)
+    - [Method Receivers](#method-receivers)
+    - [Code you method for `nil` Instances](#code-you-method-for-nil-instances)
+    - [Using Methods as Functions](#using-methods-as-functions)
+    - [When should we declare Method vs Function](#when-should-we-declare-method-vs-function)
+    - [Type declarations aren't inheritance](#type-declarations-arent-inheritance)
+    - [Types Are Executable Documentation](#types-are-executable-documentation)
+    - [Enumerations in Go : `iota`](#enumerations-in-go--iota)
+    - [Embedded fields](#embedded-fields)
+    - [Embedding is not Inheritance](#embedding-is-not-inheritance)
+    - [Quick Introduction to Interface](#quick-introduction-to-interface)
+    - [Interface are Type-Safe Duck Typing](#interface-are-type-safe-duck-typing)
+    - [Embeddings and Interfaces](#embeddings-and-interfaces)
+    - [Accept Interfaces, Return Structs](#accept-interfaces-return-structs)
+    - [Interfaces and nil](#interfaces-and-nil)
+    - [Interfaces Are Comparable](#interfaces-are-comparable)
+    - [Empty Interface `Interface{}` or `any`](#empty-interface-interface-or-any)
+    - [Type Assertion and Type Switches : Uncovering Concrete Types](#type-assertion-and-type-switches--uncovering-concrete-types)
+    - [Function Type are Bridge to Interfaces](#function-type-are-bridge-to-interfaces)
+    - [Implicit Interface makes Dependency Injection Easier](#implicit-interface-makes-dependency-injection-easier)
 - [Chapter 8 : Generics](#chapter-8--generics)
-  - [One approach (will not use)](#one-approach-will-not-use)
-  - [Introducing Generic in GO](#introducing-generic-in-go)
-  - [Generic Functions Abstract Algorithms](#generic-functions-abstract-algorithms)
-  - [Generic and Interfaces](#generic-and-interfaces)
-  - [Use Type terms to specify Operators](#use-type-terms-to-specify-operators)
-  - [Combining Generic Functions with Generic Data Structures](#combining-generic-functions-with-generic-data-structures)
-  - [More on Comparable](#more-on-comparable)
-  - [Things that are left out in Go Generics](#things-that-are-left-out-in-go-generics)
-  - [Summary points](#summary-points)
+    - [One approach (will not use)](#one-approach-will-not-use)
+    - [Introducing Generic in GO](#introducing-generic-in-go)
+    - [Generic Functions Abstract Algorithms](#generic-functions-abstract-algorithms)
+    - [Generic and Interfaces](#generic-and-interfaces)
+    - [Use Type terms to specify Operators](#use-type-terms-to-specify-operators)
+    - [Combining Generic Functions with Generic Data Structures](#combining-generic-functions-with-generic-data-structures)
+    - [More on Comparable](#more-on-comparable)
+    - [Things that are left out in Go Generics](#things-that-are-left-out-in-go-generics)
+    - [Summary points](#summary-points)
 - [Chapter 9 : Errors](#chapter-9--errors)
 - [Chapter 10 : Modules, Packages And Imports](#chapter-10--modules-packages-and-imports)
 - [Chapter 11 : Concurrency in Go](#chapter-11--concurrency-in-go)
-  - [Basic](#basic)
-  - [Five Stages of Go programmers](#five-stages-of-go-programmers)
-  - [Go Routines](#go-routines)
-  - [Channels](#channels)
-    - [Reading, Writing and Buffering](#reading-writing-and-buffering)
-    - [Using for-range and Channels](#using-for-range-and-channels)
-    - [Closing a channel](#closing-a-channel)
-    - [Channels makes Go concurrency model different](#channels-makes-go-concurrency-model-different)
-    - [Understanding How channels behave ?](#understanding-how-channels-behave-)
+    - [Basic](#basic)
+    - [Five Stages of Go programmers](#five-stages-of-go-programmers)
+    - [Go Routines](#go-routines)
+    - [Channels](#channels)
+        - [Reading, Writing and Buffering](#reading-writing-and-buffering)
+        - [Using for-range and Channels](#using-for-range-and-channels)
+        - [Closing a channel](#closing-a-channel)
+        - [Channels makes Go concurrency model different](#channels-makes-go-concurrency-model-different)
+        - [Understanding How channels behave ?](#understanding-how-channels-behave-)
 - [Chapter 12 : The Standard Library](#chapter-12--the-standard-library)
 - [Chapter 13 : The Context](#chapter-13--the-context)
 - [Chapter 14 : Writing tests](#chapter-14--writing-tests)
@@ -2337,6 +2337,7 @@ func (d *DoubleInt) Double() {
 
 type DoubleIntSlice []int // slices aren't comparable
 
+// we can change the value of an item in a parameter that is a slice type
 func (d DbouleIntSlice) Double() {
     for i := range d {
         d[i] = d[i] * 2
@@ -2352,8 +2353,8 @@ var di2 DoubleInt = 10
 var dis = DoubleIntSlice{1, 2, 3}
 var dis2 = DoubleIntSlice{1, 2, 3}
 
-DoubleComparator(&di, &di2) // false : type match, but you are comparing pointer, not values
-DoubleComparator(&di, dis) // false : type not match
+DoubleComparator(&di, &di2) // false : type match, but you are comparing pointer, not values and pointer points to different instances
+DoubleComparator(&di, dis) // false : types do not match
 DoubleComparator(dis, dis2) // compile, but run time panic (slices are not comparable)
 
 // Also we aware that they key of map must be comparable, so a map can be defined
@@ -2362,9 +2363,17 @@ DoubleComparator(dis, dis2) // compile, but run time panic (slices are not compa
 m := map[Doubler]int{}
 
 ```
+
+> [!WARNING]
+> Key of a map must be comparable, map can be defined to have interface as a key but if key isn't comparable that will also trigger a panic. Ex :
+> ```go
+> m := map[Doubler]int{}
+> ```
+
 > [!TIP]
-> - Even if all our current interface implementations are comparable, but there isn't any way to ensure that interface can be implemented only by comparable types
-> - Just to be extra safe use `Comparable` method on `reflect.Value` to inspect an interface before using it with `==` & `!=` operators
+> **Q.** There is no way to ensure that interfaces are implemented only using comparable type, so how we can be sure before using interfaces with `==` or `!=` ?
+> 
+> **Solution:** use `Comparable` method on `reflect.Value` to inspect an interface before using it with `==` & `!=` operators
 
 ### Empty Interface `Interface{}` or `any`
 - An empty interface type simply state that type can store any value whose type implements zero or more methods (matches every type in Go)
@@ -3137,7 +3146,6 @@ sum := numStrings.Map(func(s string) int {
 
 
 ## Chapter 10 : Modules, Packages And Imports 
-  - 
 
 
 ## Chapter 11 : Concurrency in Go
