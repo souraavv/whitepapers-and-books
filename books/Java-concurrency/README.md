@@ -88,7 +88,7 @@ The text in the book revolves around Java (pre-req)
 ## Chapter 2. Thread Safety
 - Whenever more than one thread accesses a given state variable, and one of them might write to it, they all must coordinate their access to it using synchronization.
 - The primary mechanism for synchronization in Java is the `synchronized` keyword, which provides exclusive locking
-  - But it also includes - `volatile` variables, explicit locks, and atmoic variable
+  - But it also includes - `volatile` variables, explicit locks, and atomic variable
 - If multiple threads access the same mutable state variable without appropriate synchronization, your program is broken. There are three ways to fix it:
   - Don't share the state variable across threads;
   - Make the state variable immutable; or
@@ -118,7 +118,7 @@ The text in the book revolves around Java (pre-req)
     }
     ```
 - The transient state for a particular computation exists solely in local variables that are stored on the thread's stack and are accessible only to the executing thread.
-- One thread accessing a StatelessFactorizer cannot influence the result of another thread accessing the same StatelessFactorizer; because the two threads do not share state, it is as if they were accessing different instances.
+- One thread accessing a `StatelessFactorizer` cannot influence the result of another thread accessing the same `StatelessFactorizer`; because the two threads do not share state, it is as if they were accessing different instances.
 
 >[!NOTE]
 > Stateless objects are always thread-safe.
@@ -251,7 +251,7 @@ public class UnsafeCountingFactorizer implements Servlet {
 -  Static `synchronized` methods use the `Class` object for the lock
 -  Every Java object can implicitly act as a lock for purposes of synchronization;
 -   The lock is automatically acquired by the executing thread before entering a `synchronized` block and automatically released when control exits the synchronized block, whether by the normal control path or by throwing an exception out of the block. 
-- These built-in locks are called intrinsic locks or monitor locks
+- These built-in locks are called **intrinsic locks** or **monitor locks**
 - Intrinsic locks in Java act as mutexes (or mutual exclusion locks), which means that at most one thread may own the lock.
   - When thread A attempts to acquire a lock held by thread B, A must wait, or block, until B releases it. If B never releases the lock, A waits forever.
   - Execute as a single, indivisible unit
@@ -650,7 +650,7 @@ public class VolatileCacheFactorizer implements Servlet {
         BigInteger i = extractFromRequest(req);
         BigIntger[] factors = cache.getFactors(i);
 
-        if (factor == null) {
+        if (factors == null) {
             factors = factor(i);
             cache = new OneValueCache(i, factors);
         }
