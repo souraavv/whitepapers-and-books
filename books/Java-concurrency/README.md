@@ -421,9 +421,9 @@ public class UnsafeCountingFactorizer implements Servlet {
   - We used `synchronized` to prevent multiple threads from accessing the same data at the same time.
 - This chapter examines techniques for **sharing and publishing** objects so they can be safely accessed by multiple threads
 - We have seen how `synchronized` blocks and methods can ensure that operations execute atomically, but it is a common misconception that `synchronized` is only about atomicity or demarcating “critical sections”. 
-- Synchronization also has another significant, and subtle, aspect: **memory visibility**. 
+    - Synchronization also has another significant, and subtle, aspect: **memory visibility**. 
 >[!IMPORTANT]
-> We want not only to prevent one thread from modifying the state of an object when another is using it, but also to ensure that when a thread modifies the state of an object, other threads can actually see the changes that were made
+> We want not only to prevent one thread from modifying the state of an object when another is using it i.e **Atomicity**, but also to ensure that when a thread modifies the state of an object, other threads can actually see the changes that were made i.e **Memory Visibility**
 
 ### Visibility
 - Visibility is subtle because the things that can go wrong are so counterintuitive.
@@ -453,75 +453,98 @@ public class UnsafeCountingFactorizer implements Servlet {
 
 - `NoVisibility` could loop forever because the value of ready might never become visible to the reader thread. 
 - Even more strangely, `NoVisibility` could print zero because the write to ready might be made visible to the reader thread before the write to `number`, a phenomenon known as **reordering**. 
-- This may seem like a broken design, but it is meant to allow JVMs to take full advantage of the performance of modern multiprocessor hardware. 
-- For example, in the absence of synchronization, the Java Memory Model permits the compiler to reorder operations and cache values in registers, and permits CPUs to reorder operations and cache values in processor-specific caches. 
+    - This may seem like a broken design, but it is meant to allow JVMs to take full advantage of the performance of modern multiprocessor hardware. 
+    - For example, in the absence of synchronization, the Java Memory Model permits the compiler to reorder operations and cache values in registers, and permits CPUs to reorder operations and cache values in processor-specific caches. 
+- **Reordering :** There is no guarantee that operations in one thread will be performed in the order given by the program, as long as the reordering is not detectable from within that thread—even if the reordering is apparent to other threads.
+
+> [!WARNING]
+> Always use the proper synchronization whenever data is shared across threads.
+
 
 #### Stale Data
 - Last example shows insufficiently synchronized programs can cause surprising results: *stale data*
 - Stale data can cause serious and confusing failures such as unexpected exceptions, corrupted data structures, inaccurate computations, and infinite loops.
 - Reading data without synchronization is analogous to using the `READ_UNCOMMITTED` isolation level in a database, where you are willing to trade accuracy for performance.
-    ```java
-    @ThreadSafe
-    public class SyncInteger {
-        @GuardedBy("this") private int value;
+> [!CAUTION]
+> In the case of unsynchronized reads, we are trading away a greater degree of accuracy, since the visible value for a shared variable can be arbitrarily stale.
+```java
+@ThreadSafe
+public class SyncInteger {
+    @GuardedBy("this") private int value;
 
-        public synchronized int get() {
-            return value;
-        }
-        public synchronized void set(int value) {
-            this.value = value;
-        }
+    public synchronized int get() {
+        return value;
     }
-    ```
+    public synchronized void set(int value) {
+        this.value = value;
+    }
+}
+```
 #### Nonatomic 64-bit Operations
-- When a thread reads a variable without synchronization, it may see a stale value, but at least it sees a value that was actually placed there by some thread rather than some random value. 
-- This safety guarantee is called *out-of-thin-air* safety.
-- Out-of-thin-air safety applies to all variables, with one exception: 64-bit numeric variables (`double` and `long`) that are not declared volatile
+- Safety guarantee provided by unsynchronized reads of a variable is called *out-of-thin-air* safety.
+    - When a thread reads a variable without synchronization, it may see a stale value, but at least it sees a value that was actually placed there by some thread rather than some random value. 
+- **Out-of-thin-air** safety applies to all variables, with one exception: 64-bit numeric variables (`double` and `long`) that are not declared volatile
 >[!WARNING]
 > The Java Memory Model requires fetch and store operations to be atomic, but for nonvolatile long and double variables, the JVM is permitted to treat a 64-bit read or write as two separate 32-bit operations. If the reads and writes occur in different threads, it is therefore possible to read a nonvolatile long and get back the high 32 bits of one value and the low 32 bits of another.
 >
 > When the Java Virtual Machine Specification was written, many widely used processor architectures could not efficiently provide atomic 64-bit arithmetic operations.
+- Thus, even if you don't care about stale values, it is not safe to use shared mutable long and double variables in multithreaded programs unless they are declared volatile or guarded by a lock.
 
 #### Locking and Visibility
 
 >[!IMPORTANT]
 > We can now give the other reason for the rule requiring all threads to synchronize on the same lock when accessing a shared mutable variable—to guarantee that values written by one thread are made visible to other threads. Otherwise, if a thread reads a variable without holding the appropriate lock, it might see a stale value.
->
-> Locking is not just about mutual exclusion; it is also about **memory visibility**. To ensure that all threads see the most up-to-date values of shared mutable variables, the reading and writing threads must synchronize on a common lock.
+
+- Locking is not just about mutual exclusion; it is also about **memory visibility**. To ensure that all threads see the most up-to-date values of shared mutable variables, the reading and writing threads must synchronize on a common lock.
+    - *Intrinsic locking* can be used to guarantee that one thread sees the effects of another in a predictable manner.
+
+> [!TIP]
+> Everything thread A did *in or prior* to a synchronized block is visible to thread B when it executes a synchronized block guarded by the same lock.
 
 #### Volatile Variables
 - The Java language also provides an alternative, weaker form of synchronization, *volatile variables*, to ensure that updates to a variable are propagated predictably to other threads.
   
 >[!NOTE]
->  When a field is declared `volatile`, the compiler and runtime are put on notice that this variable is shared and that operations on it should not be reordered with other memory operations
+>  1. **No Reordering** : When a field is declared `volatile`, the compiler and runtime are put on notice that this variable is shared and that operations on it should not be reordered with other memory operations
 >
-> Volatile variables are not cached in registers or in caches where they are hidden from other processors, so a read of a volatile variable always returns the most recent write by any thread.
+> 2. **No Caching**: Volatile variables are not cached in registers or in caches where they are hidden from other processors, so a read of a volatile variable always returns the most recent write by any thread.
 
-- Yet accessing a `volatile` variable performs no locking and so cannot cause the executing thread to block, making `volatile` variables a lighter-weight synchronization mechanism than `synchronized`
+- Yet accessing a `volatile` variable performs no locking and so cannot cause the executing thread to block, making `volatile` variables a **lighter-weight synchronization mechanism** than `synchronized`
+    - Visibility effects of volatile variables extend beyond the value of the volatile variable itself.
+    - When thread A writes to a volatile variable and subsequently thread B reads that same variable, the values of all variables that were visible to A prior to writing to the volatile variable become visible to B after reading the volatile variable.
+    - So from a memory visibility perspective, writing a volatile variable is like exiting a synchronized block and reading a volatile variable is like entering a synchronized block. 
 
 >[!WARNING]
-> Use volatile variables only when they simplify implementing and verifying your synchronization policy; avoid using volatile variables when veryfing correctness would require subtle reasoning about visibility. Good uses of volatile variables include ensuring the visibility of their own state, that of the object they refer to, or indicating that an important lifecycle event (such as initialization or shutdown) has occurred.
+> Use volatile variables only when they simplify implementing and verifying your synchronization policy; avoid using volatile variables when veryfing correctness would require subtle reasoning about visibility. 
 
 - Volatile variables are convenient, but they have limitations
-- The semantics of volatile are not strong enough to make the increment operation (`count++`) atomic, unless you can guarantee that the variable is written only from a single thread.
-- Atomic variables do provide atomic *read-modify-write* support and can often be used as **“better volatile variables”**
+    - The semantics of volatile are not strong enough to make the increment operation (`count++`) atomic, unless you can guarantee that the variable is written only from a single thread.
+    - Atomic variables do provide atomic *read-modify-write* support and can often be used as **“better volatile variables”**.
+    **Eg :** For example, the semantics of volatile are not strong enough to make the increment operation (`count++`) atomic, unless you can guarantee that the variable is written only from a single thread.
 
 >[!IMPORTANT]
 > Locking can guarantee both visibility and atomicity; volatile variables can only guarantee visibility.
 
-- You can use volatile variables only when all the following criteria are met:
+- Use volatile variable when all following criteria met:
   - Writes to the variable do not depend on its current value, or you can ensure that only a single thread ever updates the value;
   - The variable does not participate in invariants with other state variables; and
   - Locking is not required for any other reason while the variable is being accessed.
 
 ### Publication and Escape
-- Publishing an object means making it available to code outside of its current scope, such as by storing a reference to it where other code can find it, returning it from a nonprivate method, or passing it to a method in another class.
+- Publishing an object means making it available to code outside of its current scope, such as 
+    - by storing a reference to it where other code can find it, 
+    - returning it from a nonprivate method, or 
+    - passing it to a method in another class.
 - In many situations, we want to ensure that objects and their internals are not published. 
   - In other situations, we do want to publish an object for general use, but doing so in a thread-safe manner may require synchronization. 
-- Publishing internal state variables can compromise encapsulation and make it more difficult to preserve invariants;
+- Publishing internal state variables can compromise encapsulation and make it more difficult to preserve invariants.
 - Publishing objects before they are fully constructed can compromise thread safety. 
 - An object that is published when it should not have been is said to have *escaped*.
-- The most blatant form of publication is to store a reference in a public static field, where any class and thread could see it
+
+> [!WARNING]
+> Once an object escapes, you have to assume that another class or thread may, maliciously or carelessly, misuse it.
+
+1. The most blatant form of publication is to store a reference in a public static field, where any class and thread could see it
     ```java
     public static Set<Secret> knownSecrets;
     
@@ -529,8 +552,12 @@ public class UnsafeCountingFactorizer implements Servlet {
         knownSecrets = new HashSet<Secret>();
     }
     ```
-- Publishing one object may indirectly publish others. If you add a `Secret` to the published `knownSecrets` set, you've also published that `Secret`, because any code can iterate the `Set` and obtain a reference to the new `Secret`.
-- Similarly, returning a reference from a nonprivate method also publishes the returned object. 
+2. Publishing one object may indirectly publish others. 
+    
+    a. If you add a `Secret` to the published `knownSecrets` set, you've also published that `Secret`, because any code can iterate the `Set` and obtain a reference to the new `Secret`.
+    b. Similarly, returning a reference from a nonprivate method also publishes the returned object. 
+    
+    **Eg :**  `UnsafeStates` publishes the supposedly `private` array of state abbreviations. In this case, the states array has escaped its intended scope, because what was supposed to be private state has been effectively made public.
     ```java
     class UnsafeStates {
         private String[] states = new String[] {
@@ -541,11 +568,14 @@ public class UnsafeCountingFactorizer implements Servlet {
         }
     }
     ```
-- `UnsafeStates` publishes the supposedly `private` array of state abbreviations.
-- Publishing states in this way is problematic because any caller can modify its contents.
-- In this case, the states array has escaped its intended scope, because what was supposed to be private state has been effectively made public.
-- Publishing an object also publishes any objects referred to by its nonprivate fields. Or more general this can be a long chain
--  Implicitly Allowing the `this` Reference to Escape. Don't do this.
+
+> [!NOTE]
+> Any object that is reachable from a published object by following some chain of nonprivate field references and method calls has also been published.
+
+3. Passing an object to an alien method (includes methods of other classes as well as overridable methods which are neither private nor final). 
+   - Since you can't know what code will actually be invoked, you don't know that the alien method won't publish the object or retain a reference to it that might later be used from another thread.
+
+4. Publish an inner class instance. Implicitly allowing the `this` reference to escape. !!! 💀 Don't do this 💀 !!!
     ```java
     public class ThisEscape {
         public ThisEscape(EventSource source) {
@@ -559,14 +589,18 @@ public class UnsafeCountingFactorizer implements Servlet {
         }
     }
     ```
-    - When `ThisEscape` publishes the `EventListener`, it implicitly publishes the enclosing `ThisEscape` instance as well, because inner class instances contain a hidden reference to the enclosing instance.
-    - `ThisEscape` instance. But an object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an incompletely constructed object. 
+    - When `ThisEscape` publishes the `EventListener`, it implicitly publishes the enclosing `ThisEscape` instance as well, because *inner class instances contain a hidden reference to the enclosing instance*.
+    - An object is in a predictable, consistent state only after its constructor returns, so publishing an object from within its constructor can publish an *incompletely constructed object*. 
     - This is true even if the publication is the last statement in the constructor. If the `this` reference escapes during construction, the object is considered not properly constructed.
-  - Do not allow the this reference to escape during construction.
-  - A common mistake that can let the this reference escape during construction is to start a thread from a constructor. 
-  - When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the `Thread` or `Runnable` is an inner class of the owning object).
-   - The new thread might then be able to see the owning object before it is fully constructed. There's nothing wrong with creating a thread in a constructor, but it is best not to start the thread immediately.
-- If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in `SafeListener`
+
+> [!TIP]
+> Do not allow the this reference to escape during construction.
+
+5. Start a thread from a constructor. 
+    - When an object creates a thread from its constructor, it almost always shares its this reference with the new thread, either explicitly (by passing it to the constructor) or implicitly (because the `Thread` or `Runnable` is an inner class of the owning object).
+    - The new thread might then be able to see the owning object before it is fully constructed. There's nothing wrong with creating a thread in a constructor, but it is best not to start the thread immediately.
+
+- **Private Constructor and Public Factory :** If you are tempted to register an event listener or start a thread from a constructor, you can avoid the improper construction by using a private constructor and a public factory method, as shown in `SafeListener`
     ```java
     public class SafeListener {
 
@@ -589,19 +623,17 @@ public class UnsafeCountingFactorizer implements Servlet {
     ```
 
 ### Thread Confinement
-
->[!NOTE]
-> Accessing shared, mutable data requires using synchronization; one way to avoid this requirement is to not share. 
-> 
-> If data is only accessed from a single thread, no synchronization is needed. This technique, **thread confinement**
->
->  This technique, thread confinement, is one of the simplest ways to achieve thread safety. When an object is confined to a thread, such usage is automatically thread-safe even if the confined object itself is not 
-
-- Thread confinement is commonly used in pooled JDBC `Connection` objects, as they are not thread-safe. A thread acquires a connection from the pool, processes a request synchronously, and returns it. The pool ensures the connection isn't shared with other threads during its usage, maintaining confinement.
+- Accessing shared, mutable data requires using synchronization; one way to avoid this requirement is to not share. 
+- If data is only accessed from a single thread, no synchronization is needed. This technique, **thread confinement**
+- When an object is confined to a thread, such usage is automatically thread-safe even if the confined object itself is not 
+- **Eg :** Thread confinement is commonly used in pooled JDBC `Connection` objects, as they are not thread-safe. A thread acquires a connection from the pool, processes a request synchronously, and returns it. The pool ensures the connection isn't shared with other threads during its usage, maintaining confinement.
   - The connection pool implementations provided by application servers are thread-safe; connection pools are necessarily accessed from multiple threads, so a non-thread-safe implementation would not make sense.
+- Thread confinement is an element of program's design which must be enforced by its implementation. 
+    - The language and core libraries provide mechanisms that can help in maintaining thread confinement : *local variables* and the `ThreadLocal` class.
+    - But even with these, it is still the programmer's responsibility to ensure that thread-confined objects do not escape from their intended thread.
 
 #### Stack Confinement
-- Local variables are intrinsically confined to the executing thread;
+- Local variables are intrinsically confined to the executing thread.
 - They exist on the executing thread's stack, which is not accessible to other threads.
 - Stack confinement is a special case of thread confinement in which an object can only be reached through local variables.
 - Stack confinement also called *within-thread* or *thread-local usage*
@@ -629,6 +661,7 @@ public class UnsafeCountingFactorizer implements Servlet {
     - However, if we were to publish a reference to the Set (or any of its internals), the confinement would be violated and the animals would escape.
 
 #### ThreadLocal
+- Thread-Local provides get and set accessormethods that maintain a separate copy of the value for each thread that uses it, so a get returns the most recent value passed to set from the currently executing thread.
 
 ### Immutability
 - The other end-run around the need to synchronize is to use immutable objects
