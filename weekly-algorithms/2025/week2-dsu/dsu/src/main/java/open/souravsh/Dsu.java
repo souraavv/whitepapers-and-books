@@ -6,7 +6,7 @@ import java.util.List;
 public class Dsu {
     private final List<Integer> parent;
     private final List<Integer> size;
-    int n;
+    private final int n;
     public Dsu(int n) {
         this.n = n;
         this.parent = new ArrayList<Integer>(Collections.nCopies(n, -1));
