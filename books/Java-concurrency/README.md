@@ -1,68 +1,77 @@
 - [Java Concurrency in Practice](#java-concurrency-in-practice)
-    - [Chapter 1. Introduction](#chapter-1-introduction)
-        - [Benefits of Threads](#benefits-of-threads)
-            - [Exploiting Multiple Processors](#exploiting-multiple-processors)
-        - [Risks of Threads](#risks-of-threads)
-            - [Safety Hazards](#safety-hazards)
-            - [Liveness Hazards](#liveness-hazards)
-            - [Performance Hazards](#performance-hazards)
-    - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
-        - [What is Thread Safety?](#what-is-thread-safety)
-            - [Example: A Stateless Servlet](#example-a-stateless-servlet)
-        - [Atomicity](#atomicity)
-            - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
-            - [Compound Actions](#compound-actions)
-            - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
-        - [Locking](#locking)
-            - [Intrinsic Locks](#intrinsic-locks)
-            - [Reentracy](#reentracy)
-        - [Guarding State with Locks](#guarding-state-with-locks)
-        - [Liveness and Performance](#liveness-and-performance)
-    - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
-        - [Visibility](#visibility)
-            - [Stale Data](#stale-data)
-            - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
-            - [Locking and Visibility](#locking-and-visibility)
-            - [Volatile Variables](#volatile-variables)
-        - [Publication and Escape](#publication-and-escape)
-        - [Thread Confinement](#thread-confinement)
-            - [Stack Confinement](#stack-confinement)
-            - [ThreadLocal](#threadlocal)
-        - [Immutability](#immutability)
-            - [Final Fields](#final-fields)
-        - [Safe Publication](#safe-publication)
-            - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
-            - [Safe Publication Idioms](#safe-publication-idioms)
-        - [Summary](#summary)
-    - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
-        - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
-            - [State-dependent Operations](#state-dependent-operations)
-            - [State Ownership](#state-ownership)
-            - [Instance Confinement](#instance-confinement)
-            - [The Java Monitor Pattern](#the-java-monitor-pattern)
-            - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
-            - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
-            - [When Delegation Fails](#when-delegation-fails)
-        - [Publishing underlying state variables](#publishing-underlying-state-variables)
-        - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
-            - [Client-side Locking](#client-side-locking)
-    - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
-        - [Synchronized Collections](#synchronized-collections)
-            - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
-            - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
-            - [Hidden Iterators](#hidden-iterators)
-        - [Concurrent collections](#concurrent-collections)
-            - [ConcurrentHashMap](#concurrenthashmap)
-            - [Additional Atomic Map Operations](#additional-atomic-map-operations)
-            - [CopyOnWriteArrayList](#copyonwritearraylist)
-        - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
-            - [Serial thread confinement](#serial-thread-confinement)
-            - [Deques and work stealing](#deques-and-work-stealing)
-        - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
-        - [Synchronizers](#synchronizers)
-            - [Latches](#latches)
-            - [FutureTask](#futuretask)
-            - [Semaphores](#semaphores)
+  - [Chapter 1. Introduction](#chapter-1-introduction)
+    - [Benefits of Threads](#benefits-of-threads)
+      - [Exploiting Multiple Processors](#exploiting-multiple-processors)
+    - [Risks of Threads](#risks-of-threads)
+      - [Safety Hazards](#safety-hazards)
+      - [Liveness Hazards](#liveness-hazards)
+      - [Performance Hazards](#performance-hazards)
+  - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
+    - [What is Thread Safety?](#what-is-thread-safety)
+      - [Example: A Stateless Servlet](#example-a-stateless-servlet)
+    - [Atomicity](#atomicity)
+      - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
+      - [Compound Actions](#compound-actions)
+      - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
+    - [Locking](#locking)
+      - [Intrinsic Locks](#intrinsic-locks)
+      - [Reentracy](#reentracy)
+    - [Guarding State with Locks](#guarding-state-with-locks)
+    - [Liveness and Performance](#liveness-and-performance)
+  - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
+    - [Visibility](#visibility)
+      - [Stale Data](#stale-data)
+      - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
+      - [Locking and Visibility](#locking-and-visibility)
+      - [Volatile Variables](#volatile-variables)
+    - [Publication and Escape](#publication-and-escape)
+    - [Thread Confinement](#thread-confinement)
+      - [Stack Confinement](#stack-confinement)
+      - [ThreadLocal](#threadlocal)
+    - [Immutability](#immutability)
+      - [Final Fields](#final-fields)
+    - [Safe Publication](#safe-publication)
+      - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
+      - [Safe Publication Idioms](#safe-publication-idioms)
+    - [Summary](#summary)
+  - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
+    - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
+      - [State-dependent Operations](#state-dependent-operations)
+      - [State Ownership](#state-ownership)
+      - [Instance Confinement](#instance-confinement)
+      - [The Java Monitor Pattern](#the-java-monitor-pattern)
+      - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
+      - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
+      - [When Delegation Fails](#when-delegation-fails)
+    - [Publishing underlying state variables](#publishing-underlying-state-variables)
+    - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
+      - [Client-side Locking](#client-side-locking)
+  - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
+    - [Synchronized Collections](#synchronized-collections)
+      - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
+      - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
+      - [Hidden Iterators](#hidden-iterators)
+    - [Concurrent collections](#concurrent-collections)
+      - [ConcurrentHashMap](#concurrenthashmap)
+      - [Additional Atomic Map Operations](#additional-atomic-map-operations)
+      - [CopyOnWriteArrayList](#copyonwritearraylist)
+    - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
+      - [Serial thread confinement](#serial-thread-confinement)
+      - [Deques and work stealing](#deques-and-work-stealing)
+    - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
+    - [Synchronizers](#synchronizers)
+      - [Latches](#latches)
+      - [FutureTask](#futuretask)
+      - [Semaphores](#semaphores)
+  - [Chapter 6. Task Execution](#chapter-6-task-execution)
+    - [Executing Tasks in Threads](#executing-tasks-in-threads)
+      - [Executing Tasks Sequentially](#executing-tasks-sequentially)
+      - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
+      - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
+  - [The Executor Framework](#the-executor-framework)
+      - [Execution Policies](#execution-policies)
+      - [Thread Pools](#thread-pools)
+      - [Executor Lifecycle](#executor-lifecycle)
 
 
 # Java Concurrency in Practice
@@ -1656,3 +1665,183 @@ public class BoundedHashSet<T> {
 }
 
 ```
+
+## Chapter 6. Task Execution
+
+From this chapter onwards we'll understand how to structure Concurrent Applications
+- Most concurrent applications are organized around the execution of tasks: **abstract**, **discrete units** of work.
+- Dividing the work of an application into tasks simplifies program organization, facilitates error recovery by providing natural transaction boundaries, and promotes concurrency by providing a natural structure for parallelizing work.
+
+### Executing Tasks in Threads
+- The first step in organizing a program around task execution is identifying sensible *task boundaries*.
+- Ideally, tasks are independent activities: work that doesn't depend on the state, result, or side effects of other tasks.
+- Independence facilitates concurrency, as independent tasks can be executed in parallel if there are adequate processing resources. 
+- Choosing good task boundaries, coupled with a sensible task execution policy 
+- Most server application offers a natural choice of task boundary
+  - Individual client request
+  - Using individual requests as task boundaries usually offers both independence and appropriate task sizing.
+  - For example, the result of submitting a message to a mail server is not affected by the other messages being processed at the same time
+
+#### Executing Tasks Sequentially
+- The simplest is to execute tasks sequentially in a single thread.
+    ```java
+    class SingleThreadWebServer {
+        public static void main(String[] args) throws IOException {
+            ServerSocket socket = new ServerSocket(80);
+            while (true) {
+                Socket connection = socket.accept();
+                handleRequest(connection);
+            }
+        }
+    }
+    ```
+- `SingleThreadedWebServer` is simple and theoretically correct, but would perform poorly in production because it can handle only one request at a time
+  - While the server is handling a request, new connections must wait until it finishes the current request and calls accept again. 
+- In server applications, sequential processing rarely provides either good throughput or good responsiveness.
+
+####  Explicitly Creating Threads for Tasks
+
+- A more responsive approach is to create a new thread for servicing each request
+    ```java
+    class ThreadPerTaskWebServer {
+        public static void main(String[] args) throws IOException {
+            ServerSocket socket = new ServerSocket(80);
+            while (true) {
+                final Socket connection = socket.accept();
+                Runnable task = new Runnable() {
+                    public void run() {
+                        handleRequest(connection);
+                    }
+                }
+                new Thread(task).start();
+            }
+        }
+    }
+    ```
+
+- The main thread still alternates between accepting an incoming connection and dispatching the request
+- The difference is that for each connection, the main loop creates a new thread
+- Three main consequences
+  - Task processing is offloaded from the main thread, enabling the main loop to resume waiting for the next incoming connection more quickly.
+  - Tasks can be processed in parallel, enabling multiple requests to be serviced simultaneously. May improve throughput if there are multiple processors, or if tasks need to block for any reason such as I/O completion, lock acquisition, or resource availability.
+  - Task-handling code must be thread-safe, because it may be invoked concurrently for multiple tasks.
+
+#### Disadvantages of Unbounded Thread Creation
+- For production use, however, the thread-per-task approach has some practical drawbacks, especially when a large number of threads may be created:
+- **Thread lifecycle overhead** Thread creation and teardown are not free. If requests are frequent and lightweight, as in most server applications, creating a new thread for each request can consume significant computing resources.
+- **Resource consumption** Active threads consume system resources, especially memory. When there are more runnable threads than available processors, threads sit idle. If you have enough threads to keep all the CPUs busy, creating more threads won't help and may even hurt.
+- **Stability** There is a limit on how many threads can be created. The limit varies by platform. When you hit this limit, the most likely result is an `OutOfMemoryError`. Trying to recover from such an error is very risky; it is far easier to structure your program to avoid hitting this limit.
+
+
+## The Executor Framework
+- Tasks are logical units of work, and threads are a mechanism by which tasks can run asynchronously.
+- We have seen two approaches in previous section and both suffers
+- In previous chapter 5, we've learned about the bounded queues to prevent overload of an application from running out of memory 
+- Thread pool offers the same management for the threads
+- The Java provides `Executor` framework under (`java.util.concurrent`) which is a flexible implementation for thread pool 
+  - So, the primary abstraction for task execution in the Java class libraries are not `Thread`, but `Executor` 
+
+    ```java
+    public interface Executor {
+        void execute(Runnable command);
+    }
+    ```
+- The interface might looks simple, but it forms the basis of flexibility and powerful framework for asyn task executions
+- It helps in decoupling the task submission from task execution, describe task with `Runnable` 
+- The `Executor` implementation also provides lifecycle support and hooks for adding statistics gathering, monitoring and much more
+- The design of `Executor` is based on producer and consumer
+    - Producer: Produce the unit of work to be done
+    - Consumer: Threads that execute the task 
+
+    ```java
+
+    class TaskExecutionWebServer {
+        private static final int NTHREADS = 100;
+        private static final Executor exec = 
+                Executor.newFixedThreadPool(NTHREADS);
+
+        public static void main(String[] args) throws IOException {
+            ServerSocket socket = new ServerSocket(80);
+            whlie (true) {
+                final Socket connection = socket.accept();
+                Runnable task = new Runnable() {
+                    public void run() {
+                        handleRequest(connection);
+                    }
+                }
+            }
+            exec.execute(task);
+        }
+    }
+    ```
+
+- We can easily modify to behave like thread per task server
+    ```java
+    public class ThreadPerTaskExecutor implements Executor {
+        public void execute(Runnable r) {
+            new Thread(r).start();
+        }
+    }
+    ```
+
+#### Execution Policies
+
+The value of decoupling submission from execution is that it lets you easily specify, and subsequently change without great difficulty, the execution policy for a given class of tasks.
+
+- In what thread will tasks be executed?
+- How many tasks may execute concurrently?
+- In what order should tasks be executed (FIFO, LIFO, priority order)?
+- How many tasks may be queued pending execution?
+- If a task has to be rejected because the system is overloaded, which task should be selected as the victim, and how should the application be notified?
+- What actions should be taken before or after executing a task?
+
+
+
+>[!NOTE]
+> Execution policies are a resource management tool, and the optimal policy depends on the available computing resources and your quality-of-service requirements. 
+>
+> Separating the specification of execution policy from task submission makes it practical to select an execution policy at deployment time that is matched to the available hardware.
+
+
+>[!WARNING]
+> Whenever you see code of the form:
+>
+> `new Thread(runnable).start()`
+>
+> and you think you might at some point want a more flexible execution policy, seriously consider replacing it with the use of an Executor.
+
+
+#### Thread Pools
+- A thread pool, as its name suggests, manages a homogeneous pool of worker threads. 
+- A thread pool is tightly bound to a work queue holding tasks waiting to be executed. Worker threads have a simple life: request the next task from the work queue, execute it, and go back to waiting for another task.
+- Executing tasks in pool threads has a number of advantages 
+  -  Reusing an existing thread instead of creating a new one amortizes thread creation and teardown costs over multiple requests
+  - The latency associated with thread creation does not delay task execution
+- You can create a thread pool by calling one of the static factory methods in `Executors`
+  - **newFixedThreadPool** A fixed-size thread pool creates threads as tasks are submitted, up to the maximum pool size, and then attempts to keep the pool size constant (adding new threads if a thread dies due to an unexpected `Exception`).
+  - **newCachedThreadPool** A cached thread pool has more flexibility to reap idle threads when the current size of the pool exceeds the demand for processing, and to add new threads when demand increases, but places no bounds on the size of the pool.
+  - **newSingleThreadExecutor** A single-threaded executor creates a single worker thread to process tasks, replacing it if it dies unexpectedly. Tasks are guaranteed to be processed sequentially according to the order imposed by the task queue (FIFO, LIFO, priority order)
+  - **newScheduledThreadPool**  A fixed-size thread pool that supports delayed and periodic task execution, similar to `Timer`.
+
+####  Executor Lifecycle
+- JVM can't exit until all the (nondaemon) threads have terminated, so failing to shut down an `Executor` could prevent the JVM from exiting.
+- Task can be in any status - Running, Queued, completed
+- In shutting down an application, there is a spectrum
+  - Graceful shutdown (finish what you've started but don't accept any new work) 
+  - Abrupt shutdown (turn off the power to the machine room)
+- Since `Executor`s provide a service to applications, they should be able to be shut down as well, both gracefully and abruptly, and feed back information to the application about the status of tasks that were affected by the shutdown.
+
+- To address the issue of execution service lifecycle, the `ExecutorService` interface extends `Executor`
+    ```java 
+    public interface ExecutorService extends Executor {
+        void shutdown();
+        List<Runnable> shutdownNow();
+        boolean isShutdown();
+        boolean isTerminated();
+        boolean awaitTermination(long timeout, TimeUnit unit) throws
+                InterruptedException;
+        //.. and many more
+    }
+    ```
+
+
