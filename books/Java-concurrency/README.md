@@ -68,7 +68,7 @@
       - [Executing Tasks Sequentially](#executing-tasks-sequentially)
       - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
       - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
-  - [The Executor Framework](#the-executor-framework)
+    - [The Executor Framework](#the-executor-framework)
       - [Execution Policies](#execution-policies)
       - [Thread Pools](#thread-pools)
       - [Executor Lifecycle](#executor-lifecycle)
@@ -1733,7 +1733,7 @@ From this chapter onwards we'll understand how to structure Concurrent Applicati
 - **Stability** There is a limit on how many threads can be created. The limit varies by platform. When you hit this limit, the most likely result is an `OutOfMemoryError`. Trying to recover from such an error is very risky; it is far easier to structure your program to avoid hitting this limit.
 
 
-## The Executor Framework
+### The Executor Framework
 - Tasks are logical units of work, and threads are a mechanism by which tasks can run asynchronously.
 - We have seen two approaches in previous section and both suffers
 - In previous chapter 5, we've learned about the bounded queues to prevent overload of an application from running out of memory 
