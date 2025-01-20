@@ -1064,10 +1064,11 @@ public static Map<String, Point> deepCopy(Map<String, Point> original) {
 
 #### Example: Vehicle Tracker Using Delegation
 
-- Delegating Thread Safety to a `ConcurrentHashMap`
+Delegating Thread Safety to a `ConcurrentHashMap`
+
 - The example does not use any explicit synchronization; 
-  - All access to state is managed by ConcurrentHashMap, 
-  - And all the keys and values of the Map are immutable.
+  - All access to state is managed by `ConcurrentHashMap`, 
+  - And all the keys and values of the `Map` are immutable.
 
 ```java
 
@@ -1099,15 +1100,15 @@ public class ImmutablePoint {
 @ThreadSafe
 public class DelegatingVehicleTracker {
     
-    private final ConcurrentMap<String, Point> locations;
-    private final Map<String, Point> unmodifiableMap;
+    private final ConcurrentMap<String, ImmutablePoint> locations;
+    private final Map<String, ImmutablePoint> unmodifiableMap;
     
-    public DelegatingVehicleTracker(Map<String, Point> points) {
-        locations = new ConcurrentMap<String, Point>(points);
+    public DelegatingVehicleTracker(Map<String, ImmutablePoint> points) {
+        locations = new ConcurrentMap<String, ImmutablePoint>(points);
         unmodifidedMap = Collections.unmodifiedMap(locations);
     }
 
-    public Map<String, Point> getLocations() {
+    public Map<String, ImmutablePoint> getLocations() {
         return unmodifiedMap;
     }
 
@@ -1116,15 +1117,16 @@ public class DelegatingVehicleTracker {
     }
 
     public void setLocation(String id, int x, int y) {
-        if (locations.replace(id, new Point(x, y)) == null) {
+        if (locations.replace(id, new ImmutablePoint(x, y)) == null) {
             throw new IllegalArgumentException("invalid ID: " + id);
         }
     }
 }
 ```
-- `Point` is thread-safe because it is immutable. Immutable values can be freely shared and published, so we no longer need to copy the locations when returning them.
+- `ImmutablePoint` is thread-safe because it is immutable. 
+- Immutable values can be freely shared and published, so we no longer need to copy the locations when returning them.
 - The delegating version returns an unmodifiable but “live” view of the vehicle locations, while the monitor version returned a snapshot of the locations
-  - This means that if thread A calls getLocations and thread B later modifies the location of some of the points, those changes are reflected in the `Map` returned to thread A. As we remarked earlier, this can be a benefit (more up-to-date data) or a liability (potentially inconsistent view of the fleet), depending on your requirements.
+  - This means that if thread *A* calls `getLocations` and thread *B* later modifies the location of some of the points, those changes are reflected in the `Map` returned to thread *A*. As we remarked earlier, this can be a benefit (more up-to-date data) or a liability (potentially inconsistent view of the fleet), depending on your requirements.
 - If an unchanging view of the fleet is required, getLocations could instead return a shallow copy of the locations map.
     ```java
     public Map<String, Point> getLocations() {
@@ -1133,7 +1135,7 @@ public class DelegatingVehicleTracker {
         );
     }
     ```
-    - Since the contents of the `Map` are immutable, only the structure of the Map, not the contents, must be copied
+    - Since the contents of the `Map` are immutable, only the structure of the `Map`, not the contents, must be copied
 
 >[!IMPORTANT]
 > The delegation examples so far delegate to a single, thread-safe state variable. 
@@ -1239,7 +1241,8 @@ public class PublishingVehicleTracker {
 <details>
 <summary> Java Unmodifiable Map </summary> 
 
-- An unmodifiable map may still change. It is only a view on a modifiable map, and changes in the backing map will be visible through the unmodifiable map. The unmodifiable map only prevents modifications for those who only have the reference to the unmodifiable view
+- An unmodifiable map may still change - It is live view on a modifiable map, and changes in the backing map will be visible through the unmodifiable map. 
+- The unmodifiable map only prevents modifications for those who only have the reference to the unmodifiable view
 
 - Ref: https://stackoverflow.com/questions/22636575/unmodifiablemap-java-collections-vs-immutablemap-google
 
