@@ -72,6 +72,7 @@
       - [Execution Policies](#execution-policies)
       - [Thread Pools](#thread-pools)
       - [Executor Lifecycle](#executor-lifecycle)
+      - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
 
 
 # Java Concurrency in Practice
@@ -973,11 +974,17 @@ public class MutablePoint {
         this.y = p.y;
     }
 }
+
+// MutablePoint is not thread safe because: 
+// 1. Public scope of int x and int y. Public fields allow uncontrolled access.
+// 2. Copy constructor doesn’t ensure thread safety - MutablePoint p can 
+//    be accessed by multiple threads
+
 ```
 
 - This implementation maintains thread safety in part by copying mutable data before returning it to the client. 
   - This is usually not a performance issue, but could become one if the set of vehicles is very large.
-- You might have observed that `deepCopy` is called from a `synchronized` method, the tracker's intrinsic lock is held for the duration of what might be a long-running copy operation, and this could degrade the responsiveness
+- You might have observed that `deepCopy` is called from a `synchronized` method (`deepCopy` is `private`), the tracker's intrinsic lock is held for the duration of what might be a long-running copy operation, and this could degrade the responsiveness
 
 >[!NOTE]
 > Note that `deepCopy` can't just wrap the Map with an `unmodifiableMap`, because that protects only the collection from modification; it does not prevent callers from modifying the mutable objects stored in it. For the same reason, populating the `HashMap` in `deepCopy` via a copy constructor wouldn't work either, because only the references to the points would be copied, not the point objects themselves.
@@ -994,7 +1001,7 @@ Deep Copy:
 
 
 Problem
-- If you use `Collections.unmodifiableMap(map)`, it only makes the Map unmodifiable (e.g., you cannot add/remove items to/from it), but does not make the individual objects (values) stored in the Map immutable. Mutable objects can still be modified.
+- If you use `Collections.unmodifiableMap(map)`, it only makes the `Map` unmodifiable (e.g., you cannot add/remove items to/from it), but does not make the individual objects (values) stored in the Map immutable. Mutable objects can still be modified.
 
 - Similarly, using a copy constructor like `new HashMap<>(originalMap)` only copies the references to the objects, not the actual objects themselves. It still points to the same underlying objects.
 
@@ -1065,13 +1072,27 @@ public static Map<String, Point> deepCopy(Map<String, Point> original) {
 ```java
 
 @Immutable 
-public class Point {
-    public final int x, y;
-    public Point(int x, int y) {
+public class ImmutablePoint {
+    private final int x;
+    private final int y; 
+
+    public ImmutablePoint(int x, int y) {
         this.x = x;
         this.y = y;
     }
+
+    public ImmutablePoint(ImmutablePoint p) {
+        this(p.x, p.y);
+    }
+
+    public int getX() { 
+        return x; 
+    }
+    public int getY() { 
+        return y; 
+    }
 }
+
 ```
 
 ```java
@@ -1810,7 +1831,6 @@ The value of decoupling submission from execution is that it lets you easily spe
 >
 > and you think you might at some point want a more flexible execution policy, seriously consider replacing it with the use of an Executor.
 
-
 #### Thread Pools
 - A thread pool, as its name suggests, manages a homogeneous pool of worker threads. 
 - A thread pool is tightly bound to a work queue holding tasks waiting to be executed. Worker threads have a simple life: request the next task from the work queue, execute it, and go back to waiting for another task.
@@ -1844,4 +1864,8 @@ The value of decoupling submission from execution is that it lets you easily spe
     }
     ```
 
+#### Delayed and Periodic Tasks 
+- The `Timer` facility manages the execution of deferred (“run this task in 100 ms”) and periodic (“run this task every 10 ms”) tasks
+  - However, `Timer` has some drawbacks, and `ScheduledThreadPoolExecutor` should be thought of as its replacement
+- 
 
