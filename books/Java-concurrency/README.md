@@ -73,6 +73,15 @@
       - [Thread Pools](#thread-pools)
       - [Executor Lifecycle](#executor-lifecycle)
       - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
+    - [Finding exploitable parallelism](#finding-exploitable-parallelism)
+      - [Example](#example)
+      - [Result-bearing tasks: Callable and Future](#result-bearing-tasks-callable-and-future)
+    - [Example: page renderer with Future](#example-page-renderer-with-future)
+    - [Limitations of parallelizing heterogeneous tasks](#limitations-of-parallelizing-heterogeneous-tasks)
+    - [CompletionService: Executor meets BlockingQueue](#completionservice-executor-meets-blockingqueue)
+    - [Placing time limits on tasks](#placing-time-limits-on-tasks)
+    - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
+    - [Summary](#summary-1)
 
 
 # Java Concurrency in Practice
@@ -1870,5 +1879,315 @@ The value of decoupling submission from execution is that it lets you easily spe
 #### Delayed and Periodic Tasks 
 - The `Timer` facility manages the execution of deferred (“run this task in 100 ms”) and periodic (“run this task every 10 ms”) tasks
   - However, `Timer` has some drawbacks, and `ScheduledThreadPoolExecutor` should be thought of as its replacement
-- 
 
+### Finding exploitable parallelism
+- This section covers developing a component with varying degrees of concurrency. It is an HTML page-rendering component.
+  
+#### Example
+
+```java
+
+public class SingleThreadRenderer {
+    void renderPage(CharSequence source) {
+        // part - 1
+        renderText(source);
+
+
+        // part - 2
+        List<ImageData> imageData = new ArrayList<ImageData>();
+        for (ImageInfo imageInfo: scanForImageInfo(source)) {
+            imageData.add(imageInfo);
+        }
+
+        // part - 3
+        for (ImageData data: imageData) {
+            renderImage(image);
+        }
+    }
+}
+```
+- The problem with this component is that there is an untapped concurrency opportunity - downloading image data can be made in parallel to text rendering.
+  - Later, we'll move part-2 in to thread
+
+#### Result-bearing tasks: Callable and Future
+
+
+- Executor supports executing `Runnables` which are a fairly basic task abstraction. Some use-cases require result-bearing tasks, for example.
+- For these use-cases, prefer using a `Callable`, which supports returning values and throwing exceptions. 
+- `Future`, on the other hand, represents the lifecycle of a task & allows you to inspect whether the task was cancelled, has completed, cancel it explicitly, etc.
+- If you simply execute `get` on the `Future`, then you are blocking until the result has been computed.
+
+- `Callable` and `Future` 
+    ```java
+    public interface Callable<V> {
+        V call() throws Exception;
+    }
+
+    public interface Future<V> {
+        boolean cancel(boolean mayInterruptIfRunning);
+        boolean isCancelled();
+        boolean isDone();
+        V get() throws InterruptedException, ExecutionException, CancellationException;
+        V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, CancellationException, TimeoutException;
+    }
+    ```
+
+- The executor framework supports submitting futures via the submit method.
+- You could also explicitly instantiate a `FutureTask` & execute it (as it implements `Runnable`).
+- Finally, you can create a `FutureTask` from a `Callable`:
+
+    ```java
+    protected <T> RunnableFuture<T> newTaskFor(Callable<T> task) {
+        return new RunnableFuture<T> (task);
+    }
+    ```
+
+<details>
+<summary> </summary>
+
+```java
+
+import java.util.concurrency.*;
+
+public class ExecutorSubmitExample {
+    public static void main(Stirng[] args) throws Exception {
+        ExecutorService service = Executors.newFixedThreadPool(2);
+
+        // submit takes CAllable
+        Future<Integer> future = executore.submit(() -> {
+            Thread.sleep(1000);
+            return 42;
+        });
+
+        Integer ans = future.get();
+        executor.shutdown();
+    }
+}
+
+```
+
+```java
+import java.util.concurrent.*;
+
+public class FutureTaskExample {
+    public static void main(String[] args) throws Exception {
+        Callable<Integer> task = (() -> {
+            Thread.sleep(1000);
+            return 42;
+        });
+
+        FutureTask<Integer> futureTask = new FutureTask<>(task);
+
+        Thread thread = new Thread(futureTask);
+        thread.start();
+
+    }
+}
+```
+
+https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/FutureTask.html
+
+https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html
+
+
+</details>
+
+- Submitting a `Runnable` or a `Callable` to an `Executor` constitutes safe publication.
+  - This means that when a task is submitted to an `ExecutorService`, all variables that were visible to the thread that submitted the task will also be visible to the worker thread that executes it.
+  - In the case of an `ExecutorService`:
+  - The `submit()` method places the task in a thread-safe queue.
+  - A worker thread retrieves the task from the queue and executes it.
+  - This guarantees happens-before relationships, ensuring visibility of the task’s state.
+
+
+### Example: page renderer with Future
+
+```java
+
+public class FutureRenderer {
+    private final ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    void renderPage(CharSequence source) {
+        final List<ImageInfo> imageInfos = scanForImageInfo(source);
+
+        Callable<List<ImageData>> task = new Callable<List<ImageData>>() {
+            public List<ImageData> call() {
+                List<ImageData> imageData = new ArrayList<ImageData>();
+                for (ImageInfo imageInfo: imageInfos) {
+                    imageData.add(imageInfo.downloadImage());
+                }
+                return imageData;
+            }
+        };
+
+        Future<List<ImageInfo>> future = executor.submit(task);
+
+        renderText(source);
+
+        try {
+            List<ImageData> imageData = future.get();
+            for (ImageData data: imageData) {
+                renderImage(data);
+            }
+        } catch (InterruptedException e) {
+            // Re-assert the thread’s interrupted status
+            Thread.currentThread().interrupt();
+            // We don’t need the result, so cancel the task too
+            future.cancel(true);
+        } catch (ExecutorException e) {
+           ...
+        }
+    }
+}
+```
+
+- Why `Thread.currentThread().interrupt()` inside the `catch` ? 
+  - When you catch the `InterruptedException` and swallow it, you essentially prevent any higher-level methods/thread groups from noticing the interrupt. Which may cause problems.
+  - By calling `Thread.currentThread().interrupt()`, you set the interrupt flag of the thread, so higher-level interrupt handlers will notice it and can handle it appropriately.
+
+> [!NOTE]
+> Only code that implements a thread's interruption policy may swallow an interruption request. General-purpose task and library code should never swallow interruption requests.
+
+### Limitations of parallelizing heterogeneous tasks
+
+- Trying to parallelize sequential heterogeneous (very different) tasks can be tricky to do & yield not much improvement in the end. Since there are two very distinct tasks at hand (rendering text & downloading images), trying to parallelize this to more than two threads is tricky.
+  - Agar ek task bohot fast aur dusra bohot slow hai, to parallelization ka zyada fayda nahi hoga.
+- Additionally, if task A takes ten times as much time as task B, then the overall performance improvement is not great. In the previous example, the overall improvement might not be great as text rendering can be very fast, while image download can be disproportionately slower.
+
+> [!IMPORTANT]
+> Best parallelization tab hoti hai jab same type ke kaam saath-saath chalaye jayein (homogeneous tasks).
+
+
+
+### CompletionService: Executor meets BlockingQueue
+
+- The `CompletionService` combines the functionality of an executor and a blocking queue.
+- You can submit tasks for execution to the service & retrieve them in a queue-like manner as they are completed.
+    
+    ```java
+    public class Renderer {
+        private final ExecutorService executor;
+
+        Renderer(ExecutorService executor) {
+            this.executor = executor;
+        }
+
+        void renderPage(CharSequence source) {
+            List<ImageInfo> info = scanForImageInfo(source);
+            CompletionService<ImageInfo> completionService 
+                = new ExecutorCompletionService<ImageInfo> (executor);
+            
+            for (final ImageInfo imageInfo: info) {
+                completionService.submit(new Callable<ImageInfo> {
+                    public ImageData call() {
+                        return imageInfo.downloadImage();
+                    }
+                });
+            }
+
+            renderText(source);
+
+            try {
+                for (int t = 0; n = info.size(); t < n; ++t) {
+                    Future<ImageData> f = completionService.take();
+                    ImageData imageData = f.get();
+                    renderImage(imageData);
+                }
+            } catch (InterruptedException e) {
+                Thead.currentThread().interrupt();
+            } catch (ExecutionException e) {
+                ...
+            }
+        }
+    }
+    ```
+
+### Placing time limits on tasks
+
+- Sometimes, you might want to timeout if a task doesn't complete in a given time interval.
+- This can also be achieved via `Future`'s get method \w time-related parameters.
+- If a timed get completes with a `TimeoutException`, you can cancel the task via the future. If it completes on time, normal execution continues.
+- In the scenario below, there is some ad being downloaded from an external vendor, but if it is not loaded on time, a default ad is shown:
+
+    ```java
+    Page renderPageWithAd() throws InterruptedException {
+        long endNanos = System.nanoTime() + TIME_BUDGET;
+
+        Future<Ad> f = exec.submit(new FetchAdTask());
+
+        Page page = renderPageBody();
+        Ad ad;
+        try {
+            long timeLeft = endNanos - System.nanoTime();
+            ad = f.get(timeLeft, NANOSECOND);
+        } catch (ExecutionException e) {
+            ad = DEFAULT_AD;
+        } catch (TimeoutException e) {
+            ad = DEFAULT_AD;
+            f.cancel(true);
+        }
+        page.setAd(ad);
+        return page;
+    }
+    ``` 
+
+### Example: a travel reservations portal
+
+- In this example, the time-budgeting solution is generalized to a set of tasks (rather than a single task). (previous example)
+- A travel reservations portal shown bids from various companies to a user, who has input a travel date (e.g. Booking.com).
+- Depending on the company, fetching the bid might be very slow.
+- Fetching a bid from one company is independent from fetching from another so that task can be easily & effectively parallelized.
+- Rather than letting the response time for the page be driven by the slowest bid response, you could display only the information available within a given time budget.
+- This solution leverages `invokeAll` which allows you to submit a set of tasks at once (rather than submitting them one at a time & appending the Future in some list).
+- The returned collection from `invokeAll` has the same order as the input collection of tasks, allowing you to associate a task to a future.
+- 
+    ```java
+    private class QuoteTask implements Callable<TravelQuote> {
+        private final TravelCompany company;
+        private final TravelInfo travelInfo;
+        ...
+
+        public TravelQuote call() throws Exception { 
+            return company.solicitQuote(travelInfo);
+        }
+    }
+
+    public List<TravelQuote> getRankedTravelQuotes(
+            TravelInfo travelInfo, Set<TravelCompany> companies,
+            Comparator<TravelQuote> ranking, long time, Timeout unit) throws InterruptedException {
+        
+        List<QuoteTask> tasks = new ArrayList<QuoteTask>();
+        for (TravelCompany company: companies) {
+            tasks.add(new QuoteTask(company, travelInfo));
+        }
+
+        // every taks will only run for time (unit)
+        List<Future<TravelQuote>> futures = exec.invokeAll(tasks, time, unit);
+        List<TravelQuote> quotes = new ArrayList<TravelQuote>(tasks.size());
+
+        Iterator<QuoteTask> taskIter = tasks.iterator();
+        for (Future<TravelQuote> future: futures) {
+            QuoteTask task = taskIter.next();
+            try {
+                quotes.add(future.get());
+            } catch (ExecutionException e) {
+                quotes.add(task.getFailureQuote(e.getCause()));
+            } catch (CancellationException e) {
+                quotes.add(task.getTimeoutQuote(e));
+            }
+        }
+        Collections.sort(quotes, ranking);
+        return quotes;
+    }
+    ```
+
+
+### Summary
+- Structuring applications around the execution of tasks can simplify development and facilitate concurrency.
+- Java ka `Executor` framework ek high-level threading API hai jo tumhe task submission aur execution ke beech ka connection loose (decouple) karne deta hai. Matlab
+  - Execution policy configurable hai, jisme tum fixed thread pool, cached thread pool, scheduled
+  - Tum bas tasks submit karo, framework khud decide karega ki kaise aur kab execute karna hai.
+  - Thread creation, management aur scheduling ka tension tumhe nahi lena padega.
+- Whenever you find yourself creating threads to perform tasks, consider using an `Executor` instead.
+- To maximize the benefit of decomposing an application into tasks, you must identify sensible task boundaries.
+- In some applications, the obvious task boundaries work well, whereas in others some analysis may be required to uncover finer-grained exploitable parallelism
