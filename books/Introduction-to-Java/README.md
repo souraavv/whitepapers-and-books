@@ -162,6 +162,9 @@
     - [List Interfaces](#list-interfaces)
   - [Topic 17. Extras (decide name later)](#topic-17-extras-decide-name-later)
     - [Annotation](#annotation)
+    - [Callable vs Runnable in Java](#callable-vs-runnable-in-java)
+      - [With Runnable](#with-runnable)
+      - [With Callable](#with-callable)
 
 # Java
 
@@ -4591,6 +4594,7 @@ graph TD
 ### Checked Exceptions
 
 - Compile time exceptions because they are checked by compiler
+- The compiler forces you to handle them using try-catch or by declaring them with throws
 - Examples
     - **IOException** - when I/O operation fails or is interrupted
         
@@ -4639,6 +4643,8 @@ graph TD
 ### Unchecked Exceptions
 
 - Unchecked exceptions are only checked at the runtime
+- Unchecked exceptions are not checked at compile-time.
+- They occur due to programming errors (e.g., invalid operations, bad logic).
 - Typically arises when you do things like null dereferencing or attempting to access out-of-bound array
 - **Examples**
     - **NullPointerException**
@@ -6055,3 +6061,67 @@ public @interface myMetadata {
     }
     ```
     - **Explanation**: `@Immutable` designates `ImmutableUser` class as immutable, enforcing that its state (fields `name` and `age`) cannot be modified after construction, ensuring thread safety and preventing unintended state changes.
+
+
+### Callable vs Runnable in Java
+
+- `Callable` is an improvement to the `Runnable` in the Java
+- Both interfaces are designed to represent a task that can be run by multiple threads. We can run `Runnable` tasks using the `Thread` class or `ExecutorService`, whereas we can only run `Callables` using the latter.
+
+#### With Runnable
+
+```java
+public interface Runnable {
+    public void run();
+}
+
+public class EventLoggingTask implements Runnable {
+    private Logger logger = LoggerFactory.getLogger(EventLoggingTask.class);
+
+    @Override
+    public void run() {
+        logger.info("Message");
+    }
+}
+```
+
+- There’s no value returned from the task.
+- We can launch the task using `ExecutorService`:
+    ```java
+    public void executeTask() {
+        executorService = Executors.newSingleThreadExecutor();
+        Future future = executorService.submit(new EventLoggingTask());
+        executorService.shutdown();
+    }
+    ```
+- In this case, `Future` object will not hold any value.
+- Since the method signature does not have the `throws` clause specified, we don’t have a way to propagate further checked exceptions.
+
+#### With Callable 
+
+```java
+public interface Callable<V> {
+    V call() throws Exception;
+}
+
+
+public class FactorialTask impleents Callable<Integer> {
+    int number;
+    public Integer call() throws InvalidParameterException {
+        int fact = 1;
+        for (int i = 1; i <= number; ++i) {
+            fact *= i;
+        }
+        return fact;
+    }
+}
+
+
+@Test
+public void test() {
+    FactorialTask task = new FactorialTask(5);
+    Future<Integer> future = executorService.submit(task);
+    assertEquals(120, future.get().intValue());
+}
+```
+
