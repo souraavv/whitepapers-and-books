@@ -82,6 +82,9 @@
     - [Placing time limits on tasks](#placing-time-limits-on-tasks)
     - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
     - [Summary](#summary-1)
+  - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
+    - [Task Cancellation](#task-cancellation)
+    - [Interruption](#interruption)
 
 
 # Java Concurrency in Practice
@@ -1943,7 +1946,7 @@ public class SingleThreadRenderer {
     ```
 
 <details>
-<summary> </summary>
+<summary>Extras</summary>
 
 ```java
 
@@ -2191,3 +2194,145 @@ public class FutureRenderer {
 - Whenever you find yourself creating threads to perform tasks, consider using an `Executor` instead.
 - To maximize the benefit of decomposing an application into tasks, you must identify sensible task boundaries.
 - In some applications, the obvious task boundaries work well, whereas in others some analysis may be required to uncover finer-grained exploitable parallelism
+
+
+## Chapter 7. Cancellation and Shutdown 
+- This chapter focuses on how to cancel and interrupt threads and tasks when needed
+- Tasks & threads in java are stopped cooperatively - you can't force a task to stop execution, you can just kindly ask it to. It is up to the task to interpret that request & acknowledge it.
+
+### Task Cancellation
+- An activity is cancellable if external code can move it to completion before it ends.
+- Why you might want to cancel a task:
+  - User-requested (e.g. user clicks the "Cancel" button)
+  - Shutdown - the application is requested to shutdown
+  - Errors - e.g. the disk is full & you want to cancel all tasks which write to it
+  - Application events - You stop concurrent tasks running when one of the tasks finds the solution you're looking for
+  - Time-limited activities - e.g. you want to execute something for 5s and return results.
+
+- An example cancellation policy is to set a boolean flag cancelled:
+
+    ```java
+    @ThreadSafe 
+    public class PrimeGenerator implements Runnable {
+        @GuardedBy("this")
+        private final List<BigInteger> primes = new ArrayList<BigInteger>();
+        private volatile boolean cancelled;
+
+        public void run() {
+            BigInteger p = BigInteger.ONE;
+            while (!cancelled) {
+                p = p.nextProbablePrime();
+                synchronized (this) {
+                    primes.add(p);
+                }
+            }
+        }
+
+        public void cancel() {
+            cancelled = true;
+        }
+
+        public synchronized List<BigInteger> get() {
+            return new ArrayList<BigInteger>(primes);
+        }
+    }
+    ```
+
+- There is no safe way to preemptively force a thread or task in Java to stop execution.
+  - `Thread.stop()` Deprecated Hai
+  - `Thread.interrupt()` Safe Hai, Par Guarantee Nahi Hai
+    - `Thread.interrupt()` ek thread ko signal bhejta hai, par yeh forcefully stop nahi karta.
+    - Thread self-check karega (`isInterrupted()` ya `InterruptedException` handle karega) aur phir khud exit karega agar proper handling likhi ho.
+
+### Interruption 
+
+- The cancellation policy via a `boolean` flag might not work properly in certain scenarios. 
+- For example, if a thread is blocked on a `BlockingQueue::take` and the producers have stopped putting work into the queue, the task will hang forever.
+- Example of this problem 
+    ```java
+    class BrokenPrimeProblem extends Thread {
+        private final BlockingQueue<BigInteger> queue; 
+        private volatile boolean cancelled = false; 
+
+        BrokenPrimeProblem(BlockingQueue<BigInteger> queue) {
+            this.queue = queue;
+        }
+
+        public void run() {
+            try {
+                BigIntger p = BigIntger.ONE;
+
+                while (!cancelled) {
+                    // since it is blocking queue. q.put() is a blocking
+                    // operation if queue is full .. so careful
+                    queue.put(p = p.nextProbablePrime());
+                } catch (InterruptedException consumed) { }
+            }
+        }
+
+        public void cancel() {
+            cancelled = true;
+        }
+    }
+
+
+    void consumesPrimes() throws InterruptedException {
+        BlockingQueue<BigInteger> primes = ...;
+        BrokenPrimeProblem producer = new BrokenPrimeProblem(primes);
+
+        producer.start(); // extends thread
+        try {
+            while (needMorePrime()) {
+                consume(primes.take());
+            }
+        } finally {
+            producer.cancel();
+        }
+    }
+    ```
+
+
+- If thread is already blocked, then it cannot serve the cancel request
+  - So above is not the right way
+- An alternative way to handle interruption is by relying the `Thread` class' `isInterrupted()` status.
+- Thread interrupt API 
+    ```java
+    public class Thread {
+        public void interrupt() {..}
+        public boolean isInterrupted() {..}
+        public static boolean interrupted() {..}
+    }
+    ```
+- Calling `interrupt` doesn't necessarily stop the target thread from doing its work. It merely delivers the message that interruption has been requested.
+
+> [!NOTE]
+> Interruption is usually the most sensible way to implement cancellation.
+
+- Good example of interruption for the PrimeProducer:
+    ```java
+    class PrimeProducer extends Thread {
+
+        private final BlockingQueue<BigInteger> queue; 
+
+        PrimeProducer(BlockingQueue<BigInteger> queue) {
+            this.queue = queue;
+        }
+
+        public void run() {
+            try {
+                BigInteger p = BigIntger.ONE;
+                while (!Thread.currentThread().isInterrupted()) {
+                    queue.put(p = p.nextProbablePrime());
+                }
+            } catch (InterruptedException consumed) {
+
+            }
+        }
+
+        public void cancel() {
+            interrupt();
+        }
+    }
+    ```
+
+    
