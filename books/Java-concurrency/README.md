@@ -85,6 +85,7 @@
   - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
     - [Task Cancellation](#task-cancellation)
     - [Interruption](#interruption)
+    - [Interruption Policy](#interruption-policy)
 
 
 # Java Concurrency in Practice
@@ -2198,10 +2199,16 @@ public class FutureRenderer {
 
 ## Chapter 7. Cancellation and Shutdown 
 - This chapter focuses on how to cancel and interrupt threads and tasks when needed
+- It is easy to start tasks and threads. Most of the time we allow them to decide when to stop by letting them run to completion. 
+- Sometimes, however, we want to stop tasks or threads earlier than they would on their own, perhaps because the user cancelled an operation or the application needs to shut down quickly.
 - Tasks & threads in java are stopped cooperatively - you can't force a task to stop execution, you can just kindly ask it to. It is up to the task to interpret that request & acknowledge it.
+- The cooperative approach is required because we rarely want a task, thread, or service to stop immediately, since that could leave shared data structures in an inconsistent state. 
+- This provides greater flexibility, since the task code itself is usually better able to assess the cleanup required than is the code requesting cancellation.
+- A task that wants to be cancellable must have a cancellation policy that specifies the “how”, “when”, and “what” of cancellation—how other code can request cancellation, when the task checks whether cancellation has been requested, and what actions the task takes in response to a cancellation request.
+- Consider the real-world example of stopping payment on a check. Banks have rules about how to submit a stop-payment request, what responsiveness guarantees it makes in processing such requests, and what procedures it follows when payment is actually stopped (such as notifying the other bank involved in the transaction and assessing a fee against the payor's account). Taken together, these procedures and guarantees comprise the cancellation policy for check payment.
 
 ### Task Cancellation
-- An activity is cancellable if external code can move it to completion before it ends.
+- An activity is cancellable if external code can move it to completion before its normal completion
 - Why you might want to cancel a task:
   - User-requested (e.g. user clicks the "Cancel" button)
   - Shutdown - the application is requested to shutdown
@@ -2335,4 +2342,95 @@ public class FutureRenderer {
     }
     ```
 
-    
+### Interruption Policy 
+
+- Tasks should have cancellation policy and Threads should have an interruption policy 
+
+    <details>
+    <summary> Example for the above statement </summary> 
+
+    - Task cancellation poilcy 
+
+    ```java
+
+    import java.util.concurrent.*; 
+
+
+    public class TaskCancellationExample {
+        public static void main(String[] args) throws InterruptedException {
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+
+            Callable<Integer> task = () -> {
+                try {
+                    for (int i = 0; i < 10; ++i) {
+                        System.out.println("Task running..." + i);
+                        Thread.sleep(10);
+                    } 
+                } catch (InterruptedException e) {
+                    System.out.println("Task was interrupted!");
+                    return -1;
+                }
+                return 10;
+            };
+
+            Future<Integer> future = executor.submit(task);
+
+            Thread.sleep(3000);
+            System.out.println("Ab hoga task cancel");
+            future.cancel(true);
+
+            executor.shutdown();
+        }
+    }
+    ```
+
+    - Thread Interruption Policy 
+
+    ```java
+
+    public class ThreadInterruptionExample {
+        public static void main(String[] args) throws InterruptedException {
+            Thread workerThread = new Thread(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        System.out.prinln("working..");
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        System.out.println("Thread interrupted! Cleaning up..");
+                        break;
+                    }
+                }
+            });
+
+            workerThread.start();
+            Thread.sleep(3000);
+            System.out.println("Ab thread interrupt hoga");
+            workerThread.interrupt();
+
+            workerThread.join(); // es thread ke exit ka wait
+            System.out.println("Thread has exited.");
+        }
+
+    }
+
+    ```
+
+    </details>
+
+- An interrupt policy demands how a thread interprets an interrupt request
+- The most sensible interruption policy is some form of service-level cancellation - exit as quickly as possible, clean up if necessary, notify interested entities, etc
+- Code that doesn't owns the thread should be careful to preserve the interrupted status of the thread so that the owning code can eventuallly act on int.
+- An example of a thread you don't own is a task executing in a thread pool. The task doesn't own the thread it is running on, the thread pool does.
+- Most blocking library classes (`Thread.sleep()`, `Thread.wait()`, `join()`) throw an `InterruptedException` when interrupted as they never execute in a thread they own
+- The most sensible action for clients of such classes would be not handle the exception and let it propagate to the caller. Alternatively, if you want to handle it and do some clean up, make sure to set the current thread's `interrupted` status.
+
+
+<details>
+<summary> Real examples for the above </summary>
+
+
+
+</details>
+
+
+
