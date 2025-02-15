@@ -2418,19 +2418,19 @@ public class FutureRenderer {
     </details>
 
 - An interrupt policy demands how a thread interprets an interrupt request
+- It is important to distinguish between how tasks and threads should react to interruption
+  - A single interrupt request may havemore than one desired recipient
+  - Interrupting a worker thread in a thread pool can mean both “cancel the current task” and “shut down the worker thread”.
 - The most sensible interruption policy is some form of service-level cancellation - exit as quickly as possible, clean up if necessary, notify interested entities, etc
-- Code that doesn't owns the thread should be careful to preserve the interrupted status of the thread so that the owning code can eventuallly act on int.
-- An example of a thread you don't own is a task executing in a thread pool. The task doesn't own the thread it is running on, the thread pool does.
-- Most blocking library classes (`Thread.sleep()`, `Thread.wait()`, `join()`) throw an `InterruptedException` when interrupted as they never execute in a thread they own
+- Code that doesn't owns the thread should be careful to preserve the interrupted status of the thread so that the owning code can eventuallly act on it, even if the “guest” code acts on the interruption as well
+  - If you are house-sitting for someone, you don't throw out the mail that comes while they're away—you save it and let them deal with it when they get back, even if you do read their magazines.
+  - An example of a thread you don't own is a task executing in a thread pool. The task doesn't own the thread it is running on, the thread pool does.
+  - This is why most blocking library methods (`Thread.sleep()`, `Thread.wait()`, `join()`)  simply throw `InterruptedException` in response to an interrupt. 
+  - They will never execute in a thread they own, so they implement the most reasonable cancellation policy for task or library code: get out of the way as quickly as possible and communicate the interruption back to the caller so that code higher up on the call stack can take further action.
 - The most sensible action for clients of such classes would be not handle the exception and let it propagate to the caller. Alternatively, if you want to handle it and do some clean up, make sure to set the current thread's `interrupted` status.
 
 
-<details>
-<summary> Real examples for the above </summary>
 
-
-
-</details>
 
 
 
