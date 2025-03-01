@@ -90,7 +90,6 @@
       - [Example (Timed Run)](#example-timed-run)
       - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
       - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
-      - [Cancellation via `Future`](#cancellation-via-future)
 
 
 # Java Concurrency in Practice
@@ -2435,11 +2434,11 @@ public class FutureRenderer {
 - The most sensible action for clients of such classes would be not handle the exception and let it propagate to the caller. Alternatively, if you want to handle it and do some clean up, make sure to set the current thread's `interrupted` status.
 
 #### Responding to Interruption
-- Propagate the exception (possibliy after some task-specific clenaup), making your method an interruptible blocking method
+- Propagate the exception (possibliy after some task-specific cleanup), making your method an **interruptible blocking method**
   - Easy by using `throws InterruptedException` 
-  - In case if you can't (perhaps because you taks is defined by a `Runnable`), you need to find another way to preserve the interruption request
+  - In case if you can't (perhaps because you task is defined by a `Runnable`), you need to find another way to preserve the interruption request
   - The standard way of doing it is: restore interruption status
-  - What you should not do is swallow the `InterruptedException` by catching it and doing nothing in the `catch` block, unless your code is actually implementing the interruption policy for a thread
+  - What you should **not do** is swallow the `InterruptedException` by catching it and doing nothing in the `catch` block, unless your code is actually implementing the interruption policy for a thread
 - Restore the interruption status so that code higher up on the call stack can deal with it
     ```java
     public Task getNextTask(BlockingQueue<Task> queue) {
@@ -2463,11 +2462,11 @@ public class FutureRenderer {
 #### Example (Timed Run)
 - Many problems can take forever to solve (e.g., enumerate all the prime numbers); 
   - for others, the answer might be found reasonably quickly but also might take forever
-- Being able to say “spend up to ten minutes looking for the answer” or “enumerate all the answers you can in ten minutes” can be useful in these situations.
+- Being able to say “*spend up to ten minutes looking for the answer*” or “*enumerate all the answers you can in ten minutes*” can be useful in these situations.
 
 - In the below example, we cancel the task after a second. While the `PrimeGenerator` might take somewhat longer than a second to stop , it will eventually notice the interrupt and stop, allowing thread to terminate. 
-- But another aspect of executing a task is that you want to find out if the task is throws an excpetion 
-- If `PrimeGenerator` throws an unchecked exception before the timeout expires, it will probably go un-noticed (silent, because new thread mai hi consume ho jayega), since prime generator runs in a separate thread (`new Thread(generator).start();`) that does not explicitly handle exceptions.
+- But another aspect of executing a task is that you want to find out if the task is throws an exception 
+- If `PrimeGenerator` throws an unchecked exception before the timeout expires, it will probably go un-noticed (silent, because bo exception new thread mai hi consume ho jayega), since prime generator runs in a separate thread (`new Thread(generator).start();`) that does not explicitly handle exceptions.
 - [Stack Overflow Reference](https://stackoverflow.com/questions/6662539/java-thread-exceptions?utm_source=chatgpt.com)
 - [Java Doc](https://docs.oracle.com/javase/7/docs/api/java/lang/Thread.UncaughtExceptionHandler.html) :  If a thread has not had its `UncaughtExceptionHandler` explicitly set, then its ThreadGroup object acts as its `UncaughtExceptionHandler`. If the ThreadGroup object has no special requirements for dealing with the exception, it can forward the invocation to the default uncaught exception handler.
 
@@ -2512,29 +2511,31 @@ public class FutureRenderer {
     ```
 - The above approach has issues
   - Delayed Cancellation Response:
-    - The `PrimeGenerator` checks the `cancelled` flag only between generating successive prime numbers. If the prime number generation is computationally intensive, there could be a delay in recognizing the cancellation reqeust, leadin to a slower shutdown than intended
+    - The `PrimeGenerator` checks the `cancelled` flag only between generating successive prime numbers. If the prime number generation is computationally intensive, there could be a delay in recognizing the cancellation reqeust, leading to a slower shutdown than intended
 
 #### Scheduling an Interrupt on Borrowed Thread. *Don't do this*.
-- The below example shows an attempt at running an arbitrary `Runnable` for a given amount of time. It runs the task in the calling thread and schedules a cancellation task to interrupt it after a given time interval. This addresses the problem of unchecked exceptions thrown from the task since theycan be caught by teh caller of `timedRun`
+- The below example shows an attempt at running an arbitrary `Runnable` for a given amount of time. 
+    ```java
+
+    private static final ScheduledExecutorService cancelExec = ...;
+
+    public static void timedRun(Runnable r, 
+            long timeout, TimeUnit unit) {
+        final Thread taskThread = Thread.currentThread();
+        cancelExec.schedule(new Runnable() {
+            public void run() {
+                taskThread.interrupt();`
+            }
+        }, timeout, unit);
+        r.run();
+    }
+    ```
+- It runs the task in the calling thread and schedules a cancellation task to interrupt it after a given time interval. 
+- This addresses the problem of unchecked exceptions thrown from the task since they can be caught by the caller of `timedRun`
 - This method schedules an interrupt for the thread executing `timedRun` after the given timeout . However, this approach has significant drawbacks:
-- This is an appealing simple approach, but it violates the rules: **you should know a thread's interruption policy before interrupting it**. Since `timedRun` can be called from an arbitrary thread, it cannot konw the calling thread's interruption policy. Issues: 
+- This is an appealing simple approach, but it violates the rules: **you should know a thread's interruption policy before interrupting it**. Since `timedRun` can be called from an arbitrary thread, it cannot know the calling thread's interruption policy. Issues: 
   - **[Uncertain Interruption Timing](https://stackoverflow.com/questions/33272581/why-should-we-not-schedule-an-interrupt-on-a-borrowed-thread?utm_source=chatgpt.com)**:
     - If the task `r.run()` completes before the timeout, the schedules interrupt may occur after `timedRun` has returned. Consequently, the thread might be performing unrelated operations when it's interrupted, leading to unpredictable behavior 
-```java
-
-private static final ScheduledExecutorService cancelExec = ...;
-
-public static void timedRun(Runnable r, 
-        long timeout, TimeUnit unit) {
-    final Thread taskThread = Thread.currentThread();
-    cancelExec.schedule(new Runnable() {
-        public void run() {
-            taskThread.interrupt();`
-        }
-    }, timeout, unit);
-    r.run();
-}
-```
 
 <details>
 <summary> Stackoverflow reference </summary>
@@ -2569,17 +2570,9 @@ Better Approach using ExecutorService
 
 #### Interrupting a Task in a Dedicated Thread
 - The below addresses the exception-handling problem of `aSecondOfPrimes` and the problems with the previous attempt.
-- But ek flaw ab bhi hai
-- Kaise solve kiya exception handling issue ? 
-  - Separate Execution Policy: 
-    - Pehle jo method thi `aSecondOfPrimes`, usme task current thread me hi run hota tha, aur agar exception aata tha toh silently ignore ho jata tha kyunki wo ek alag thread me run ho raha tha.
-    - Iss version me RethrowableTask ek volatile Throwable (t) maintain karta hai, jo exception ko safely capture karta hai.
-    - Thread ko interrupt karne ka kaam ab bhi scheduled hai, lekin task apni execution policy maintain karta hai.
-    - rethrow() method ensure karta hai ki agar koi exception aya toh wo launderThrowable(t); ke through caller thread me rethrow ho jayega
-- But abhi bhi issues hai...
-  - 
-```java
-public static void timedRun(final Runnable r, 
+  
+    ```java
+    public static void timedRun(final Runnable r, 
         long timeout, TimeUnit unit) throws InterruptedException {
     
     class RethrowableTask implements Runnable {
@@ -2611,6 +2604,15 @@ public static void timedRun(final Runnable r,
     task.rethrow();
 }
 ```
+
+- But flaws ab bhi hai
+- Baise es approach ne Kaise solve kiya exception handling issue ? 
+  - Separate Execution Policy: 
+    - Pehle jo method thi `aSecondOfPrimes`, usme task current thread me hi run hota tha, aur agar exception aata tha toh silently ignore ho jata tha kyunki wo ek alag thread me run ho raha tha.
+    - Iss version me RethrowableTask ek volatile Throwable (t) maintain karta hai, jo exception ko safely capture karta hai.
+    - Thread ko interrupt karne ka kaam ab bhi scheduled hai, lekin task apni execution policy maintain karta hai.
+    - rethrow() method ensure karta hai ki agar koi exception aya toh wo launderThrowable(t); ke through caller thread me rethrow ho jayega
+
 
 #### Cancellation via `Future`
 - We have already used an abstraction for managing the LCM of a task, dealing with exceptions, and facilitating cancellation - `Future`.
