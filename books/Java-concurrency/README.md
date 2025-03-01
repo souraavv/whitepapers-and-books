@@ -90,6 +90,7 @@
       - [Example (Timed Run)](#example-timed-run)
       - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
       - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
+      - [Cancellation via `Future`](#cancellation-via-future)
 
 
 # Java Concurrency in Practice
@@ -2602,8 +2603,8 @@ Better Approach using ExecutorService
     }, timeout, unit);
     taskThread.join(unit.toMillis(timeout));
     task.rethrow();
-}
-```
+    }
+    ```
 
 - But flaws ab bhi hai
 - Baise es approach ne Kaise solve kiya exception handling issue ? 
@@ -2630,6 +2631,7 @@ Better Approach using ExecutorService
 - In below example - `timeRun` that submits the task to an `ExecutorService` and retrieves the result with a timed `Future.get`
 - If `get` terminates with a `TimeoutException`, the task is cancelled via its `Future`
 - ReThrow the exception, so that caller can deal with the exception better
+
 ```java
 public static void timedRun(Runnable r,
         long timeout, TimeUnit unit) throws InterruptedException {
