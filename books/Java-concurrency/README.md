@@ -104,6 +104,10 @@
       - [Limitations of Shutdownnow](#limitations-of-shutdownnow)
     - [Handling Abnormal Thread Termination (Theory heavy section, but worth)](#handling-abnormal-thread-termination-theory-heavy-section-but-worth)
       - [Uncaught Exception Handlers](#uncaught-exception-handlers)
+    - [JVM Shutdown](#jvm-shutdown)
+      - [Shutdown Hooks](#shutdown-hooks)
+      - [Daemon Threads](#daemon-threads)
+      - [Finalizers](#finalizers)
 
 
 # Java Concurrency in Practice
@@ -3147,3 +3151,105 @@ public class LogWriter {
 - In long-running applications, always use uncaught exception handlers for all threads that at least log the exception.
 - To set an `UncaughtExceptionHandler` for pool threads, provide a `ThreadFactory` to the `ThreadPoolExecutor` constructor
 
+### JVM Shutdown 
+- The JVM can shut down in either an orderly or abrupt manner
+- An orderly shutdown is initiated when the last "normal" (nondaemon) thread terminates, 
+  - someone calls `System.exit` 
+  - platform-specific means (such as sending `SIGINT` or hitting `Ctrl+c`)
+- While this is the standard and preferred way for the JVM to shut down, it can also be shut down abruptly by calling `Runtime.halt` or by killing the JVM proces through the operating system (such as seding `SIGKILL`)
+
+#### Shutdown Hooks
+- In an orderly shutdown, the JVM first starts all registered shutdown hooks. 
+- Shutdown hooks are unstarted threads that are registered with `Runtime.addShutdownHook`. The JVM makes no guarantees on the order in which shutodwn hooks are started
+- If any application threads(daemon or non-daemon) are still running at shutdown time, they continue to run concurrently with the shutdown process 
+- When all shutdown hooks have completed, the JVM may choose to run finalizers if `runFinalizersOnExit` is `true`, and then halts.
+- The JVM makes no attempt to stop or interrupt any application threads that are still running at shudown time; they are abruptly terminated when the JVM eventually halts. 
+- If the shutdown hooks or finalizers don't complete, then the orderly shutdown process "hangs" and the JVM must be shutdown abruptly
+- In an abrupt shutdown, the JVM is not required to do anything other than halt the JVM; **shutdown hooks will not run**
+- Shutdown hooks should be **thread-safe**;
+- They must use synchronization when accessing shared data and should be careful to avoid deadlock, just like any other concurrent code.
+- Further, they should not make assumptions about the state of the application (such as whether other services have shutdown already or normal threads have completed) or about why the JVM is shutting down, and must therefore be coded exteremely defensively
+- Finally they should exit as quickly as possible, since their existence delays JVM termination at a time when the user may be expecting the JVM to terminate quickly
+- Shutdown hooks can be used for service or application cleanup, such as deleting temporary files or cleaning up resources that are not automatically cleaned up by the OS (e.g., `LogService` could register a shutdown hook from its `start` method to ensure the log file is closed on exit)
+- Because shutdown hooks all run concurrently, closing the log file could cause trouble for other shutdown hooks who want to use the logger. 
+  - To avoid this problem shutdown hooks should not rely on service that can be shutdown by the application or other shutdown hooks.
+  - One way to accomplish this is to use a single shutdown hook for all serivces, rather than one for each service, and have it call a series of shutdown actions. This ensures that shutdown actions excecute sequentially in a single thread, thus avoiding the possiblity of race conditions or deadlocks between shutdown actions
+    ```java
+    public void start() {
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                try {
+                    LogService.this.stop();
+                } catch (InterruptedException ignore) {
+
+                }
+            }
+        })
+    }
+    ```
+#### Daemon Threads
+- Sometimes you want to create a thread that performs some helper function but you don't want the existence of this thread to prevent the JVM from shutting down. This is what daemon threads are for.
+- Threads are divided into two parts
+  - Normal threads
+  - Daemon threads
+- When the JVM starts up, all the threads it creates (such as garbage collector and other housekeeping threads) are daemon threads, except the main thread. 
+- When a new thread is created, it inherits the daemon status of thread that created it, so by default any threads created by the main thread are also normal threads
+- Normal threads and daemon threads differ only in what happens when they exit
+- When a thread exits, the JVM performs an inventory of running threads, and if the only threads that are left are daemon threads, it initiates an orderly shutdown
+- When the JVM halts, any remaining daemon threads are abandoned - `finally` blocks are not executed, stacks are not unwound - the JVM just exists
+- Daemon threads should be used sparingly - few processing activities can be safely abandoned at any time with no cleanup. 
+- In particular, it is dangerous to use daemon threads for task that might perform any sort of I/O
+- Daemon threads are best saved for "housekeeping" tasks, such as background thread that periodically removes expired entries from an in-memory cachee
+
+> Dameon threads are not a good substitute for properly managing lifecycle of services within an application 
+
+#### Finalizers
+- The garbage collector does a good job of reclaiming memory resources when they are no longer needed, but some resources, such as file or socket handles, must be explicitly returned to the operating system when no longer needed. 
+- To assit in this, the garbage collector treats object that have a nontrivial `finalize` method specially: after they are reclaimed by the collector, `finalize` is called so that persistent resources can be released
+- Since finalizers can run in a thread managed by the JVM, any state accessed by a finalizer will be accessed by more than one thread and therefore must be accessed with synchronization.
+- Finalizers offer no guarantees on when or even if they run, and they impose a significant performance cost on objects with non-trivial finalizers.
+- They are also extremely difficult to write correctly
+- In most cases, the combination of `finally` blocks and explicity `close` methods does a better job of resource management than fianlizers; the solve exception is when you need to manage object that hold resources acquired by native methods
+- So, summary is - Avoid fianlizers
+  
+    ```java
+    class Resource {
+        public Resource() {
+            System.out.println("Resource acquired!");
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            try {
+                System.out.println("Finalizer called! Cleaning up resource...");
+            } finally {
+                super.finalize();
+            }
+        }
+    }
+
+    public class FinalizerExample {
+        public static void main(String[] args) {
+            Resource res = new Resource();
+
+            res = null;
+
+            System.gc();
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            System.out.println("End of program");
+        }
+    }
+
+    /**
+     * output: 
+     * Resource acquired!
+     * Finalizer called! Cleaning up resource...
+     * End of program
+     */
+    ```
