@@ -108,6 +108,15 @@
       - [Shutdown Hooks](#shutdown-hooks)
       - [Daemon Threads](#daemon-threads)
       - [Finalizers](#finalizers)
+  - [Chapter 8. Applying Thread Pools](#chapter-8-applying-thread-pools)
+    - [Implicit Couplings Between Tasks and Execution Policies](#implicit-couplings-between-tasks-and-execution-policies)
+      - [Thread Starvation Deadlock](#thread-starvation-deadlock)
+      - [Long Running Task](#long-running-task)
+    - [Sizing Thread Pools](#sizing-thread-pools)
+    - [Configuring `ThreadPoolExecutor`](#configuring-threadpoolexecutor)
+      - [Thread Creation and Teardown](#thread-creation-and-teardown)
+      - [Managing Queued Tasks](#managing-queued-tasks)
+      - [Saturation Policies](#saturation-policies)
 
 
 # Java Concurrency in Practice
@@ -3253,3 +3262,321 @@ public class LogWriter {
      * End of program
      */
     ```
+
+## Chapter 8. Applying Thread Pools
+
+### Implicit Couplings Between Tasks and Execution Policies
+- We claimed earlier that the Executor framework decouples task submission from task execution.
+  - Lekin yeh kehna thoda zyada bol diya gaya hai, kyunki har task har execution policy ke saath compatible nahi hota.
+  - Kuch tasks ko specific execution policies ki zarurat hoti hai, jaise ki time-sensitive tasks ya sequential execution wale tasks
+  - Isliye, jab hum Executor framework ka use karte hain, toh humein yeh samajhna zaroori hai ki kaunsa task kaunsi execution policy ke saath sahi se kaam karega.
+- While using the Thread Pool:
+  - **Dependent Tasks:** Agar ek task doosre task ke result ya timing par depend karta hai aur dono ko same thread pool me submit kiya jata hai, to deadlock ka risk hota hai. 
+  - **Thread Confinement Exploiting Tasks:** Kuch tasks aise hote hain jo ek hi thread me chalne par safely execute hote hain, jaise ki single-threaded executors me. Agar inhe multi-threaded pool me daala jaye, to thread safety issues aa sakte hain.
+  - **Response-Time-Sensitive Tasks:** Aise tasks jo jaldi response dene chahte hain, unhe agar long-running tasks ke saath chhote thread pool me daala jaye, to response time slow ho sakta hai, jo user experience ko kharab kar sakta hai.
+  - **ThreadLocal Variables Use Karne Wale Tasks:** ThreadLocal variables har thread ke liye alag values rakhte hain. Thread pools threads ko reuse karte hain, to agar ThreadLocal variables ka sahi se manage nahi kiya gaya, to purani values naye tasks me leak ho sakti hain, jo unexpected behavior ya memory leaks ka kaaran ban sakti hain. [​Is it dangerous to use ThreadLocal in ExecutorService ?](https://stackoverflow.com/questions/54726017/is-it-dangerous-to-use-threadlocal-with-executorservice)
+
+#### Thread Starvation Deadlock 
+- Thread Starvation Deadlock tab hota hai jab ek thread pool mein ek task doosre task ka intezaar karta hai, lekin woh doosra task execute nahi ho pata kyunki saare threads pehle se hi busy hote hain. This is called thread starvation deadlock.
+- Agar thread pool ke threads aapas mein ek doosre ka intezaar karte rahte hain, to yeh deadlock ki situation banata hai. Isliye, jab dependent tasks ko execute karte hain, to ensure karna chahiye ki thread pool ka size itna bada ho ki saare tasks ko execute kar sakein aur deadlock na ho. 
+- The below sample, will always deadlock. We are creating a `new SingleThreadExecutor()` and then we are submitting two tasks (footer & header) which will sit up in the queue, but the thread (only thread) is waiting on header.get() and header task is waiting in queue to get the thread to execute.
+
+    ```java
+    public class ThreadDeadlock {
+        // single thread executor create kr rahe hai
+        ExecutorService exec = Executor.newSingleThreadExecutor();
+
+        public class RenderPageTask implements Callable<String> {
+            public void call() throws Exception {
+                Future<String> header, footer;
+
+                header = exec.submit(new LoadFileTask("header.html"));
+                footer = exec.submit(new LoadFileTask("footer.html"));
+
+                String page = renderBody();
+                // will deadlock -- task waiting for result of subtask 
+                return header.get() + page + footer.get();
+            }
+        }
+    }
+    ```
+
+> Whenever you submit to an Executor tasks that are not independent, be aware of the possibility of thread starvation deadlock, and document any pool sizing or configuration constraints in the code or configuration file where the Executor is configured.
+
+#### Long Running Task 
+- Thread pools can have responsiveness problems if tasks can block for extended periods of time, even if deadlock is not a possibility. 
+- A thread pool can become clogged with long-running tasks, increasing the service time even for short tasks. 
+- If task > thread pool size, then responsiveness will suffer
+- One techinque to mitigate this
+  - Use timed resources wait instead of unbounded waits
+  - Most blocking method in the platform libraries comes in both untimed and time version, such as `Thread.join()`, `BlockingQueue.put()`, `CountDownLatch.await()` and `Selector.select`
+  - If the wait times out, you can mark the task as failed and abort it or requeue it for execution later
+  - This guarantees that each task eventually makes progress towards either successful or failed completion, freeing up threads for tasks that might complete more quickly. 
+
+### Sizing Thread Pools
+- The ideal size for a thread pool depends on the types of tasks that will be submitted and the characteristics of the deployment system. 
+- Thread pool sizes should rarely be hard-coded; instead pool sizes should be provided by a configuration mechanism or computed dynamically by consulting `Runtime.availableProcessors`.
+- Sizing thread pools is not an exact science, but fortunately you need only avoid the extremes of “too big” and “too small”.
+  - If a thread pool is too big, then threads compete for scarce CPU and memory resources, resulting in higher memory usage and possible resource exhaustion. 
+  - If it is too small, throughput suffers as processors go unused despite available work.
+- To size a thread pool properly, you need to understand your computing environment, your resource budget, and the nature of your tasks.
+  - How many processors does the deployment system have? 
+  - How much memory? 
+  - Do tasks perform mostly computation, I/O, or some combination? 
+  - Do they require a scarce resource, such as a JDBC connection? 
+- If you have different categories of tasks with very different behaviors, consider using multiple thread pools so each can be tuned according to its workload
+
+$$
+N_{cpu} = number\ of\ CPUs 
+$$
+$$
+U_{cpu} = target\ CPU\ utilization\, 0 \leq U_{cpu} \leq 1
+$$
+$$
+\frac{W}{C} = ratio\ of\ wait\ time\ to\ compute\ time
+$$
+
+$$
+N_{threads} = N_{cpu} * U_{cpu} * (1 + \frac{W}{C})
+$$
+- Calculating pool size constraints for these types of resources is easier: just add up how much of that resource each task requires and divide that into the total quantity available. The result will be an upper bound on the pool size.
+  - Because CPU cycles are not the only resource you might want to manage using thread pools. Other resources that can contribute to sizing constraints are memory, file handles, socket handles, and database connections. 
+
+### Configuring `ThreadPoolExecutor`
+- `ThreadPoolExecutor` provides the base implementation for the executors returned by the `newCachedThreadPool`, `newFixedThreadPool`, and `newScheduled-ThreadExecutor` factories in Executors
+- `ThreadPoolExecutor` is a flexible, robust pool implementation that allows a variety of customizations.
+- If the default execution policy does not meet your needs, you can instantiate a `ThreadPoolExecutor` through its constructor and customize it as you see fit
+<details>
+<summary> </summary> 
+
+```java
+import java.util.concurrent.*;
+
+public class CustomThreadPoolExample {
+    public static void main(String[] args) {
+        // Core and maximum pool sizes (more details in the next section)
+        int corePoolSize = 5;
+        int maximumPoolSize = 10;
+        // Time that excess idle threads will wait for new tasks before terminating
+        long keepAliveTime = 5000;
+        TimeUnit unit = TimeUnit.MILLISECONDS;
+        // Task queue with a capacity of 100
+        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(100);
+        // Default thread factory
+        ThreadFactory threadFactory = Executors.defaultThreadFactory();
+        // Handler for tasks that cannot be executed
+        RejectedExecutionHandler handler = new ThreadPoolExecutor.AbortPolicy();
+
+        // Create the ThreadPoolExecutor
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+            corePoolSize,
+            maximumPoolSize,
+            keepAliveTime,
+            unit,
+            workQueue,
+            threadFactory,
+            handler
+        );
+
+        // Submit tasks to the executor
+        for (int i = 0; i < 20; i++) {
+            executor.execute(new Task("Task " + i));
+        }
+
+        // Shutdown the executor
+        executor.shutdown();
+    }
+}
+
+class Task implements Runnable {
+    private String name;
+
+    public Task(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void run() {
+        System.out.println(name + " is being executed by " + Thread.currentThread().getName());
+        try {
+            // Simulate some work
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+
+</details>
+
+#### Thread Creation and Teardown
+- The core pool size, maximum pool size, and keep-alive time govern thread creation and teardown
+- The core size is the target size; the implementation attempts to maintain the pool at this size even when there are no tasks to execute, and will not create more threads than this unless the work queue is full
+- The maximum pool size is the upper bound on how many pool threads can be active at once.
+- A thread that has been idle for longer than the keep-alive time becomes a candidate for reaping and can be terminated if the current pool size exceeds the core size.
+- Whena `ThreadPoolExecutor` is initially created, the core threads are not started immediately but instead as tasks are submitted, unless you call `prestartAllCoreThreads`.
+
+> Developers are sometimes tempted to set the core size to zero so that the worker threads will eventually be torn down and therefore won't prevent the JVM from exiting, but this can cause some strange-seeming behavior in thread pools that don't use a `SynchronousQueue` for their work queue (as `newCachedThreadPool does`). If the pool is already at the core size, `ThreadPoolExecutor` creates a new thread only if the work queue is full. 
+>
+> So tasks submitted to a thread pool with a work queue that has any capacity and a core size of zero will not execute until the queue fills up, which is usually not what is desired.
+>
+> Later, Java introduced `allowCoreThreadTimeOut` allows you to request that all pool threads be able to time out; enable this feature with a core size of zero if you want a bounded thread pool with a bounded work queue but still have all the threads torn down when there is no work to do.
+>
+
+- General constructor for `ThreadPoolExecutor`
+    ```java
+    public ThreadPoolExecutor(int corePoolSize,
+            int maximumPoolSize,
+            long keepAliveTime,
+            TimeUnit unit,
+            BlockingQueue<Runnable> workQueue,
+            ThreadFactory threadFactory,
+            RejectedExecutionHandler handler) {
+                ...
+            }
+    ```
+- By tuning the core pool size and keep-alive times, you can encourage the pool to reclaim resources used by otherwise idle threads, making them available for more useful work. (Like everything else, this is a tradeoff: reaping idle threads incurs additional latency due to thread creation if threads must later be created when demand increases.)
+- The `newFixedThreadPool` factory sets both the core pool size and the maximum pool size to the requested pool size, creating the effect of infinite timeout; 
+- The `newCachedThreadPool` factory sets the maximum pool size to `Integer.MAX_VALUE` and the core pool size to zero with a timeout of one minute, creating the effect of an infinitely expandable thread pool that will contract again when demand decreases.
+
+#### Managing Queued Tasks
+- Bounded thread pools limit the number of tasks that can be executed concurrently. (The single-threaded executors are a notable special case: they guarantee that no tasks will execute concurrently, offering the possibility of achieving thread safety through thread confinement.)
+  - Unbounded thread creation could lead to instability
+  - But bounding pool is also not a proper fix to this instability - If the arrival rate for new requests exceeds the rate at which they can be handled, requests will still queue up. With a thread pool, they wait in a queue of `Runnable`s managed by the Executor instead of queueing up as threads contending for the CPU
+    - Representing a waiting task with a Runnable and a list node is certainly a lot cheaper than with a thread, but the risk of resource exhaustion still remains if clients can throw requests at the server faster than it can handle them.
+
+> Requests often arrive in bursts even when the average request rate is fairly stable
+>
+> Queues can help smooth out transient bursts of tasks, but if tasks continue to arrive too quickly you will eventually have to throttle the arrival rate to avoid running out of memory
+>
+> Even before you run out of memory, response time will get progressively worse as the task queue grows.
+
+
+- This is analogous to flow control in communications networks: you may be willing to buffer a certain amount of data, but eventually you need to find a way to get the other side to stop sending you data, or throw the excess data on the floor and hope the sender retransmits it when you're not so busy.
+- `ThreadPoolExecutor` allows you to supply a `BlockingQueue` to hold tasks awaiting execution
+- There are three basic approaches to task queueing:
+  - unbounded queue
+  - bounded queue
+  - synchronous hand-off
+- The default for `newFixedThreadPool` and `newSingleThreadExecutor` is to use an unbounded `LinkedBlockingQueue`.
+  - Tasks will queue up if all worker threads are busy, but the queue could grow without bound if the tasks keep arriving faster than they can be executed.
+- A more stable resource management strategy is to use a bounded queue, such as an `ArrayBlockingQueue` or a bounded `LinkedBlockingQueue` or `Priority-BlockingQueue`
+- Bounded queues help prevent resource exhaustion but introduce the question of what to do with new tasks when the queue is full. 
+- There are a number of possible *saturation policies* for addressing this problem;
+- With a bounded work queue, the queue size and pool size must be tuned together. A large queue coupled with a small pool can help reduce memory usage, CPU usage, and context switching, at the cost of potentially constraining throughput.
+- For very large or unbounded pools, you can also bypass queueing entirely and instead hand off tasks directly from producers to worker threads using a `SynchronousQueue`.
+  -  A `SynchronousQueue` is not really a queue at all, but a mechanism for managing handoffs between threads. In order to put an element on a `SynchronousQueue`, another thread must already be waiting to accept the handoff
+  -   If no thread is waiting but the current pool size is less than the maximum, `Thread-PoolExecutor` creates a new thread; otherwise the task is rejected according to the saturation policy.
+  -   Using a direct handoff is more efficient because the task can be handed right to the thread that will execute it, rather than first placing it on a queue and then having the worker thread fetch it from the queue.
+- `SynchronousQueue` is a practical choice only if the pool is unbounded or if rejecting excess tasks is acceptable. The `newCachedThreadPool` factory uses a `SynchronousQueue`.
+
+> Using a FIFO queue like `LinkedBlockingQueue` or `ArrayBlockingQueue` causes tasks to be started in the order in which they arrived. 
+> 
+> For more control over task execution order, you can use a `PriorityBlockingQueue`, which orders tasks according to priority. 
+> 
+> Priority can be defined by natural order (if tasks implement `Comparable`) or by a `Comparator`.
+>
+> The `newCachedThreadPool` factory is a good default choice for an `Executor`, providing better queuing performance than a fixed thread pool
+>
+> A fixed size thread pool is a good choice when you need to limit the number of concurrent tasks for resource-management purposes, as in a server application that accepts requests from network clients and would otherwise be vulnerable to overload.
+
+- This performance difference comes from the use of `SynchronousQueue` instead of `LinkedBlocking-Queue`. `SynchronousQueue` was replaced in Java 6 with a new nonblocking algorithm that improved throughput in `Executor` benchmarks by a factor of three over the Java 5.0 `SynchronousQueue` implementation
+- Bounding either the thread pool or the work queue is suitable only when tasks are independent. With tasks that depend on other tasks, bounded thread pools or queues can cause thread starvation deadlock; instead, use an unbounded pool configuration like `newCachedThreadPool`
+  - An alternative configuration for tasks that submit other tasks and wait for their results is to use a bounded thread pool, a `SynchronousQueue` as the work queue, and the caller-runs saturation policy.
+
+#### Saturation Policies
+- In Java's ThreadPoolExecutor, when the work queue reaches its capacity, the saturation policy determines how the executor handles additional tasks. 
+- You can customize this behavior by using the `setRejectedExecutionHandler` method to set a specific rejection policy
+- Java provides several built-in implementations of the `RejectedExecutionHandler` interface, each offering a different strategy for managing tasks when the executor is saturated
+- **AbortPolicy (Default):**
+  - Behavior: Throws a `RejectedExecutionException` when a task cannot be accepted for execution. This is the default policy.
+  - Use Case: When it's critical to know that a task has been rejected, allowing the application to handle the exception appropriately.
+    ```java
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(
+        corePoolSize, maximumPoolSize, keepAliveTime,   timeUnit, workQueue, 
+        new ThreadPoolExecutor.AbortPolicy());
+    ```
+- **CallerRunsPolicy:**
+  - The caller-runs policy implements a form of throttling that neither discards tasks nor throws an exception, but instead tries to slow down the flow of new tasks by pushing some of the work back to the caller.
+  - Behavior: Instead of discarding the task or throwing an exception, the calling thread executes the task itself. This approach slows down the task submission rate, providing a simple feedback mechanism. Ab esse hoga yeh ki caller thread jo call kar raha hai bahi slow ho jayega, ab bo kuch naya accept hi nahi karega. Yeh sab esley taaki ThreadPool jo abhi busy hai unhe existing work ko finish karne ke time mil jaye
+  - The main thread would also not be calling accept during this time, so incoming requests will queue up in the TCP layer instead of in the application. 
+  - If the overload persisted, eventually the TCP layer would decide it has queued enough connection requests and begin discarding connection requests as well. 
+  - As the server becomes overloaded, the overload is gradually pushed outward—from the pool threads to the work queue to the application to the TCP layer, and eventually to the client—enabling more graceful degradation under load. LOL
+- **DiscardPolicy:**
+  - Behavior: Silently discards the newly submitted task when the executor is saturated, without any notification.
+  - Use Case: Suitable when task loss is acceptable and you prefer to discard excess tasks without raising errors.
+- **DiscardOldestPolicy:**
+  - Discards the oldest unhandled request and attempts to resubmit the new task. If the work queue is a priority queue, this policy discards the highest-priority element, which may not be desirable.
+  - Useful when it's more important to process recent tasks, and older tasks can be safely discarded.
+
+    <details>
+    <summary> Implementing a Custom Rejection Policy </summary>
+
+    ```java
+
+    import java.util.concurrent.RejectedExecutionHandler;
+    import java.util.concurrent.ThreadPoolExecutor;
+
+    public class CustomRejectionHandler implements RejectedExecutionHandler {
+        @Override
+        public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+            ...
+        }
+    }
+    ```
+
+    </details>
+
+
+    <details>
+    <summary> Blocking Task Submission When Queue Is Full:  </summary>
+    - Java's `ThreadPoolExecutor` does not provide a built-in saturation policy that blocks task submission when the work queue is full. 
+    - However, you can achieve this behavior by using a `Semaphore` to limit the rate of task submission.
+
+    ```java
+
+    import java.util.concurrent.*;
+
+    public class BoundedExecutor {
+        public final ExecutorService executor;
+        public final Semaphore semaphore;
+
+        public BoundedExecutor(int poolSize, int queueCapacity) {
+            this.executor = new ThreadPoolExecutor(
+                poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(queueCapacity)
+            );
+            // thread = poolSize and queue Size (total survivers)
+            this.semaphore = new Semaphore(poolSize + queueCapacity);
+        }
+
+        public void submitTask(final Runnable task) throws InterruptedException {
+            semaphore.acquire();
+
+            try {
+                executor.execute(() -> {
+                    try {
+                        task.run();
+                    } finally {
+                        semaphore.release();
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                // this may look like double release.. but not
+                // remember in last section we read.. that if task submission
+                // fails, then we get RejectedExecutionException
+                semaphore.release();
+                throw e;
+            }
+        }
+
+        public void shutdown() {
+            executor.shutdown();
+        }
+    }
+    ```
+
+    </details>
+
