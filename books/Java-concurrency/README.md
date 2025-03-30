@@ -122,6 +122,11 @@
     - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
       - [Example: A Puzzle Framework](#example-a-puzzle-framework)
     - [Summary](#summary-2)
+  - [Chapter 9. GUI Applications](#chapter-9-gui-applications)
+  - [Chapter 10. Avoiding Liveness Hazards](#chapter-10-avoiding-liveness-hazards)
+    - [Deadlock](#deadlock)
+      - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
+      - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
 
 
 # Java Concurrency in Practice
@@ -3985,3 +3990,137 @@ public class TimingThreadPool extends ThreadPoolExecutor {
 
 ### Summary
 - The Executor framework is a powerful and flexible framework for concurrently executing tasks. It offers a number of tuning options, such as policies for creating and tearing down threads, handling queued tasks, and what to do with excess tasks, and provides several hooks for extending its behavior
+
+
+## Chapter 9. GUI Applications 
+- Skipping for the last
+
+## Chapter 10. Avoiding Liveness Hazards
+- There is often a tension between safety and liveness
+- Hum locks use karte hai jisse code thread safe ho, par agar sahi se na use karo to deadlock ho sakte hai
+- Similarly, we use thread pools and semaphores to bound resource consumption, but failure to understand the activities being bounded can cause resource deadlocks. 
+- Java applications do not recover from deadlock, so it is worthwhile to ensure that your design precludes the conditions that could cause it
+- This chapter explores some of the causes of liveness failures and what can be done to prevent them.
+
+### Deadlock
+- Deadlock is illustrated by the classic, if somewhat unsanitary, “dining philosophers” problem.
+  - Five philosophers go out for Chinese food and are seated at a circular table. There are five chopsticks (not five pairs), one placed between each pair of diners
+  - The philosophers alternate between thinking and eating.
+  - Each needs to acquire two chopsticks for long enough to eat, but can then put the chopsticks back and return to thinking.
+- When a thread holds a lock forever, other threads attempting to acquire that lock will block forever waiting. 
+- When thread A holds lock L and tries to acquire lock M, but at the same time thread B holds M and tries to acquire L, both threads will wait forever.
+  - This situation is the simplest case of deadlock (or deadly embrace), where multiple threads wait forever due to a cyclic locking dependency. 
+- Database systems are designed to detect and recover from deadlock.
+  - A transaction may acquire many locks, and locks are held until the transaction commits
+  - So it is quite possible, and in fact not uncommon, for two transactions to deadlock. 
+  - Without intervention, they would wait forever. But the database server is not going to let this happen.
+  - When it detects that a set of transactions is deadlocked (which it does by searching the is-waiting-for graph for cycles), it picks a victim and aborts that transaction
+  - The JVM is not nearly as helpful in resolving deadlocks as database servers are. When a set of Java threads deadlock, that's the end of the game - those threads are permanently out of commission.
+- Like many other concurrency hazards, deadlocks rarely manifest themselves immediately
+- The fact that a class has a potential deadlock doesn't mean that it ever will deadlock, just that it can. When deadlocks do manifest themselves, it is often at the worst possible time—under heavy production load.
+
+#### Lock-ordering Deadlocks
+
+- Example: Simplest example 
+    ```java
+    // warniing: deadlock prone
+
+    public class LeftRightDeadlock {
+        private final Object left = new Object();
+        private final Object right = new Object();
+
+        public void leftRight() {
+            synchronized(left) {
+                synchronized(right) {
+                    doSomething();
+                }
+            }
+        }
+
+        public void rightLeft() {
+            synchronized(right) {
+                synchronized(left) {
+                    doSomething();
+                }
+            }
+        }
+    }
+    ```
+
+#### Dynamic Lock Order Deadlocks
+- Dynamic Lock-ordering Deadlock. Don't do this.
+
+    ```java
+    public void tranferMoney(Account fromAccount,
+            Account toAccount,
+            DollarAmount amount) throws InsufficientFundsException {
+        synchronized (fromAccount) {
+            synchronized (toAccount) {
+                if (fromAccount.getBalance().compareTo(amount) < 0) {
+                    throw new InsufficientFundsException();
+                } else {
+                    fromAccount.debit(amount);
+                    toAccount.credit(amount);
+                }
+            }
+        }
+    }
+    ```
+- The above looks harmless, isn't ? Take a pause, and think...
+    <details>
+    <summary> Spoiler : How can transferMoney dealock ?</summary>
+
+    - It may appear as if all the threads acquire their locks in the same order, but in fact the lock order depends on the order of arguments passed to `transferMoney`, and these in turn might depend on external inputs
+    -  Deadlock can occur if two threads call transferMoney at the same time, one transferring from X to Y, and the other doing the opposite:
+    -  Since the order of arguments is out of our control, to fix the problem we must induce an ordering on the locks and acquire them according to the induced ordering consistently throughout the application.
+    -  One way to induce an ordering on objects is to use System.identityHashCode, which returns the value that would be returned by Object.hashCode.
+    -  In the rare case that two objects have the same hash code, we must use an arbitrary means of ordering the lock acquisitions, and this reintroduces the possibility of deadlock
+    -  To prevent inconsistent lock ordering in this case, a third “tie breaking” lock is used.
+  
+    ```java
+    private static final Object tieLock = new Object();
+
+    public void transferMoney(Account fromAcct, Account toAcct, DollarAmount amount) throws InsufficientFundsException {
+        class Helper {
+            public void transfer() throws InsufficientFundsException {
+                if (fromAcct.getBalance().compareTo(amount) < 0)
+                    throw new InsufficientFundsException();
+                else {
+                    fromAcct.debit(amount);
+                    toAcct.credit(amount);
+                }
+            }
+        }
+        int fromHash = System.identityHashCode(fromAcct);
+        int toHash = System.identityHashCode(toAcct);
+
+        if (fromHash < toHash) {
+            synchronized (fromAcct) {
+                synchronized (toAcct) {
+                    new Helper().transfer();
+                }
+            }
+        } else if (fromHash > toHash) {
+            synchronized (toAcct) {
+                synchronized (fromAcct) {
+                    new Helper().transfer();
+                }
+            }
+        } else {
+            synchronized (tieLock) {
+                synchronized (fromAcct) {
+                    synchronized (toAcct) {
+                        new Helper().transfer();
+                    }
+                }
+            }
+        }
+    }
+
+    ```
+    - If Account has a unique, immutable, comparable key such as an account number, inducing a lock ordering is even easier: order objects by their key, thus eliminating the need for the tie-breaking lock.
+    - You may think we're overstating the risk of deadlock because locks are usually held only briefly, but deadlocks are a serious problem in real systems
+    - A production application may perform billions of lock acquire-release cycles per day. Only one of those needs to be timed just wrong to bring the application to deadlock, and even a thorough load-testing regimen may not disclose all latent deadlocks.
+    </details>
+
+
