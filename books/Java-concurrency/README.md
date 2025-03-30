@@ -127,6 +127,7 @@
     - [Deadlock](#deadlock)
       - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
       - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
+      - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
 
 
 # Java Concurrency in Practice
@@ -3993,7 +3994,7 @@ public class TimingThreadPool extends ThreadPoolExecutor {
 
 
 ## Chapter 9. GUI Applications 
-- Skipping for the last
+- Skipping to the end
 
 ## Chapter 10. Avoiding Liveness Hazards
 - There is often a tension between safety and liveness
@@ -4070,7 +4071,7 @@ public class TimingThreadPool extends ThreadPoolExecutor {
     <details>
     <summary> Spoiler : How can transferMoney dealock ?</summary>
 
-    - It may appear as if all the threads acquire their locks in the same order, but in fact the lock order depends on the order of arguments passed to `transferMoney`, and these in turn might depend on external inputs
+    - It may appear as if all the threads acquire their locks in the same order, but in fact the lock order depends on the order of arguments passed to `transferMoney` (that's why example named as dynamic), and these in turn might depend on external inputs
     -  Deadlock can occur if two threads call transferMoney at the same time, one transferring from X to Y, and the other doing the opposite:
     -  Since the order of arguments is out of our control, to fix the problem we must induce an ordering on the locks and acquire them according to the induced ordering consistently throughout the application.
     -  One way to induce an ordering on objects is to use System.identityHashCode, which returns the value that would be returned by Object.hashCode.
@@ -4080,7 +4081,8 @@ public class TimingThreadPool extends ThreadPoolExecutor {
     ```java
     private static final Object tieLock = new Object();
 
-    public void transferMoney(Account fromAcct, Account toAcct, DollarAmount amount) throws InsufficientFundsException {
+    public void transferMoney(Account fromAcct, Account toAcct,
+            DollarAmount amount) throws InsufficientFundsException {
         class Helper {
             public void transfer() throws InsufficientFundsException {
                 if (fromAcct.getBalance().compareTo(amount) < 0)
@@ -4123,4 +4125,64 @@ public class TimingThreadPool extends ThreadPoolExecutor {
     - A production application may perform billions of lock acquire-release cycles per day. Only one of those needs to be timed just wrong to bring the application to deadlock, and even a thorough load-testing regimen may not disclose all latent deadlocks.
     </details>
 
+
+#### Deadlocks Between Cooperating Objects
+- Acquiring multiple locks can sometimes lead to subtle deadlock situations, especially when locks are acquired in different orders across interacting classes
+- 
+    <details>
+    <summary> Lock-ordering Deadlock Between Cooperating Objects. Don't do this. </summary>
+
+    ```java
+    class Taxi {
+        @GuardedBy("this") private Point location, destination;
+        private final Dispatcher dispatcher;
+
+        public Taxi(Dispatcher dispatcher) {
+            this.dispatcher = dispatcher;
+        }
+
+        public synchronized Point getLocation() {
+            return location;
+        }
+
+        public synchronized void setLocation(Point location) {
+            this.location = location;
+            if (location.equals(destination)) {
+                dispatcher.notifyAvailable(this);
+            }
+        }
+    }
+
+
+    class Dispatcher {
+        @GuardedBy("this") private final Set<Taxi> taxis;
+        @GuardedBy("this") private final Set<Taxi> availableTaxis;
+
+        public Dispatcher() {
+            taxis = new HashSet<Taxi>();
+            availableTaxis = new HashSet<Taxi>();
+        }
+
+        public synchronized void notifyAvailable(Taxi taxi) {
+            availableTaxis.add(taxi);
+        }
+
+        public synchronized Image getImage() {
+            Image image = new Image();
+            for (Taxi t: taxis) {
+                image.drawMarker(t.getLocation());
+            }
+            return image;
+        }
+    }
+    ```
+    </details>
+
+- Potential deadlock sequence:
+  - A thread invokes `setLocation` on a `Taxi` instance, acquiring the taxi's intrinsic lock. Within this method, it calls `notifyAvailable` on the `Dispatcher`, attempting to acquire the dispatcher's lock.
+  - Simultaneously, another thread calls `getImage` on the `Dispatcher`, acquiring the dispatcher's lock and, during its execution, attempts to acquire the locks of individual `Taxi` instances to retrieve their locations.
+  - This circular waiting leads to both threads being blocked indefinitely
+
+> [!NOTE]
+> Invoking an alien method with a lock held is asking for liveness trouble. The alien method might acquire other locks (risking deadlock) or block for an unexpectedly long time, stalling other threads that need the lock you hold.
 
