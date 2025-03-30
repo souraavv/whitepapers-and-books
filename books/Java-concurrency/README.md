@@ -3542,9 +3542,9 @@ $$
 
     <details>
     <summary> Blocking Task Submission When Queue Is Full: Throttle Task Submission </summary>
+
     - Java's `ThreadPoolExecutor` does not provide a built-in saturation policy that blocks task submission when the work queue is full. 
     - However, you can achieve this behavior by using a `Semaphore` to limit the rate of task submission.
-
     ```java
 
     import java.util.concurrent.*;
@@ -3604,6 +3604,9 @@ $$
 - There a number of reason to use a custom thread factory 
   - maybe you just want to give pool threads more meaningful names to simplify interpreting thread dumps and error logs.
   - might want to specify an UncaughtExceptionHandler for pool threads
+
+    <details>
+    <summary> MyThreadFactory and MyThreadApp </summary>
 
     ```java
     public class MyThreadFactory implements ThreadFactory {
@@ -3671,6 +3674,8 @@ $$
     }
     ```
 
+    </details>
+
 - Most of the options passed to the `ThreadPoolExecutor` constructors can also be modified after construction via setters (such as the core thread pool size, maximum thread pool size, keep-alive time, thread factory, and rejected execution handler).
     ```java
     ExecutorService exec = Executors.newCacheThreadPool();
@@ -3686,6 +3691,9 @@ $$
 - Agar yeh unconfigurable na hota, toh galti se pool size badalne par yeh sequential execution ka behavior toot sakta tha.
 - Agar tumhare paas ek existing `ExecutorService` hai aur tum chahte ho ki uski configurations ko lock kar diya jaye taaki koi bhi usme changes na kar sake, toh tum `Executors.unconfigurableExecutorService(existingExecutorService)` method ka use kar sakte ho. 
   - Yeh method existing executor ko ek aise wrapper mein daal deta hai jo sirf `ExecutorService` ke methods expose karta hai, aur kisi bhi additional configuration methods ko hide kar deta hai. 
+    <details> 
+    <summary> UnconfigurableExecutorExample </summary>
+    
     ```java
     import java.util.concurrent.ExecutorService;
     import java.util.concurrent.Executors;
@@ -3725,6 +3733,7 @@ $$
     }
 
     ```
+    </details>
 
 ### Extending `ThreadPoolExecutor`
 - Java ke `ThreadPoolExecutor` class mein kuch special methods hote hain jinhe "hooks" kaha jata hai.
@@ -3816,6 +3825,9 @@ public class TimingThreadPool extends ThreadPoolExecutor {
     }
     ```
 - Loop parallelization can also be applied to some recursive designs; there are often sequential loops within the recursive algorithm that can be parallelized in the same manner
+    <details>
+    <summary> Loop Parallelization </summary>
+
     ```java
     public <T> void sequentialRecursive(List<Node<T>> nodes, 
             Collection<T> results) {
@@ -3853,6 +3865,8 @@ public class TimingThreadPool extends ThreadPoolExecutor {
         return resultQueue;
     }
     ```
+
+    </details>
 
 #### Example: A Puzzle Framework
 - An appealing application of this technique is solving puzzles that involve finding a sequence of transformations from some initial state to reach a goal state, such as the familiar “sliding block puzzles”,
