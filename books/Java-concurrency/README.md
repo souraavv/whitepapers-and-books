@@ -3346,70 +3346,71 @@ $$
 - `ThreadPoolExecutor` provides the base implementation for the executors returned by the `newCachedThreadPool`, `newFixedThreadPool`, and `newScheduled-ThreadExecutor` factories in Executors
 - `ThreadPoolExecutor` is a flexible, robust pool implementation that allows a variety of customizations.
 - If the default execution policy does not meet your needs, you can instantiate a `ThreadPoolExecutor` through its constructor and customize it as you see fit
-<details>
-<summary> </summary> 
 
-```java
-import java.util.concurrent.*;
+    <details>
+    <summary> CustomThreadPoolExample </summary> 
 
-public class CustomThreadPoolExample {
-    public static void main(String[] args) {
-        // Core and maximum pool sizes (more details in the next section)
-        int corePoolSize = 5;
-        int maximumPoolSize = 10;
-        // Time that excess idle threads will wait for new tasks before terminating
-        long keepAliveTime = 5000;
-        TimeUnit unit = TimeUnit.MILLISECONDS;
-        // Task queue with a capacity of 100
-        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(100);
-        // Default thread factory
-        ThreadFactory threadFactory = Executors.defaultThreadFactory();
-        // Handler for tasks that cannot be executed
-        RejectedExecutionHandler handler = new ThreadPoolExecutor.AbortPolicy();
+    ```java
+    import java.util.concurrent.*;
 
-        // Create the ThreadPoolExecutor
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-            corePoolSize,
-            maximumPoolSize,
-            keepAliveTime,
-            unit,
-            workQueue,
-            threadFactory,
-            handler
-        );
+    public class CustomThreadPoolExample {
+        public static void main(String[] args) {
+            // Core and maximum pool sizes (more details in the next section)
+            int corePoolSize = 5;
+            int maximumPoolSize = 10;
+            // Time that excess idle threads will wait for new tasks before terminating
+            long keepAliveTime = 5000;
+            TimeUnit unit = TimeUnit.MILLISECONDS;
+            // Task queue with a capacity of 100
+            BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(100);
+            // Default thread factory
+            ThreadFactory threadFactory = Executors.defaultThreadFactory();
+            // Handler for tasks that cannot be executed
+            RejectedExecutionHandler handler = new ThreadPoolExecutor.AbortPolicy();
 
-        // Submit tasks to the executor
-        for (int i = 0; i < 20; i++) {
-            executor.execute(new Task("Task " + i));
-        }
+            // Create the ThreadPoolExecutor
+            ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                corePoolSize,
+                maximumPoolSize,
+                keepAliveTime,
+                unit,
+                workQueue,
+                threadFactory,
+                handler
+            );
 
-        // Shutdown the executor
-        executor.shutdown();
-    }
-}
+            // Submit tasks to the executor
+            for (int i = 0; i < 20; i++) {
+                executor.execute(new Task("Task " + i));
+            }
 
-class Task implements Runnable {
-    private String name;
-
-    public Task(String name) {
-        this.name = name;
-    }
-
-    @Override
-    public void run() {
-        System.out.println(name + " is being executed by " + Thread.currentThread().getName());
-        try {
-            // Simulate some work
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            // Shutdown the executor
+            executor.shutdown();
         }
     }
-}
 
-```
+    class Task implements Runnable {
+        private String name;
 
-</details>
+        public Task(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public void run() {
+            System.out.println(name + " is being executed by " + Thread.currentThread().getName());
+            try {
+                // Simulate some work
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    ```
+
+    </details>
 
 #### Thread Creation and Teardown
 - The core pool size, maximum pool size, and keep-alive time govern thread creation and teardown
@@ -3418,8 +3419,9 @@ class Task implements Runnable {
 - A thread that has been idle for longer than the keep-alive time becomes a candidate for reaping and can be terminated if the current pool size exceeds the core size.
 - Whena `ThreadPoolExecutor` is initially created, the core threads are not started immediately but instead as tasks are submitted, unless you call `prestartAllCoreThreads`.
 
+> [!TIP] 
 > Developers are sometimes tempted to set the core size to zero so that the worker threads will eventually be torn down and therefore won't prevent the JVM from exiting, but this can cause some strange-seeming behavior in thread pools that don't use a `SynchronousQueue` for their work queue (as `newCachedThreadPool does`). If the pool is already at the core size, `ThreadPoolExecutor` creates a new thread only if the work queue is full. 
->
+> 
 > So tasks submitted to a thread pool with a work queue that has any capacity and a core size of zero will not execute until the queue fills up, which is usually not what is desired.
 >
 > Later, Java introduced `allowCoreThreadTimeOut` allows you to request that all pool threads be able to time out; enable this feature with a core size of zero if you want a bounded thread pool with a bounded work queue but still have all the threads torn down when there is no work to do.
@@ -3447,6 +3449,8 @@ class Task implements Runnable {
   - But bounding pool is also not a proper fix to this instability - If the arrival rate for new requests exceeds the rate at which they can be handled, requests will still queue up. With a thread pool, they wait in a queue of `Runnable`s managed by the Executor instead of queueing up as threads contending for the CPU
     - Representing a waiting task with a Runnable and a list node is certainly a lot cheaper than with a thread, but the risk of resource exhaustion still remains if clients can throw requests at the server faster than it can handle them.
 
+> [!NOTE] 
+> 
 > Requests often arrive in bursts even when the average request rate is fairly stable
 >
 > Queues can help smooth out transient bursts of tasks, but if tasks continue to arrive too quickly you will eventually have to throttle the arrival rate to avoid running out of memory
@@ -3472,6 +3476,7 @@ class Task implements Runnable {
   -   Using a direct handoff is more efficient because the task can be handed right to the thread that will execute it, rather than first placing it on a queue and then having the worker thread fetch it from the queue.
 - `SynchronousQueue` is a practical choice only if the pool is unbounded or if rejecting excess tasks is acceptable. The `newCachedThreadPool` factory uses a `SynchronousQueue`.
 
+> [!NOTE] 
 > Using a FIFO queue like `LinkedBlockingQueue` or `ArrayBlockingQueue` causes tasks to be started in the order in which they arrived. 
 > 
 > For more control over task execution order, you can use a `PriorityBlockingQueue`, which orders tasks according to priority. 
