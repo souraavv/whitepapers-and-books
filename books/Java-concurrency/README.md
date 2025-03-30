@@ -117,6 +117,11 @@
       - [Thread Creation and Teardown](#thread-creation-and-teardown)
       - [Managing Queued Tasks](#managing-queued-tasks)
       - [Saturation Policies](#saturation-policies)
+      - [Thread Factories](#thread-factories)
+    - [Extending `ThreadPoolExecutor`](#extending-threadpoolexecutor)
+    - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
+      - [Example: A Puzzle Framework](#example-a-puzzle-framework)
+    - [Summary](#summary-2)
 
 
 # Java Concurrency in Practice
@@ -715,7 +720,7 @@ public class SyncInteger {
     - However, if we were to publish a reference to the Set (or any of its internals), the confinement would be violated and the animals would escape.
 
 #### ThreadLocal
-- Thread-Local provides get and set accessormethods that maintain a separate copy of the value for each thread that uses it, so a get returns the most recent value passed to set from the currently executing thread.
+- Thread-Local provides get and set accessormethods that maintain a separate copy of the value for each thread that uses it, so a get returns the most recent value passed to set from the currently executing thread. [ThreadLocal in Java](https://www.javacodegeeks.com/2020/12/threadlocal-in-java-example-program-and-tutorial.html?utm_source=chatgpt.com)
 
 ### Immutability
 - The other end-run around the need to synchronize is to use immutable objects
@@ -3536,7 +3541,7 @@ $$
 
 
     <details>
-    <summary> Blocking Task Submission When Queue Is Full:  </summary>
+    <summary> Blocking Task Submission When Queue Is Full: Throttle Task Submission </summary>
     - Java's `ThreadPoolExecutor` does not provide a built-in saturation policy that blocks task submission when the work queue is full. 
     - However, you can achieve this behavior by using a `Semaphore` to limit the rate of task submission.
 
@@ -3585,3 +3590,384 @@ $$
 
     </details>
 
+#### Thread Factories
+
+- Whenever thread pools needs to **create** a thread, it does so through a *thread factory* 
+- The default Thread Factory creates a new, nondaemon thread with no special configuration 
+- Specifying a thread factory allows you to customize the configuration of pool threads
+- `ThreadFactory` has a single method, `newThread`, that is called whenever a thread pool needs to create a new thread
+    ```java
+    public interface ThreadFactory {
+        Thread newThread(Runnable r);
+    }
+    ```
+- There a number of reason to use a custom thread factory 
+  - maybe you just want to give pool threads more meaningful names to simplify interpreting thread dumps and error logs.
+  - might want to specify an UncaughtExceptionHandler for pool threads
+
+    ```java
+    public class MyThreadFactory implements ThreadFactory {
+        private final String poolName;
+
+        public MyThreadFactory(String poolName) {
+            this.poolName = poolName;
+        }
+
+        public Thread newThread(Runnable r) {
+            return new MyAppThread(runnable, poolName);
+        }
+    }
+    ```
+
+    ```java
+    public class MyAppThread extends Thread {
+        public static final String DEFAULT_NAME = "MyAppThread";
+        private static volatile boolean debugLifecycle = false;
+        private static final AtomicInteger created = new AtomicInteger();
+        private static final AtomicInteger alive = new AtomicInterger();
+
+        private static final Logger log = Logger.getAnnonymousLogger();
+
+        public MyAppThread(Runnable r) {
+            this(r, DEFAULT_NAME);
+        }
+
+        public MyAppThread(Runnable runnable, String name) {
+            super(runnable, name + "-" + created.incrementAndGet());
+            setUncauaghtExceptionHandler(
+                new Thread.UncaughtExceptionHandler() {
+                    public void uncaughtException(Thread t, Throwable e) {
+                        log.log(Level.SEVERE, "UNCAUGHT in thread " + t.getName(), e);
+                    }
+                }
+            )
+        }
+
+        public void run() {
+            boolean debug = debugLifeCycle;
+            if (debug) {
+                log.log(Leve.FINE, "CREATED " + getName());
+            }
+            try {
+                alive.incrementAndGet();
+                super.run();
+            } finally {
+                alive.decrementAndGet();
+                if (debug) {
+                    log.log(Level.FINE, "Exiting " + getName());
+                }
+            }
+        }
+
+        public static int getThreadsCreated() {
+            return created.get();
+        }
+
+        public static int getThreadAlive() {
+            return alive.get();
+        }
+
+
+    }
+    ```
+
+- Most of the options passed to the `ThreadPoolExecutor` constructors can also be modified after construction via setters (such as the core thread pool size, maximum thread pool size, keep-alive time, thread factory, and rejected execution handler).
+    ```java
+    ExecutorService exec = Executors.newCacheThreadPool();
+    if (exec instanceof ThreadPoolExecutor) {
+        ((ThreadPoolExecutor) exec).setCorePoolSize(10);
+    } else {
+        throw new AssertionError("Oops, bad assumption");
+    }
+    ```
+- Java mein Executors class ka `newSingleThreadExecutor()` method ek aisa `ExecutorService` return karta hai jo internally ek single-threaded thread pool hota hai. 
+- Lekin yeh ek "unconfigurable" wrapper ke saath aata hai, jisse hum pool ke configurations (jaise thread count) ko badal nahi sakte. 
+- Yeh design isliye hai taaki yeh ensure ho sake ki tasks ek ke baad ek, sequentially execute ho, aur koi bhi concurrent execution na ho. 
+- Agar yeh unconfigurable na hota, toh galti se pool size badalne par yeh sequential execution ka behavior toot sakta tha.
+- Agar tumhare paas ek existing `ExecutorService` hai aur tum chahte ho ki uski configurations ko lock kar diya jaye taaki koi bhi usme changes na kar sake, toh tum `Executors.unconfigurableExecutorService(existingExecutorService)` method ka use kar sakte ho. 
+  - Yeh method existing executor ko ek aise wrapper mein daal deta hai jo sirf `ExecutorService` ke methods expose karta hai, aur kisi bhi additional configuration methods ko hide kar deta hai. 
+    ```java
+    import java.util.concurrent.ExecutorService;
+    import java.util.concurrent.Executors;
+    import java.util.concurrent.ThreadPoolExecutor;
+
+    public class UnconfigurableExecutorExample {
+        public static void main(String[] args) {
+            // Pehle ek fixed thread pool banate hain
+            ExecutorService configurableExecutor =
+                    Executors.newFixedThreadPool(5);
+
+            // Ab isse unconfigurable bana dete hain
+            ExecutorService unconfigurableExecutor =
+                    Executors.unconfigurableExecutorService(configurableExecutor);
+
+            // Ab hum unconfigurableExecutor ka upyog tasks submit 
+            // karne ke liye kar sakte hain
+            unconfigurableExecutor.submit(() -> {
+                System.out.println("Task chal raha hai...");
+            });
+
+            // Agar hum unconfigurableExecutor ko ThreadPoolExecutor mein cast 
+            // karne ki koshish karte hain
+            // to ClassCastException aayega, kyunki yeh ab sirf ExecutorService 
+            // ke methods ko expose karta hai
+            try {
+                ThreadPoolExecutor pool = 
+                        (ThreadPoolExecutor) unconfigurableExecutor;
+                pool.setCorePoolSize(10); // Yeh line exception throw karegi
+            } catch (ClassCastException e) {
+                System.out.println("Cannot cast to ThreadPoolExecutor: " 
+                        + e.getMessage());
+            }
+
+            unconfigurableExecutor.shutdown();
+        }
+    }
+
+    ```
+
+### Extending `ThreadPoolExecutor`
+- Java ke `ThreadPoolExecutor` class mein kuch special methods hote hain jinhe "hooks" kaha jata hai.
+- Inhe override karke hum thread pool ke behavior ko customize kar sakte hain. 
+  - Ye hooks hain: `beforeExecute`, `afterExecute`, aur `terminated`.
+  - `beforeExecute(Thread t, Runnable r):`
+    - Yeh method har task ke execution se pehle call hota hai. Isko logging, monitoring ya kisi bhi pre-processing ke liye use kar sakte hain.
+  - `afterExecute(Runnable r, Throwable t):`
+    - execution ke baad call hota hai, chahe task successfully complete ho ya exception throw kare.
+  - `terminated():`
+    - Yeh method tab call hota hai jab thread pool completely shutdown ho jata hai, yaani saare tasks finish ho chuke hote hain aur saare worker threads terminate ho chuke hote hain. Isko hum resources ko release karne, final logging ya statistics ko summarize karne ke liye kar sakte hain.
+
+<details>
+<summary> Hooks in ThreadPoolExecutor </summary>
+
+```java
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
+
+public class TimingThreadPool extends ThreadPoolExecutor {
+    private final Logger log = Logger.getLogger("TimingThreadPool");
+    private final AtomicLong numTasks = new AtomicLong();
+    private final AtomicLong totalTime = new AtomicLong();
+
+    // for each thread, uska apna ek alag instance hoga startTime ka
+    // separate copy (bina synchronization ka use kr sakte hai)
+    // Example in java - SimpleDateFormat - yeh thread safe nahi hota 
+
+    private final ThreadLocal<Long> startTime = new ThreadLocal<>();
+
+    public TimingThreadPool(int corePoolSize, int maximumPoolSize, 
+            long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue) {
+        super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue);
+    }
+
+    @Override
+    protected void beforeExecute(Thread t, Runnable r) {
+        super.beforeExecute(t, r);
+        log.fine(String.format("Thread %s: start %s", t, r));
+        startTime.set(System.nanoTime());
+    }
+
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+        try {
+            long endTime = System.nanoTime();
+            long taskTime = endTime - startTime.get();
+            numTasks.incrementAndGet();
+            totalTime.addAndGet(taskTime);
+            log.fine(String.format("Thread %s: end %s, time=%dns", t, r, taskTime));
+        } finally {
+            super.afterExecute(r, t);
+        }
+    }
+
+    @Override
+    protected void terminated() {
+        try {
+            log.info(String.format("Terminated: avg time=%dns", totalTime.get() / numTasks.get()));
+        } finally {
+            super.terminated();
+        }
+    }
+}
+
+```
+
+</details>
+
+### Parallelizing Recursive Algorithms
+- Loops whose bodies contain nontrivial computation or perform potentially blocking I/O are frequently good candidates for parallelization, as long as the iterations are independent.
+- If we have a loop whose iterations are independent and we don't need to wait for all of them to complete before proceeding, we can use an `Executor` to transform a sequential loop into a parallel one, as shown in `processSequentially` and `processInParallel`
+    ```java
+    void processSequentially(List<Element> elements) {
+        for (Element e: elements) {
+            process(e);
+        }
+    }
+
+    void processInParallel(Executor exec, List<Element> elements) {
+        for (final Element e: elements) {
+            exec.executor(new Runnable() {
+                public void run() {
+                    process(e);
+                }
+            })
+        }
+    }
+    ```
+- Loop parallelization can also be applied to some recursive designs; there are often sequential loops within the recursive algorithm that can be parallelized in the same manner
+    ```java
+    public <T> void sequentialRecursive(List<Node<T>> nodes, 
+            Collection<T> results) {
+        for (Node<T> n: nodes) {
+            results.add(n.compute());
+            sequentialRecursive(n.getChildren(), results);
+        }
+    }
+
+    // notice how we shifted to final 
+    public <T> void parallelRecursive(final Executor exec,
+            List<Node<T>> nodes,
+            final Collection<T> results) {
+        for (final Node<T> n : nodes) {
+            // making call to the n.compute parallel
+            exec.executor(new Runnable() {
+                public void run() {
+                    // since add can be called by concurrent thread,
+                    // results must be thread safe for add method
+                    results.add(n.compute());
+                }
+            });
+            // still sequential
+            parallelRecursive(exec, n.getChildren(), results);
+        }
+    }
+
+    public<T> Collection<T> getParallelResults(List<Node<T>> nodes) 
+            throws InterruptedException {
+        ExecutorService exec = Executors.newCacheThreadPool();
+        Queue<T> resultQueue = new ConcurrentLinkedQueue<T>();
+        parallelRecursive(exec, nodes, resultQueue);
+        exec.shutdown();
+        exec.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        return resultQueue;
+    }
+    ```
+
+#### Example: A Puzzle Framework
+- An appealing application of this technique is solving puzzles that involve finding a sequence of transformations from some initial state to reach a goal state, such as the familiar “sliding block puzzles”,
+- See http://www.puzzleworld.org/SlidingBlockPuzzles
+- We define "puzzle" as a combination of an initial position, a goal position, and a set of rules that determine a valid move 
+
+    <details>
+    <summary> A Puzzle Framework </summary> 
+
+    ```java
+    public interface Puzzle<P, M> {
+        P initialPosition();
+        boolean isGoal(P position);
+        Set<M> legalMoves(P position);
+        P move(P position, M move);
+    }
+
+    @Immutable 
+    static class Node<P, M> {
+        final P pos;
+        final M move;
+        final Node<P, M> prev;
+
+        Node (P pos, M move, Node<P, M> prev) {
+            ...
+        }
+
+        List<M> asMoveList() {
+            List<M> solution = new LinkedList<M>();
+            for (Node<P, M> n = this; n.move != null; n = n.prev) {
+                solution.add(0, n.move)
+            }
+
+
+            return solution;
+        }
+    }
+
+    // Result-bearing Latch Used by ConcurrentPuzzleSolver.
+    @ThreadSafe
+    public class ValueLatch<T> {
+        @Guardedby("this") private T value = null;
+        private final CountDownLatch done = new CountDownLatch();
+
+        public boolean isSet() {
+            return (done.getCount() == 0);
+        }
+
+        public synchronized void setValue(T newValue) {
+            if (!isSet()) {
+                value = newValue;
+                done.countDown();
+            }
+        }
+
+        public T getValue() throws InterruptedException {
+            done.await();
+            synchronized(this) {
+                return value;
+            }
+        }
+    }
+
+    public class ConcurrentPuzzleSolver<P, M> {
+        private final Puzzle<P, M> puzzle;
+        private final ExecutorService executor;
+        private final ConcurrentMap<P, Boolean> seen;
+        final ValueLatch<Node<P, M>> solution = new ValueLatch<>();
+
+        public ConcurrentPuzzleSolver(Puzzle<P, M> puzzle) {
+            this.puzzle = puzzle;
+            this.exec = Executor.newCachedThreadPool():
+            this.seen = new ConcurrentThreadPool<>();
+        }
+
+        public List<M> solve() throws InterruptedException {
+            try {
+                P pos = puzzle.initialPosition();
+                exec.execute(newTask(pos, null, null));
+                Node<P, M> solnNode = solution.getValue();
+                return (solnNode == null) ? null: solnNode.asMoveList();
+            } finally {
+                exec.shutdown();
+            }
+        }
+
+        protected Runnable newTask(P p, M m, Node<P, M> n) {
+            return new SolveTask(p, m, n);
+        }
+    }
+
+
+    class SolverTask extends Node<P, M> implements Runnable {
+        SolverTask(P pos, M move, Node<P, M> prev) {
+            super(pos, move, prev);
+        }
+
+        public void run() {
+            if (solution.isSet() || seen.putIfAbsent(pos, true) != null) {
+                return;
+                // already solved or seen in past
+            }
+            if (puzzle.isGoal(pos)) {
+                solutions.setValue(this);
+            } else {
+                for (M move: puzzle.legalMoves(pos)) {
+                    exec.execute(newTask(puzzle.move(pos, move), move, this));
+                }
+            }
+        }
+    }
+    ```
+
+    </details>
+
+
+### Summary
+- The Executor framework is a powerful and flexible framework for concurrently executing tasks. It offers a number of tuning options, such as policies for creating and tearing down threads, handling queued tasks, and what to do with excess tasks, and provides several hooks for extending its behavior
