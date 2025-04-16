@@ -128,6 +128,18 @@
       - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
       - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
       - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
+      - [Open Calls](#open-calls)
+  - [Advance Topics: Chapter 13 Explicity Locks](#advance-topics-chapter-13-explicity-locks)
+    - [Locks and Reentrant Locks](#locks-and-reentrant-locks)
+      - [Lock Interface](#lock-interface)
+      - [Polled and Timed Lock Acquisition](#polled-and-timed-lock-acquisition)
+      - [Interruptible Lock Acquisition](#interruptible-lock-acquisition)
+      - [Non-block-structured Locking](#non-block-structured-locking)
+    - [Peformance considerations](#peformance-considerations)
+    - [Fairness](#fairness)
+    - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
+    - [Read-write locks](#read-write-locks)
+    - [Summary](#summary-3)
 
 
 # Java Concurrency in Practice
@@ -4186,3 +4198,262 @@ public class TimingThreadPool extends ThreadPoolExecutor {
 > [!NOTE]
 > Invoking an alien method with a lock held is asking for liveness trouble. The alien method might acquire other locks (risking deadlock) or block for an unexpectedly long time, stalling other threads that need the lock you hold.
 
+#### Open Calls
+
+```java
+class Taxi {
+    @GuardedBy("this") private Point location, destination;
+    private final Dispatcher dispatcher;
+
+    public Taxi(Dispatcher dispatcher) {
+        this.dispatcher = dispatcher;
+    }
+
+    public synchronized Point getLocation() {
+        return location;
+    }
+
+    public synchronized void setLocation(Point location) {
+        this.location = location;
+        if (location.equals(destination)) {
+            dispatcher.notifyAvailable(this);
+        }
+    }
+}
+
+class Dispatcher {
+    @GuardedBy("this") private final Set<Taxi> taxis;
+    @GuardedBy("this") private final Set<Taxi> availableTaxis;
+
+    public Dispatcher() {
+        taxis = new HashSet<Taxi>();
+        availableTaxis = new HashSet<Taxi>();
+    }
+
+    public synchronized void notifyAvailable(Taxi taxi) {
+        availableTaxis.add(taxi);
+    }
+
+    public synchronized Image getImage() {
+        Image image = new Image();
+        for (Taxi t: taxis) {
+            image.drawMarker(t.getLocation());
+        }
+        return image;
+    }
+}
+```
+
+
+## Advance Topics: Chapter 13 Explicity Locks 
+Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistaken for 'difficult'. It simply means you need to have your basics clear before moving on to these topics.
+
+### Locks and Reentrant Locks
+- Reentrant lock is not replacement for intrinsic locking, but rather an alternative with advanced features for when intrinsic locking proves too limited.
+
+#### Lock Interface
+    ```java
+    public interface Lock {
+        void lock();
+        void lockInterruptibly() throws InterruptedException;
+        boolean tryLock();
+        boolean tryLock(long timeOut, TimeUnit unit) 
+                throws InterruptedException;
+        void unlock();
+        Condition newCondition();
+    }
+    ```
+- `ReentrantLock` implements `Lock`, providing the same mutual exclusion and memory-visibility guarantees as `synchronized`
+- Acquiring a `ReentrantLock` has the same memory semantics as entering a `synchronized` block, and releasing a `ReentrantLock` has the same memory semantics as exiting a `synchronized` block. 
+- `ReentrantLock` supports all of the lock-acquisition modes defined by `Lock`, providing more flexibility for dealing with lock unavailability than does `synchronized`.
+- Why create a new locking mechanism that is so similar to intrinsic locking?
+  - Intrinsic locking works fine in most situations but has some functional limitations—it is not possible to interrupt a thread waiting to acquire a lock, or to attempt to acquire a lock without being willing to wait for it forever.
+  - Intrinsic locks also must be released in the same block of code in which they are acquired; this simplifies coding and interacts nicely with exception handling, but makes non-blockstructured locking disciplines impossible.
+  - None of these are reasons to abandon `synchronized`, but in some cases a more flexible locking mechanism offers better liveness or performance.
+- This idiomis somewhat more complicated than using intrinsic locks: the lock must be released in a `finally` block. Otherwise, the lock would never be released if the guarded code were to throw an exception
+
+> [!WARNING] You should always consider the effect of exceptions when using any form of locking, including intrinsic locking
+>
+> Failing to use finally to release a Lock is a ticking time bomb
+>
+> When it goes off, you will have a hard time tracking down its origin as there will be no record of where or when the Lock should have been released
+>
+
+- This is one reason not to use `ReentrantLock` as a blanket substitute for synchronized: it is more “dangerous” because it doesn't automatically clean up the lock when control leaves the guarded block. 
+
+    ```java
+    Lock lock = new ReentrantLock();
+    lock.lock();
+    try {
+
+    } finally {
+        lock.unlock();
+    }
+    ``` 
+    
+#### Polled and Timed Lock Acquisition
+- The timed and polled lock-acqusition modes provided by `tryLock` allow more sophisticated error recovery than unconditional acquisition.
+- With intrinsic locks, a deadlock is fatal—the only way to recover is to restart the application, and the only defense is to construct your program so that inconsistent lock ordering is impossible. 
+  - Timed and polled locking offer another option: **probabalistic deadlock avoidance.**
+- Using timed or polled lock acquisition (`tryLock`) lets you regain control if you cannot acquire all the required locks, release the ones you did acquire, and try again (or at least log the failure and do something else)
+- With intrinsic locks, there is no way to cancel a lock acquisition once it is started, so intrinsic locks put the ability to implement time-budgeted activities at risk.
+- The timed `tryLock` makes it practical to incorporate exclusive locking into such a time-limited activity.
+
+#### Interruptible Lock Acquisition
+- Just as timed lock acquisition allows exclusive locking to be used within timelimited activities, interruptible lock acquisition allows locking to be used within cancellable activities
+    ```java
+    public boolean transferMoney(Account fromAccount,
+            Account toAccount,
+            DollarAmount amount,
+            long timeout,
+            TimeUnit unit) throws InsufficientFundsException, InterruptedException {
+        long fixedDelay = ...;
+        long ranMod = ...;
+        long stopTime = ...;
+
+        while (true) {
+            if (fromAccount.lock.tryLock()) {
+                try {
+                    if (toAccount.lock.tryLock()) {
+                        try {
+                            if (fromAccount.getBalance().compareTo(amount) < 0) {
+                                throw new InsufficientFundException();
+                            } else {
+                                fromAccount.debit(amount);
+                                toAccount.debit(amount);
+                                return true;
+                            }
+                        } finally {
+                            toAccount.lock.unlock();
+                        }
+                    }
+                } finally {
+                    fromAccount.lock.unlock();
+                }
+            }
+            if (System.nanoTime() > stopTime) {
+                return false;
+            }
+            NANOSECONDS.sleep(fixedDealy + rnd.nextLong() % randMod);
+        }
+    }
+    ```
+
+- The canonical structure of interruptible lock acquisition is slightly more complicated than normal lock acquisition, as two try blocks are needed. 
+  - "Canonical" ka matlab hota hai standard ya recommended structure. Jaise har kaam karne ka ek best-practice way hota hai.
+  - Problem kya hai interruptible lock mein?
+    - Jab hum `lock.lockInterruptibly()` use karte ho, to:
+      - Ye method `InterruptedException` throw kar sakta hai.
+      - Toh hume 2 try blocks chahiye:
+        - Ek try block lock ke around (jisme exception handle ho)
+        - Ek try-finally block critical section + unlock ke liye
+        ```java
+        try {
+            lock.lockInterruptibly();
+            try {
+
+            } finally {
+                lock.unlock();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        ```
+  - Interruptible Lock Acquisition ka kya matlab hai?
+    - Agar aap chahte ho ki thread ko lock ka wait karte interrupt kar sakte hai
+    - Normal jab him simple `.lock()` karte hai to usko nahi interrupt kr sakte
+  
+#### Non-block-structured Locking
+- In Java, every object has an intrinsic lock (also known as a monitor lock). When a thread enters a synchronized block or method, it acquires this lock. The key characteristics are:
+  - **Block-Structured:** The lock is acquired at the beginning of the block and automatically released at the end, even if an exception occurs. This ensures that locks are not accidentally left unreleased, which could lead to deadlocks.
+  - **Single Ownership**: Only one thread can hold the lock at a time. Other threads attempting to acquire the same lock will block until it's released.
+- Reducing lock granularity can enhance scalability. 
+- **Hand-over-Hand Locking (Lock Coupling)**
+  - Hand-over-hand locking is a technique used in concurrent data structures, like linked lists, to allow multiple threads to operate safely and efficiently. Here's how it works:
+  - **Per-Node Locking:** Each node in the data structure has its own lock. This allows threads to lock only the parts of the structure they are working on, reducing contention.
+  - **Sequential Locking:** When traversing the structure, a thread locks the current node and then the next node before releasing the lock on the current node. This ensures that the structure remains consistent during traversal and modification.
+  - **Improved Concurrency:** By locking only the necessary parts of the structure, multiple threads can operate on different parts simultaneously, improving performance.
+
+### Peformance considerations
+### Fairness
+- Fair Lock : Threads acquire the lock in the order they requested it, ensuring a first-come, first-served behavior.
+  - Low risk of starvation
+- Unfair Lock : Threads can "barge" in and acquire the lock even if other threads are waiting.
+  - High risk of starvation 
+  - Performance might improve 
+- Both `Reentrant` and `Semaphore` offers a choice of two *fairness* options: create a *nonfair* lock(default) or *fair* lock 
+  - Nonfair ReentrantLocks do not go out of their way to promote barging—they simply don't prevent a thread from barging if it shows up at the right time.
+    - Maltab jo dikh gaya usko lock assign ho jayega..aisa kuch nahi hai ki jisne sabse jyada wait kiya..ya jo pehle queue mai tha. Yeh system actively unfair nahi hai, lekin fairness ko enforce bhi nahi karta.
+  - With a fair lock, a newly requesting thread is queued if the lock is held by another thread or if threads are queued waiting for the lock; with a nonfair lock, the thread is queued only if the lock is currently held
+- The polled `tryLock` always barges, even for fair locks.
+- Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
+- When it comes to locking, though, fairness has a significant performance cost because of the overhead of suspending and resuming threads
+
+    > [!NOTE] The polled `tryLock` always barges, even for fair locks.
+
+- Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
+  - Lekin locking ke case mein, fairness ka ek bada performance cost hota hai — thread ko roko, resume karo, ye sab mehenga padta hai system ko.
+  - Isiliye zyada tar cases mein, perfect fairness ki zarurat nahi hoti.
+  - Bas itna guarantee mil jaye ki jo thread wait kar raha hai, kabhi na kabhi lock mil hi jayega, toh kaafi hai.
+     - Isko bolte hain "statistical fairness", aur ye cheap hai aur kaafi acha kaam karta hai.
+  - Some algorithms rely on fair queueing to ensure their correctness, but these are unusual. 
+  - Aksar, non-fair locks zyada fast hote hain, aur unka use karna better hota hai overall performance ke liye.
+  
+- Es book mai ek performance test run kiya — jismein HashMap ko wrap kiya tha ReentrantLock ke saath —
+  - ek baar fair lock use karke, aur doosri baar non-fair lock ke saath.
+  - Fair lock ne performance mein lagbhag 100x slow down dikhaya!
+  - Fair locks bahut costly hote hain, unless you really need strict ordering.
+
+- Ek or example 
+  - Q: Barging waale (non-fair) locks fair locks se itne fast kyun hote hain jab zyada threads ek saath lock maang rahe ho?
+    - Chalo ek example se samjhte hain:
+    - Thread A ke paas lock hai.
+    - Thread B aata hai aur bolta hai "mujhe bhi chahiye".
+    - Kyunki lock busy hai, B ko sula diya jata hai (suspend).
+    - Jab A apna kaam karke lock release karta hai, B ko jagaya jata hai.
+    - Lekin jagne mein thoda time lagta hai (OS wakeup delay). Isi beech agar Thread C aata hai, toh chances hain ki:
+    - C turant lock le lega, kaam karega, chhod bhi dega — aur B abhi bhi uth raha hoga. 
+    - Result:
+      - B ko lock milta hi milta, koi nuksaan nahi
+      - C ne jaldi kaam nipta liya, toh system ka overall performance better ho gaya.
+      - Win-win situation.
+  - Fair locks kab kaam aate hain?
+    - Jab lock ka kaam time-consuming ho.
+    - Ya jab threads lock maangte hi nahi bar-bar.
+    - Aise cases mein barging ka fayda nahi hota, toh fair lock bhi theek kaam karta hai.
+  - Intrinsic Locks (i.e., synchronized):
+    - Java ka default locking (synchronized) ya ReentrantLock: Fairness guarantee nahi dete.
+    - Bas "eventually sabko mil jayega" waali statistical fairness dete hain.
+    - JVM ko strictly fair banane ki koi requirement nahi hai — aur koi bhi real-world JVM fair locking follow nahi karti.
+    - ReentrantLock ne koi naya unfairness nahi laaya — bas openly dikhaya ki system already aisa hi behave karta tha.
+  - TL; DR:
+    - Barging fast hota hai kyunki sleeping thread ko uthne mein time lagta hai, aur naye thread turant lock le sakte hain.
+    - Fair locks slow hain kyunki sabko line se dena padta hai.
+    - Java locking fair dikhte hain, but andar se mostly barging hi hota hai.
+
+Yeh test chala 4-core Opteron machine pe, Solaris OS ke saath.
+- `tryLock()` is a non-blocking, polled method. It tries to acquire the lock immediately and does not wait.
+  - "Barging" means a thread acquires the lock ignoring the queue of waiting threads.
+- Even if a `ReentrantLock` is created as fair, calling `tryLock()` will not honor the fairness.
+- If the lock happens to be available when `tryLock()` is called, the calling thread will acquire it immediately, even if other threads have been waiting longer. 
+    ```java
+    ReentrantLock lock = new ReentrantLock(true); // fair lock
+
+    // Thread A has been waiting for the lock...
+    // Thread B comes in and calls tryLock()
+
+    if (lock.tryLock()) {
+        // Thread B acquires the lock even though A is waiting
+    }
+    ```
+
+
+### Choosing between Synchronized and Reentrant Lock 
+- Both `synchronized` and `ReentrantLock`:
+  - 
+### Read-write locks 
+
+### Summary 
+- Explicit `Lock`s offer an extended feature set compared to intrinsic locking, including greater flexibility in dealing with lock unavailability and greater control over queueing behavior
+- But `ReentrantLock` is not a blanket substitute for `synchronized`; use it only when you need features that `synchronized` lacks.
+- Read-write locks allow multiple readers to access a guarded object concurrently, offering the potential for improved scalability when accessing read-mostly data structures.
