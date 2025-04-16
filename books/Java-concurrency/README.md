@@ -4391,7 +4391,7 @@ Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistak
 - Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
 - When it comes to locking, though, fairness has a significant performance cost because of the overhead of suspending and resuming threads
 
-    > [!NOTE] 
+    > [!IMPORTANT] 
     > The polled `tryLock` always barges, even for fair locks.
 
 - Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
