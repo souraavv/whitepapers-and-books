@@ -4252,6 +4252,7 @@ Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistak
 - Reentrant lock is not replacement for intrinsic locking, but rather an alternative with advanced features for when intrinsic locking proves too limited.
 
 #### Lock Interface
+- Lock Interface
     ```java
     public interface Lock {
         void lock();
@@ -4272,7 +4273,8 @@ Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistak
   - None of these are reasons to abandon `synchronized`, but in some cases a more flexible locking mechanism offers better liveness or performance.
 - This idiomis somewhat more complicated than using intrinsic locks: the lock must be released in a `finally` block. Otherwise, the lock would never be released if the guarded code were to throw an exception
 
-> [!WARNING] You should always consider the effect of exceptions when using any form of locking, including intrinsic locking
+>[!WARNING]
+> You should always consider the effect of exceptions when using any form of locking, including intrinsic locking
 >
 > Failing to use finally to release a Lock is a ticking time bomb
 >
@@ -4290,7 +4292,7 @@ Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistak
         lock.unlock();
     }
     ``` 
-    
+
 #### Polled and Timed Lock Acquisition
 - The timed and polled lock-acqusition modes provided by `tryLock` allow more sophisticated error recovery than unconditional acquisition.
 - With intrinsic locks, a deadlock is fatal—the only way to recover is to restart the application, and the only defense is to construct your program so that inconsistent lock ordering is impossible. 
@@ -4389,7 +4391,8 @@ Chapters 13 to 16 cover advanced topics. The term 'advanced' shouldn't be mistak
 - Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
 - When it comes to locking, though, fairness has a significant performance cost because of the overhead of suspending and resuming threads
 
-    > [!NOTE] The polled `tryLock` always barges, even for fair locks.
+    > [!NOTE] 
+    > The polled `tryLock` always barges, even for fair locks.
 
 - Wouldn't we want all locks to be fair? After all, fairness is good and unfairness is bad, right? (Just ask your kids.) 
   - Lekin locking ke case mein, fairness ka ek bada performance cost hota hai — thread ko roko, resume karo, ye sab mehenga padta hai system ko.
