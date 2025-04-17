@@ -4544,7 +4544,7 @@ public class PossibleReordering {
 * PossibleReordering could print (1,0) or (0, 1) or (1, 1) : Thread A could run to completion before B starts, B could run to completion before A starts or their actions could be interleaved
 * But it could also print (0, 0) : Actions in each thread has do dataflow dependence on each other, and accordingly can be executed out of order. Even if they are executed in order, the timing by which caches are flushed to main memory can make it appear from the perspective of B that the assignments in A occurred in the opposite order.
 
-![Interleaving showing reordering in PossibleReordering](images/image.png)
+    ![Interleaving showing reordering in PossibleReordering](images/image.png)
 
 > [!NOTE]
 > - It is difficult to reason about ordering in the absense of synchronization; but it is easier to ensure that program use synchronization appropriately. 
@@ -4567,11 +4567,13 @@ public class PossibleReordering {
     - **Thread termination rule** : Any action in a thread happens-before any other thread detects that thread has terminated, either by successfully return from `Thread.join` or by `Thread.isAlive` returning false.
     - **Interruption rule** : A thread calling interrupt on another thread happens-before the interrupted thread detects the interrupt.
     - **Finalizer rule** : The end of a constructor for an object happens-before the start of the finalizer for that object.
-    > [!INFO]
-    > - A finalizer is a special method named finalize() that is called by the garbage collector before an object is reclaimed (destroyed) to perform cleanup operations.
-    > - Can be overridden in a class to perform cleanup (e.g., releasing resources), but explicit resource management (e.g., using try-with-resources or close()) is preferred.
-    > - No guarantee when or if it will be called, as it depends on the garbage collector.
-    - **Transitivity** : If A happens-before B, and B happens-before C, then A happens-before C. 
+
+> [!NOTE]
+> - A finalizer is a special method named finalize() that is called by the garbage collector before an object is reclaimed (destroyed) to perform cleanup operations.
+> - Can be overridden in a class to perform cleanup (e.g., releasing resources), but explicit resource management (e.g., using try-with-resources or close()) is preferred.
+> - No guarantee when or if it will be called, as it depends on the garbage collector.
+
+- **Transitivity** : If A happens-before B, and B happens-before C, then A happens-before C. 
 
 - Even though actions are only partially ordered, synchronization actions i.e lock acquisition and release and read and writes of volatile variables are totally ordered, which ensures ordering among multiple threads
 - Describe happens-before in terms of "subsequent" lock acquisitions and reads of volatile variables
@@ -4581,7 +4583,7 @@ public class PossibleReordering {
 - Link intra-thread order with inter-thread order using synchronization actions and volatile variables i.e establishing happens-before relation between the actions in the two threads.
 ![happens-before in the Java Memory Model](images/image-1.png)
 
-> [!INFO]
+> [!NOTE]
 > 
 > Totally Ordered
 > - Acquisition and Release of `Lock` : The JMM ensures that all lock acquisitions and releases on the same lock are totally ordered. For example, if Thread A releases a lock and Thread B acquires it, this order is globally consistent across all threads.
