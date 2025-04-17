@@ -11,10 +11,13 @@ import java.util.UUID;
 
 public class ExpenseService {
 
-    private NotificationService notificationService =
-            new EmailNotificationService();
+
+    private SplitStrategy splitStrategy = new EqualSplit();
+    private BasePublisher publisher = new BasePublisher();
+
+
     public Expense createExpense(String expenseCreatorId, String title,
-                                 String description, double expenseAmount,
+                                 String description, Double expenseAmount,
                                  ExpenseGroup expenseGroup) {
         Expense expense = Expense.builder()
                 .expenseId(UUID.randomUUID().toString())
@@ -43,8 +46,8 @@ public class ExpenseService {
             User user = UserRepo.users.get(userId);
             if (user != null) {
                 expenseGroup.getGroupMember().add(user);
-                notificationService.sendNotification(user, new Notification(
-                        "Adding to expense group: " + expenseGroupId));
+                publisher.addSubscriber(user);
+                publisher.notifySubscribers(String.format("User '%s' added to group", user.getName()));
             } else {
                 throw new IllegalArgumentException("Invalid user id provided:" +
                         " " + userId);
@@ -64,6 +67,7 @@ public class ExpenseService {
             Expense expense = ExpenseRepo.expenses.get(expenseId);
             if (expense != null) {
                 expense.setExpenseGroup(expenseGroup);
+
             } else {
                 throw new IllegalArgumentException("Invalid expense Id: " + expenseId);
             }

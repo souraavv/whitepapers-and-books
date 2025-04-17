@@ -100,6 +100,27 @@ All at the global scale, and even in the presence of ongoing transaction.
 - Serializability is a guarantee about transactions, or groups of one or more operations over one or more objects. It guarantees that the execution of a set of transactions (usually containing read and write operations) over multiple items is equivalent to some serial execution (total ordering) of the transactions.
 - Serializability is the traditional “I,” or isolation, in *ACID*. If users’ transactions each preserve application correctness (“C,” or consistency, in ACID), a serializable execution also preserves correctness. Therefore, serializability is a mechanism for guaranteeing database correctness.
 - Serializability is also not composable (Two serializable systems combined aren't guaranteed to remain serializable.)
+    <details>
+    <summary> Example of not composable </summary>
+
+    ```bash
+       DB1 (Data item A)
+       T1: R(A) ... W(A)
+       T2:       R(A) ... W(A)
+       -------------------------
+       Order: T1  --->  T2
+
+
+    DB2 (Data item B)
+        T2: R(B) ... W(B)
+        T1:       R(B) ... W(B)
+        -------------------------
+        Order: T2  --->  T1
+
+        
+
+    ```
+    </details>
 - Serializability does not imply any kind of deterministic order—it simply requires that some equivalent serial execution exists.
 
 ### Linearizability is the "AC", or Atomicity Consistency, in the ACID

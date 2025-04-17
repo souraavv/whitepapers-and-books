@@ -2,8 +2,21 @@
 Flow:
 
 First create an Expense Group 
-Add Users to the expense group (this should be done at beginning after creating group) - Later we'll not allow users to join the 
-expense group.
+Add Users to the expense group (this should be done at beginning after creating group) 
+
+
+Operation allowed in the Expense Group
+- Add a new member
+- Remove a member
+- Create an expense report
+
+Each expense has expense strategy
+- Equal share
+- 
+
+- At the time of creation of an Expense in a group, we'll take the snap of 
+  the members of the groups
+
 
 Create an expense in a group
 You can create n number of expense in a group
@@ -20,6 +33,8 @@ Each expense has an expense owner (who created this expense)
 Each expense belongs to an unique expense group 
 
 Each contribution has a contribution value 
+
+
 
 
 

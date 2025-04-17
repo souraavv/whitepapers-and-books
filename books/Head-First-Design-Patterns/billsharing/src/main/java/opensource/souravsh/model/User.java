@@ -6,7 +6,6 @@ import lombok.NonNull;
 
 import java.util.UUID;
 
-
 @Getter
 @Setter
 public class User {
