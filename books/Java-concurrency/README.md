@@ -153,6 +153,9 @@
       - [Missed Signals](#missed-signals)
       - [Notification](#notification)
       - [Example - A Gate Class](#example---a-gate-class)
+      - [Subclass Safety Issue](#subclass-safety-issue)
+      - [Encapsulating Condition Queues](#encapsulating-condition-queues)
+      - [Entry and Exit Protocols](#entry-and-exit-protocols)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -5036,6 +5039,55 @@ public class ThreadGate {
     - Har baar jab gate close hota hai, ek generation number increment kar do.
     - Jab thread `await()` karta hai, woh current generation note kar leta hai.
     - Jab woh dobara jaagta hai, toh check karta hai:
+
+#### Subclass Safety Issue 
+- Maan lo base class ek blocking stack banata hai jisme:
+  - Agar stack empty ho to `pop()` thread wait karta hai
+  - `push()` ke baad ek thread ko `notify()` kiya jata hai
+  - Yeh theek hai kyunki har baar ek hi thread wake karna hai = "one-in, one-out".
+- Ab subclass bana:
+  - Subclass ek naya method add karta hai:
+  ```java
+  popTwoElements() {
+   // wait karo jab tak do elements stack mein na ho
+  }
+  ```
+  - Toh ab 2 alag waiters hain:
+    - Ek jo ek element ke liye wait kar raha hai (`pop()`)
+    - Dusra jo do element ke liye wait kar raha hai (`popTwoElements()`)
+- In this case there are chances of signal waste
+- Agar aisa risk hai subclass mein, to 2 option hote hain:
+  - Option 1: Subclassing allow mat karo
+    - Class ko `final` bana do
+    - Locks, condition queues aur state variables ko `private` rakho
+  - Option 2: Subclassing allow karo, lekin protocol expose karo
+    - Lock aur condition ko `protected` ya package-private rakho
+    - Document karo: kis condition par wait ho raha hai, kis condition par notify() hona chahiye
+    - A state-dependent class should either fully expose (and document) its waiting and notification protocols to subclasses, or prevent subclasses from participating in them at all.
+
+#### Encapsulating Condition Queues
+- It is generally best to encapsulate the condition queue so that it is not accessible outside the class hierarchy in which it is used
+- Otherwise, callers might be tempted to think they understand your protocols for waiting and notification and use them in a manner inconsistent with your design
+
+#### Entry and Exit Protocols
+- Entry Protocol 
+  - Jab koi thread koi kaam karna chahta hai (jaise `take()` buffer se), to pehle check kare ki kya condition sahi hai?
+    - Agar nahi hai, to `wait()` karna chahiye.
+    - Is check ko while loop mein likhna chahiye
+- Exit Protocol
+  - Jab koi thread state change karta hai (jaise put() buffer mein element daalta hai), to:
+    - Sochna chahiye: *“Kya iss change se kisi aur thread ki condition satisfy ho gayi?”*
+    - Agar haan, to usko `notify()` ya `notifyAll()` karna chahiye. 
+- Entry + Exit ka coordination = no missed signals, no hijacked signals
+  
+> [!TIP]
+>
+> AbstractQueuedSynchronizer (AQS)
+>
+> Java ke concurrency tools jaise ReentrantLock, Semaphore, CountDownLatch etc. — sab AQS pe based hote hain.
+>
+
+
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
