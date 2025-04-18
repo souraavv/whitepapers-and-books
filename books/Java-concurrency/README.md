@@ -140,6 +140,12 @@
     - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
     - [Read-write locks](#read-write-locks)
     - [Summary](#summary-3)
+    - [References](#references)
+  - [Chapter 14. Buliding Custom Synchronizers](#chapter-14-buliding-custom-synchronizers)
+    - [Managing State Dependence](#managing-state-dependence)
+    - [Bounded Buffer that Balks When Preconditions are Not Met.](#bounded-buffer-that-balks-when-preconditions-are-not-met)
+      - [Example: Crude Blocking by Polling and Sleeping](#example-crude-blocking-by-polling-and-sleeping)
+      - [Condition Queues to the Rescue](#condition-queues-to-the-rescue)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -4557,6 +4563,288 @@ Yeh test chala 4-core Opteron machine pe, Solaris OS ke saath.
 - Explicit `Lock`s offer an extended feature set compared to intrinsic locking, including greater flexibility in dealing with lock unavailability and greater control over queueing behavior
 - But `ReentrantLock` is not a blanket substitute for `synchronized`; use it only when you need features that `synchronized` lacks.
 - Read-write locks allow multiple readers to access a guarded object concurrently, offering the potential for improved scalability when accessing read-mostly data structures.
+
+### References 
+
+- [Are Locks AutoCloseable?](https://stackoverflow.com/questions/6965731/are-locks-autocloseable#:~:text=No%2C%20neither%20the%20Lock%20interface,try%2Dwith%2Dresource%20syntax.)
+  - Short answer: No
+
+## Chapter 14. Buliding Custom Synchronizers
+- The class libraries include a number of state-dependent classes—those having operations with state-based preconditions—such as `FutureTask`, `Semaphore`, and `BlockingQueue`
+  - Jaise ki agar queue full hai or add karna hai to wait kare, agar queue empty hai or remove karna hai to wait kare, task se result retrieve karna hai to task ke finish hone ka wait kare
+- Now what happen if library classes do not provide functionality you need 
+  - You should be able to build your own synchronizers using the low-level mechanism provided by the language and libraries, including intrinsic *condition queue*, explicit `Condition` objects and the `AbstractQueueSynchronizer` framework 
+- Es chapter mai hum yahi options explore karenge - Or khud se state dependence implement karenge 
+
+### Managing State Dependence
+- In a single-threaded program, if a state-based precondition (like “the connection pool is nonempty”) does not hold when a method is called, it will never become true. 
+  - Therefore, classes in sequential programs can be coded to fail when their preconditions do not hold.
+- State-dependent methods on concurrent objects can sometimes get away with failing when their preconditions are not met, but there is often a better alternative: wait for the precondition to become true.
+- State-dependent operations that *block* until the operation can proceed are more convenient and less error-prone than those that simply fail
+- We first show how state dependence might be (painfully) tackled using polling and sleeping.
+    > [!IMPORTANT]
+    > The state variables that make up the precondition must be guarded by the object's lock, so that they can remain constant while the precondition is tested.
+    > 
+    > But if the precondition does not hold, the lock must be released so another thread can modify the object state - otherwise pre-condition will never become true
+    >
+    > The lock must then be reacquired before testing the precondition again.
+    >
+
+- Bounded buffers such as `ArrayBlockingQueue` are commonly used in producer-consumer design
+- A bounded buffer provides *put* and *take* operations, each of which has preconditions: you cannot take an element from an empty buffer, nor put an element into a full buffer.
+- State dependent operations can deal with precondition failure 
+  - by throwing an exception 
+  - or returning an error status (making it the caller's problem), 
+  - or by blocking until the object transitions to the right state.
+    ```java
+    @ThreadSafe
+    public abstract class BaseBoundedBuffer<V> {
+        @GuardedBy("this") private final V[] buf;
+        @GuardedBy("this") private int tail;
+        @GuardedBy("this") private int head;
+        @GuardedBy("this") private int count;
+
+        protected BaseBoundedBuffer(int capacity) {
+            this.buf = (V[]) new Object[capacity];
+        }
+
+        protected synchronized final void doPut(V v) {
+            buf[tail] = v;
+            if (++tail == buf.length) {
+                tail = 0;
+            }
+            ++count;
+        }
+
+        protected synchronized final V doTake() {
+            V v = buf[head];
+            buf[head] = null;
+            if (++head == buf.length) {
+                head = 0;
+            }
+            --count;
+            return v;
+        }
+
+        public synchronized final boolean isFull() {
+            return (count == buf.length);
+        }
+
+        public synchronized final boolean isEmpty() {
+            return (count == 0);
+        }
+    }
+    ```
+
+### Bounded Buffer that Balks When Preconditions are Not Met.
+- `GrumpyBoundedBuffer` is a crude first attempt at implementing a bounded buffer. 
+- The put and take methods are synchronized to ensure exclusive access to the buffer state, since both employ check-then-act logic in accessing the buffer.
+- While this approach is easy enough to implement, it is annoying to use. 
+- The simplification in implementing the buffer (forcing the caller to manage the state dependence) is more than made up for by the substantial complication in using it, since now the caller must be prepared to catch exceptions and possibly retry for every buffer operation
+- Pushing the state dependence back to the caller also makes it nearly impossible to do things like preserve FIFO ordering; by forcing the caller to retry, you lose the information of who arrived first.
+    ```java
+    @ThreadSafe
+    public class GrumpyBoundedBuffer<V> extends BaseBoundedBuffer<V> {
+        public GrumpyBoundedBuffer(int size) {
+            super(size);
+        }
+
+        // notice under synchronized 
+        public synchronized void put(V v) throws BufferFullException {
+            if (isFull()) {
+                throw new BufferFullException();
+            }
+            doPut(v);
+        }
+
+        public synchronized V take() throws BufferEmptyException {
+            if (isEmpty()) {
+                throws new BufferEmptyException();
+            }
+            return doTake();
+        }
+    }
+    ```
+- Client Logic 
+    ```java
+    while (true) {
+        try {
+            V item = buffer.take();
+            break;
+        } catch (BufferEmptyException e) {
+            Thread.sleep(SLEEP_GRANULARITY);
+        }
+    }
+    ```
+
+- A variant of this approach is to return an error value when the buffer is in the wrong state. 
+  - This is a minor improvement in that it doesn't abuse the exception mechanism by throwing an exception that really means “sorry, try again”
+  - But it does not address the fundamental problem: that callers must deal with precondition failures themselves
+- `Queue` offers both of these options— `poll` returns `null` if the queue is empty, and remove throws an exception—but Queue is not intended for use in producer-consumer designs
+- `BlockingQueue`, whose operations block until the queue is in the right state to proceed, is a better choice when producers and consumers will execute concurrently.
+- The client code is not the only way to implement the retry logic 
+  - The caller could retry the take immediately, without sleeping—an approach known as busy waiting or spin waiting. This could consume quite a lot of CPU time if the buffer state does not change for a while
+  - On the other hand, if the caller decides to `sleep` so as not to consume so much CPU time, it could easily “oversleep” if the buffer state changes shortly after the call to `sleep`
+  - So the client code is left with the choice between the poor CPU usage of spinning and the poor responsiveness of sleeping. Somewhere between busy waiting and sleeping would be calling Thread.yield in each iteration, which is a hint to the scheduler that this would be a reasonable time to let another thread run
+
+#### Example: Crude Blocking by Polling and Sleeping
+- `SleepyBoundedBuffer` attempts to spare callers the inconvenience of implementing the retry logic on each call by encapsulating the same crude “poll and sleep” retry mechanism within the put and take operations. 
+    ```java
+    @ThreadSafe
+    public class SleepyBoundedBuffer<V> extends BaseBoundedBuffer<V> {
+        public SleepyBoundedBuffer(int size) {
+            super(size);
+        }
+
+        public void put(V v) throws InterruptedException {
+            while (true) {
+                synchronized (this) {
+                    if (!isFull()) {
+                        doPut(v);
+                        return;
+                    }
+                }
+                Thread.sleep(SLEEP_GRANULARITY);
+            }
+        }
+
+        public void V take() throws InterruptedException {
+            while (true) {
+                synchronized (this) {
+                    if (!isEmpty()) {
+                        return doTake();
+                    }
+                }
+                Thread.sleep(SLEEP_GRANULARITY);
+            }
+        }
+    }
+    ```
+- Once the thread wakes up, it reacquires the lock and tries again, alternating between sleeping and testing the state condition until the operation can proceed.
+- It is usually a bad idea for a thread to go to sleep or otherwise block with a lock held, but in this case is even worse because the desired condition (buffer is full/empty) can never become true if the lock is not released!
+- From the perspective of the caller, this works nicely—if the operation can proceed immediately, it does, and otherwise it blocks—and the caller need not deal with the mechanics of failure and retry. 
+- Choosing the sleep granularity is a tradeoff between responsiveness and CPU usage
+- `SleepyBoundedBuffer` also creates another requirement for the caller—dealing with `InterruptedException`
+- When a method blocks waiting for a condition to become true, the polite thing to do is to provide a cancellation mechanism
+
+> [!TIP]
+>
+> These attempts to synthesize a blocking operation from polling and sleeping were fairly painful. It would be nice to have a way of suspending a thread but ensuring that it is awakened promptly when a certain condition (such as the buffer being no longer full) becomes true. This is exactly what condition queues do.
+
+#### Condition Queues to the Rescue
+- Condition queues are like the “toast is ready” bell on your toaster.
+  - If you are listening for it, you are notified promptly when your toast is ready and can drop what you are doing (or not, maybe you want to finish the newspaper first) and get your toast
+- Condition queue ka matlab hota hai ek aisi jagah jahan kuch threads ruk kar kisi condition ke true hone ka intezaar karte hain.
+- Jaise normal queue mein data items hote hain, waise condition queue mein threads hote hain jo kisi condition ke pura hone ka wait kar rahe hote hain.
+
+> [!TIP]
+>
+> A condition queue gets its name because it gives a group of threads—called the wait set—a way to wait for a specific condition to become true
+>
+> Unlike typical queues in which the elements are data items, the elements of a condition queue are the threads waiting for the condition.
+
+- Just as each Java object can act as a lock, each object can also act as a condition queue, and the `wait`, `notify`, and `notifyAll` methods in Object constitute the API for intrinsic condition queues.
+
+- Java ka har object do kaam kar sakta hai:
+  - Lock ka kaam kar sakta hai 
+  - Condition queue ka kaam bhi kar sakta hai (jisme wait, notify, notifyAll methods use hote hain).
+- Lekin in methods ko use karne ke liye ek zaroori condition hai:
+- Agar tum kisi object par wait ya notify lagana chahte ho, to tumhare paas us object ka lock hona chahiye.
+
+- Lock aur Condition Queue ka relation kya hai?
+  - Jab tak tumhare paas lock nahi hai, tum object ki state ko safely check nahi kar sakte, aur kisi thread ko notify bhi nahi kar sakte.
+  - Matlab:
+    - Tum tabhi kisi condition ka wait kar sakte ho jab tum us object ki current state ko dekh sako.
+    - Aur tabhi kisi thread ko jaga sakte ho jab tum state ko change kar sako.
+- `wait()` exactly kya karta hai?
+  - Tumhara thread lock chhod deta hai.
+  - Thread OS ke through sleep (ruk) jata hai.
+  - Isse doosre threads ko lock mil jata hai, aur wo object ke state ko change kar sakte hain.
+  - Jab thread dobara wake hota hai (notify hone par), to wo phir se lock leke kaam shuru karta hai.
+- Normally, `wait()`/`notifyAll()` wali condition queues fair nahi hoti — matlab jo thread pehle aaya, zaroori nahi wo pehle wake ho.
+- Lekin agar tum explicit Conditions ka use karo (jaise `ReentrantLock.newCondition()`), to tum fair ya non-fair dono choose kar sakte ho.
+
+<details>
+<summary> Eaxmple se samje ? </summary> 
+- Jab hum synchronized + wait/notify use karte hain, to woh intrinsic lock aur intrinsic condition queue use karta hai — ye by default non-fair hoti hai.
+- Agar tum ReentrantLock ka use karo, to tum explicitly Condition bana sakte ho.
+- Ek shared buffer jisme ek hi item store ho sakta hai (producer ek item daalega, consumer lega).
+
+```java
+import java.util.concurrent.locks.*;
+
+public class SingleItemBuffer<V> {
+    // true = fair
+    private final Lock lock = new ReentrantLock(true);
+    private final Condition nonEmpty = lock.newCondition();
+    private final Condition notFull = lock.newCondition();
+
+    private V item;
+    private boolean available = false;
+
+    // Producer method
+    public void put(V v) throws InterruptedException {
+        lock.lock();
+        try {
+            while (available) {
+                notFull.await();
+            }
+            item = v;
+            available = true;
+            notEmpty.singnal();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    pubic V take() throws InterruptedException {
+        lock.lock();
+        try {
+            while (!available) {
+                nonEmpty.await();
+            }
+            available = false;
+            notFull.signal();
+            return item;
+        } finally {
+            lock.unloack();
+        }
+    }
+}
+```
+
+</details>
+
+```java
+@ThreadSafe
+public class BoundedBuffer<V> extends BaseBoundedBuffer<V> {
+    public BoundedBuffer(int size) {
+        super(size);
+    }
+
+    // Blocks until: not-full
+    public synchronized void put(V v) throws InterruptedException {
+        while (isFull()) {
+            wait();
+        }
+        doPut(v);
+        notifyAll();
+    }
+
+    // Blocks until: non-empty
+    public synchronized V take() throws InterruptedException {
+        while (isEmpty()) {
+            wait();
+        }
+        V v = doTake();
+        notifyAll();
+        return v;
+    }
+}
+```
+- `BoundedBuffer` is finally good enough to use
+- A production version should also include timed versions of `put` and `take`, so that blocking operations can time out if they cannot complete within a time budget. 
+
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
