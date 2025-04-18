@@ -1,150 +1,151 @@
 - [Java Concurrency in Practice](#java-concurrency-in-practice)
-    - [Chapter 1. Introduction](#chapter-1-introduction)
-        - [Benefits of Threads](#benefits-of-threads)
-            - [Exploiting Multiple Processors](#exploiting-multiple-processors)
-        - [Risks of Threads](#risks-of-threads)
-            - [Safety Hazards](#safety-hazards)
-            - [Liveness Hazards](#liveness-hazards)
-            - [Performance Hazards](#performance-hazards)
-    - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
-        - [What is Thread Safety?](#what-is-thread-safety)
-            - [Example: A Stateless Servlet](#example-a-stateless-servlet)
-        - [Atomicity](#atomicity)
-            - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
-            - [Compound Actions](#compound-actions)
-            - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
-        - [Locking](#locking)
-            - [Intrinsic Locks](#intrinsic-locks)
-            - [Reentracy](#reentracy)
-        - [Guarding State with Locks](#guarding-state-with-locks)
-        - [Liveness and Performance](#liveness-and-performance)
-    - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
-        - [Visibility](#visibility)
-            - [Stale Data](#stale-data)
-            - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
-            - [Locking and Visibility](#locking-and-visibility)
-            - [Volatile Variables](#volatile-variables)
-        - [Publication and Escape](#publication-and-escape)
-        - [Thread Confinement](#thread-confinement)
-            - [Stack Confinement](#stack-confinement)
-            - [ThreadLocal](#threadlocal)
-        - [Immutability](#immutability)
-            - [Final Fields](#final-fields)
-        - [Safe Publication](#safe-publication)
-            - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
-            - [Safe Publication Idioms](#safe-publication-idioms)
-        - [Summary](#summary)
-    - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
-        - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
-            - [State-dependent Operations](#state-dependent-operations)
-            - [State Ownership](#state-ownership)
-            - [Instance Confinement](#instance-confinement)
-            - [The Java Monitor Pattern](#the-java-monitor-pattern)
-            - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
-            - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
-            - [When Delegation Fails](#when-delegation-fails)
-        - [Publishing underlying state variables](#publishing-underlying-state-variables)
-        - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
-            - [Client-side Locking](#client-side-locking)
-    - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
-        - [Synchronized Collections](#synchronized-collections)
-            - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
-            - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
-            - [Hidden Iterators](#hidden-iterators)
-        - [Concurrent collections](#concurrent-collections)
-            - [ConcurrentHashMap](#concurrenthashmap)
-            - [Additional Atomic Map Operations](#additional-atomic-map-operations)
-            - [CopyOnWriteArrayList](#copyonwritearraylist)
-        - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
-            - [Serial thread confinement](#serial-thread-confinement)
-            - [Deques and work stealing](#deques-and-work-stealing)
-        - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
-        - [Synchronizers](#synchronizers)
-            - [Latches](#latches)
-            - [FutureTask](#futuretask)
-            - [Semaphores](#semaphores)
-    - [Chapter 6. Task Execution](#chapter-6-task-execution)
-        - [Executing Tasks in Threads](#executing-tasks-in-threads)
-            - [Executing Tasks Sequentially](#executing-tasks-sequentially)
-            - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
-            - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
-        - [The Executor Framework](#the-executor-framework)
-            - [Execution Policies](#execution-policies)
-            - [Thread Pools](#thread-pools)
-            - [Executor Lifecycle](#executor-lifecycle)
-            - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
-        - [Finding exploitable parallelism](#finding-exploitable-parallelism)
-            - [Example](#example)
-            - [Result-bearing tasks: Callable and Future](#result-bearing-tasks-callable-and-future)
-        - [Example: page renderer with Future](#example-page-renderer-with-future)
-        - [Limitations of parallelizing heterogeneous tasks](#limitations-of-parallelizing-heterogeneous-tasks)
-        - [CompletionService: Executor meets BlockingQueue](#completionservice-executor-meets-blockingqueue)
-        - [Placing time limits on tasks](#placing-time-limits-on-tasks)
-        - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
-        - [Summary](#summary-1)
-    - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
-        - [Task Cancellation](#task-cancellation)
-        - [Interruption](#interruption)
-        - [Interruption Policy](#interruption-policy)
-        - [Responding to Interruption](#responding-to-interruption)
-        - [Example (Timed Run)](#example-timed-run)
-            - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
-            - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
-        - [Cancellation via `Future`](#cancellation-via-future)
-        - [Dealing with Non-interruptible Blocking](#dealing-with-non-interruptible-blocking)
-        - [Encapsulating nonstandard cancellation with `newtaskFor`](#encapsulating-nonstandard-cancellation-with-newtaskfor)
-            - [Create CancellableTask Interface](#create-cancellabletask-interface)
-            - [Create CancellingExecutor](#create-cancellingexecutor)
-            - [Example](#example-1)
-        - [Stopping a Thread-based Service](#stopping-a-thread-based-service)
-            - [Java’s ExecutorService Approach](#javas-executorservice-approach)
-            - [Example: A Logging Service](#example-a-logging-service)
-            - [Producer-Consumer Logging Service with No Shutdown Support.](#producer-consumer-logging-service-with-no-shutdown-support)
-            - [Poison Pills](#poison-pills)
-            - [Limitations of Shutdownnow](#limitations-of-shutdownnow)
-        - [Handling Abnormal Thread Termination (Theory heavy section, but worth)](#handling-abnormal-thread-termination-theory-heavy-section-but-worth)
-            - [Uncaught Exception Handlers](#uncaught-exception-handlers)
-        - [JVM Shutdown](#jvm-shutdown)
-            - [Shutdown Hooks](#shutdown-hooks)
-            - [Daemon Threads](#daemon-threads)
-            - [Finalizers](#finalizers)
-    - [Chapter 8. Applying Thread Pools](#chapter-8-applying-thread-pools)
-        - [Implicit Couplings Between Tasks and Execution Policies](#implicit-couplings-between-tasks-and-execution-policies)
-            - [Thread Starvation Deadlock](#thread-starvation-deadlock)
-            - [Long Running Task](#long-running-task)
-        - [Sizing Thread Pools](#sizing-thread-pools)
-        - [Configuring `ThreadPoolExecutor`](#configuring-threadpoolexecutor)
-            - [Thread Creation and Teardown](#thread-creation-and-teardown)
-            - [Managing Queued Tasks](#managing-queued-tasks)
-            - [Saturation Policies](#saturation-policies)
-            - [Thread Factories](#thread-factories)
-        - [Extending `ThreadPoolExecutor`](#extending-threadpoolexecutor)
-        - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
-            - [Example: A Puzzle Framework](#example-a-puzzle-framework)
-        - [Summary](#summary-2)
-    - [Chapter 9. GUI Applications](#chapter-9-gui-applications)
-    - [Chapter 10. Avoiding Liveness Hazards](#chapter-10-avoiding-liveness-hazards)
-        - [Deadlock](#deadlock)
-            - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
-            - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
-            - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
-    - [Advance Topics: Chapter 13 Explicity Locks](#advance-topics-chapter-13-explicity-locks)
-        - [Locks and Reentrant Locks](#locks-and-reentrant-locks)
-            - [Lock Interface](#lock-interface)
-            - [Polled and Timed Lock Acquisition](#polled-and-timed-lock-acquisition)
-            - [Interruptible Lock Acquisition](#interruptible-lock-acquisition)
-            - [Non-block-structured Locking](#non-block-structured-locking)
-        - [Peformance considerations](#peformance-considerations)
-        - [Fairness](#fairness)
-        - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
-        - [Read-write locks](#read-write-locks)
-        - [Summary](#summary-3)
-    - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
-        - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
-        - [Platform Memory Models](#platform-memory-models)
-        - [Reordering](#reordering)
-        - [Java Memory Model in 500 words or less](#java-memory-model-in-500-words-or-less)
-        - [Piggybacking on synchronization](#piggybacking-on-synchronization)
+  - [Chapter 1. Introduction](#chapter-1-introduction)
+    - [Benefits of Threads](#benefits-of-threads)
+      - [Exploiting Multiple Processors](#exploiting-multiple-processors)
+    - [Risks of Threads](#risks-of-threads)
+      - [Safety Hazards](#safety-hazards)
+      - [Liveness Hazards](#liveness-hazards)
+      - [Performance Hazards](#performance-hazards)
+  - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
+    - [What is Thread Safety?](#what-is-thread-safety)
+      - [Example: A Stateless Servlet](#example-a-stateless-servlet)
+    - [Atomicity](#atomicity)
+      - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
+      - [Compound Actions](#compound-actions)
+      - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
+    - [Locking](#locking)
+      - [Intrinsic Locks](#intrinsic-locks)
+      - [Reentracy](#reentracy)
+    - [Guarding State with Locks](#guarding-state-with-locks)
+    - [Liveness and Performance](#liveness-and-performance)
+  - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
+    - [Visibility](#visibility)
+      - [Stale Data](#stale-data)
+      - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
+      - [Locking and Visibility](#locking-and-visibility)
+      - [Volatile Variables](#volatile-variables)
+    - [Publication and Escape](#publication-and-escape)
+    - [Thread Confinement](#thread-confinement)
+      - [Stack Confinement](#stack-confinement)
+      - [ThreadLocal](#threadlocal)
+    - [Immutability](#immutability)
+      - [Final Fields](#final-fields)
+    - [Safe Publication](#safe-publication)
+      - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
+      - [Safe Publication Idioms](#safe-publication-idioms)
+    - [Summary](#summary)
+  - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
+    - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
+      - [State-dependent Operations](#state-dependent-operations)
+      - [State Ownership](#state-ownership)
+      - [Instance Confinement](#instance-confinement)
+      - [The Java Monitor Pattern](#the-java-monitor-pattern)
+      - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
+      - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
+      - [When Delegation Fails](#when-delegation-fails)
+    - [Publishing underlying state variables](#publishing-underlying-state-variables)
+    - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
+      - [Client-side Locking](#client-side-locking)
+  - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
+    - [Synchronized Collections](#synchronized-collections)
+      - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
+      - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
+      - [Hidden Iterators](#hidden-iterators)
+    - [Concurrent collections](#concurrent-collections)
+      - [ConcurrentHashMap](#concurrenthashmap)
+      - [Additional Atomic Map Operations](#additional-atomic-map-operations)
+      - [CopyOnWriteArrayList](#copyonwritearraylist)
+    - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
+      - [Serial thread confinement](#serial-thread-confinement)
+      - [Deques and work stealing](#deques-and-work-stealing)
+    - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
+    - [Synchronizers](#synchronizers)
+      - [Latches](#latches)
+      - [FutureTask](#futuretask)
+      - [Semaphores](#semaphores)
+  - [Chapter 6. Task Execution](#chapter-6-task-execution)
+    - [Executing Tasks in Threads](#executing-tasks-in-threads)
+      - [Executing Tasks Sequentially](#executing-tasks-sequentially)
+      - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
+      - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
+    - [The Executor Framework](#the-executor-framework)
+      - [Execution Policies](#execution-policies)
+      - [Thread Pools](#thread-pools)
+      - [Executor Lifecycle](#executor-lifecycle)
+      - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
+    - [Finding exploitable parallelism](#finding-exploitable-parallelism)
+      - [Example](#example)
+      - [Result-bearing tasks: Callable and Future](#result-bearing-tasks-callable-and-future)
+    - [Example: page renderer with Future](#example-page-renderer-with-future)
+    - [Limitations of parallelizing heterogeneous tasks](#limitations-of-parallelizing-heterogeneous-tasks)
+    - [CompletionService: Executor meets BlockingQueue](#completionservice-executor-meets-blockingqueue)
+    - [Placing time limits on tasks](#placing-time-limits-on-tasks)
+    - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
+    - [Summary](#summary-1)
+  - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
+    - [Task Cancellation](#task-cancellation)
+    - [Interruption](#interruption)
+    - [Interruption Policy](#interruption-policy)
+    - [Responding to Interruption](#responding-to-interruption)
+    - [Example (Timed Run)](#example-timed-run)
+      - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
+      - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
+    - [Cancellation via `Future`](#cancellation-via-future)
+    - [Dealing with Non-interruptible Blocking](#dealing-with-non-interruptible-blocking)
+    - [Encapsulating nonstandard cancellation with `newtaskFor`](#encapsulating-nonstandard-cancellation-with-newtaskfor)
+      - [Create CancellableTask Interface](#create-cancellabletask-interface)
+      - [Create CancellingExecutor](#create-cancellingexecutor)
+      - [Example](#example-1)
+    - [Stopping a Thread-based Service](#stopping-a-thread-based-service)
+      - [Java’s ExecutorService Approach](#javas-executorservice-approach)
+      - [Example: A Logging Service](#example-a-logging-service)
+      - [Producer-Consumer Logging Service with No Shutdown Support.](#producer-consumer-logging-service-with-no-shutdown-support)
+      - [Poison Pills](#poison-pills)
+      - [Limitations of Shutdownnow](#limitations-of-shutdownnow)
+    - [Handling Abnormal Thread Termination (Theory heavy section, but worth)](#handling-abnormal-thread-termination-theory-heavy-section-but-worth)
+      - [Uncaught Exception Handlers](#uncaught-exception-handlers)
+    - [JVM Shutdown](#jvm-shutdown)
+      - [Shutdown Hooks](#shutdown-hooks)
+      - [Daemon Threads](#daemon-threads)
+      - [Finalizers](#finalizers)
+  - [Chapter 8. Applying Thread Pools](#chapter-8-applying-thread-pools)
+    - [Implicit Couplings Between Tasks and Execution Policies](#implicit-couplings-between-tasks-and-execution-policies)
+      - [Thread Starvation Deadlock](#thread-starvation-deadlock)
+      - [Long Running Task](#long-running-task)
+    - [Sizing Thread Pools](#sizing-thread-pools)
+    - [Configuring `ThreadPoolExecutor`](#configuring-threadpoolexecutor)
+      - [Thread Creation and Teardown](#thread-creation-and-teardown)
+      - [Managing Queued Tasks](#managing-queued-tasks)
+      - [Saturation Policies](#saturation-policies)
+      - [Thread Factories](#thread-factories)
+    - [Extending `ThreadPoolExecutor`](#extending-threadpoolexecutor)
+    - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
+      - [Example: A Puzzle Framework](#example-a-puzzle-framework)
+    - [Summary](#summary-2)
+  - [Chapter 9. GUI Applications](#chapter-9-gui-applications)
+  - [Chapter 10. Avoiding Liveness Hazards](#chapter-10-avoiding-liveness-hazards)
+    - [Deadlock](#deadlock)
+      - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
+      - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
+      - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
+      - [Open Calls](#open-calls)
+  - [Advance Topics: Chapter 13 Explicity Locks](#advance-topics-chapter-13-explicity-locks)
+    - [Locks and Reentrant Locks](#locks-and-reentrant-locks)
+      - [Lock Interface](#lock-interface)
+      - [Polled and Timed Lock Acquisition](#polled-and-timed-lock-acquisition)
+      - [Interruptible Lock Acquisition](#interruptible-lock-acquisition)
+      - [Non-block-structured Locking](#non-block-structured-locking)
+    - [Peformance considerations](#peformance-considerations)
+    - [Fairness](#fairness)
+    - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
+    - [Read-write locks](#read-write-locks)
+    - [Summary](#summary-3)
+  - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
+    - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
+    - [Platform Memory Models](#platform-memory-models)
+    - [Reordering](#reordering)
+    - [Java Memory Model in 500 words or less](#java-memory-model-in-500-words-or-less)
+    - [Piggybacking on synchronization](#piggybacking-on-synchronization)
 
 
 # Java Concurrency in Practice
@@ -4456,9 +4457,101 @@ Yeh test chala 4-core Opteron machine pe, Solaris OS ke saath.
 
 
 ### Choosing between Synchronized and Reentrant Lock 
-- Both `synchronized` and `ReentrantLock`:
-  - 
+- `ReentrantLock` provides the same locking and memory semantics as intrinsic locking, as well as additional features such as timed lock waits, interruptible lock wait, fairness, and the ability to implement non-block-structured locking 
+- The performance of `ReentrantLock` appears to dominate that of intrinsic locking 
+- Intrinsic locks still have signifcant advantages over explicit locks
+- Intrinsic locks (`synchronized` blocks/methods) are simpler and less error-prone, making them suitable for most use cases. 
+- However, `ReentrantLock` offers advanced features not available with intrinsic locks, such as:​
+  - Ability to interrupt threads waiting on the lock
+  - Non-blocking attempts to acquire the lock (`tryLock()`)
+  - Ability to acquire the lock with a timeout
+- These features make ReentrantLock a powerful tool for complex synchronization scenarios. However, it's crucial to use it carefully, as forgetting to release the lock can lead to deadlocks and other concurrency issues
+- Anyway these details keep changing from version to version. thus, better to looks at some performance test whitepapers if required.
+
+    ```java
+    import java.util.concurrent.locks.ReentrantLock;
+
+    public class AutoCloseableLock implements AutoCloseable {
+        private final ReentrantLock lock;
+
+        public AutoCloseableLock(ReentrantLock lock) {
+            this.lock = lock;
+            this.lock.lock();
+        }
+
+        @Override
+        public void close() {
+            lock.unlock();
+        }
+    }
+
+    ReentrantLock lock = new ReentrantLock();
+
+    try (AutoCloseableLock ignored = new AutoCloseableLock(lock)) {
+        // Critical section
+        // The lock is automatically released at the end of this block
+    }
+    ```
+
 ### Read-write locks 
+
+- `ReentrantLock` implements a standard mutual-exclusion lock: at most one thread at a time can hold a `ReentrantLock`. 
+- But mutual exclusion is frequently a stronger locking discipline than needed to preserve data integrity, and thus limits concurrency more than necessary. 
+- Mutual exclusion is a conservative locking strategy that prevents writer/writer and writer/reader overlap, but also prevents reader/reader overlap. 
+- In many cases, data structures are “read-mostly”—they are mutable and are sometimes modified, but most accesses involve only reading
+- In these cases, it would be nice to relax the locking requirements to allow multiple readers to access the data structure at once.
+- As long as each thread is guaranteed an up-to-date view of the data and no other thread modifies the data while the readers are viewing it, there will be no problems
+- This is what read-write locks allow: a resource can be accessed by multiple readers or a single writer at a time, but not both.
+- The locking strategy implemented by read-write locks allows multiple simultaneous readers but only a single writer. 
+    ```java
+    public interface ReadWriteLock {
+        Lock readLock();
+        Lock writeLock();
+    }
+    ```
+- **Release preference**. When a writer releases the write lock and both readers and writers are queued up, who should be given preference—readers, writers, or whoever asked first?
+- **Reader barging**. If the lock is held by readers but there are waiting writers, should newly arriving readers be granted immediate access, or should they wait behind the writers? Allowing readers to barge ahead of writers enhances concurrency but runs the risk of starving writers.
+- **Reentrancy.** Are the read and write locks reentrant?
+- **Downgrading.** If a thread holds the write lock, can it acquire the read lock without releasing the write lock? This would let a writer “downgrade” to a read lock without letting other writers modify the guarded resource in the meantime.
+- **Upgrading**. Can a read lock be upgraded to a write lock in preference to other waiting readers or writers? Most read-write lock implementations do not support upgrading, because without an explicit upgrade operation it is deadlock-prone. (If two readers simultaneously attempt to upgrade to a write lock, neither will release the read lock.)
+- `ReentrantReadWriteLock` provides reentrant locking semantics for both locks. Like `ReentrantLock`, a `ReentrantReadWriteLock` can be constructed as nonfair (the default) or fair. 
+- With a fair lock, preference is given to the thread that has been waiting the longest; if the lock is held by readers and a thread requests the write lock, no more readers are allowed to acquire the read lock until the writer has been serviced and releases the write lock. With a nonfair lock, the order in which threads are granted access is unspecified. Downgrading from writer to reader is permitted; upgrading from reader to writer is not (attempting to do so results in deadlock).
+- Like `ReentrantLock`, thewrite lock in `ReentrantReadWriteLock` has a unique owner and can be released only by the thread that acquired it
+- For ReadLock, JVM keep track also of which threads have been granted the read locks
+
+    ```java
+    public class ReadWriteMap<K, V> {
+        private final Map<K, V> map;
+        private final ReadWriteLock lock = new ReentrantReadWriteLock();
+        private final Lock r = lock.readLock();
+        private final Lock w = lock.writeLock();
+
+        public ReadWriteMap(Map<K, V> map) {
+            this.map = map;
+        }
+
+        // same for remove(), putAll(), clear();
+        public V put (K key, V value) {
+            w.lock();
+            try {
+                return map.put(key, value);
+            } finally {
+                w.unlock();
+            }
+        }
+
+        // same forother read-only operation 
+        public V get(Object key) {
+            r.lock();
+            try {
+                return map.get(key);
+            } finally {
+                r.unlock();
+            }
+        }
+    }
+
+    ```
 
 ### Summary 
 - Explicit `Lock`s offer an extended feature set compared to intrinsic locking, including greater flexibility in dealing with lock unavailability and greater control over queueing behavior
