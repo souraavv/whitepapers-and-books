@@ -146,6 +146,10 @@
     - [Bounded Buffer that Balks When Preconditions are Not Met.](#bounded-buffer-that-balks-when-preconditions-are-not-met)
       - [Example: Crude Blocking by Polling and Sleeping](#example-crude-blocking-by-polling-and-sleeping)
       - [Condition Queues to the Rescue](#condition-queues-to-the-rescue)
+    - [Using Condition Queues](#using-condition-queues)
+      - [The Condition Predicate](#the-condition-predicate)
+      - [Lock – Wait – Predicate ka 3-way Connection](#lock--wait--predicate-ka-3-way-connection)
+      - [Waking Up Too Soon](#waking-up-too-soon)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -4568,6 +4572,9 @@ Yeh test chala 4-core Opteron machine pe, Solaris OS ke saath.
 
 - [Are Locks AutoCloseable?](https://stackoverflow.com/questions/6965731/are-locks-autocloseable#:~:text=No%2C%20neither%20the%20Lock%20interface,try%2Dwith%2Dresource%20syntax.)
   - Short answer: No
+- [Java : Does wait() release lock from synchronized block](https://stackoverflow.com/questions/13249835/java-does-wait-release-lock-from-synchronized-block)
+  - Short answer: Yes
+  - Little more detail: Thread on wait call -> WAITING STATE -- (notify) -- BLOCKED -- (fight for the lock) --> ACQUIRE LOCK (RUNNABLE STATE)
 
 ## Chapter 14. Buliding Custom Synchronizers
 - The class libraries include a number of state-dependent classes—those having operations with state-based preconditions—such as `FutureTask`, `Semaphore`, and `BlockingQueue`
@@ -4845,6 +4852,85 @@ public class BoundedBuffer<V> extends BaseBoundedBuffer<V> {
 - `BoundedBuffer` is finally good enough to use
 - A production version should also include timed versions of `put` and `take`, so that blocking operations can time out if they cannot complete within a time budget. 
 
+### Using Condition Queues
+- Condition queues ka use karne se hum aise classes bana sakte hain jo system ke state ke upar depend karte hain 
+  - Ye powerful toh hai, lekin galat use karna bahut easy hai — kyunki compiler ya JVM tumhe rokta nahi hai agar tum `wait` aur `notify` ka galat use karo.
+- Isliye jab possible ho toh ready-made classes ka use karna better hai, jaise:
+  - `LinkedBlockingQueue`, `CountDownLatch`, `Semaphore`, `FutureTask`
+
+#### The Condition Predicate
+- The Condition Predicate – Kya hota hai?
+  - Condition queue ka core idea hota hai: Tum kis condition ka wait kar rahe ho?
+    - Isko kehte hain condition predicate.
+- Angreize mai bole to - *The condition predicate is the precondition that makes an operation state-dependent in the first place.* 
+
+> [!IMPORTANT]
+> Document the condition predicate(s) associated with a condition queue and the operations that wait on them.
+
+> [!TIP]
+>
+> Ye ek boolean condition hoti hai jo batati hai ki thread kaam kare ya ruk jaaye.
+>
+
+- Example se samjho: Bounded Buffer
+  - Buffer mein 2 operation hote hain: `put(item)` or `take()`
+  - Condition Predicate kya hai yahan?
+    - `take()` ka condition predicate: buffer is not empty (agar empty hai toh ruk jao, `wait()` karo)
+    - `put()` ka condition predicate: buffer is not full (agar full hai toh ruk jao, `wait()` karo)
+- Ye condition predicate kaam karte hain class ke state variables se jaise `count`, `bufferSize`, etc.
+
+#### Lock – Wait – Predicate ka 3-way Connection
+- Har `wait()` call ke pehle tumhe 3 cheezein ensure karni hoti hain:
+  - Tum lock hold karo (same object ka jisme wait kar rahe ho).
+  - Tum condition predicate check karo (state variable se).
+  - Agar predicate false hai, toh `wait()` karo. 
+- Yeh sab ek hi object pe hona chahiye, taaki consistency bani rahe.
+- Flow kya hota hai?
+  - Maan lo `take()` call hua:
+    - Lock lo buffer pe.
+    - Dekho kya buffer empty hai (predicate check).
+    - Agar empty hai, toh `wait()` karo (lock chhod ke ruk jao).
+    - Jab koi put() karega, toh notify() hoga.
+    - Thread wake hoke lock dubara lega, predicate check karega. 
+    - Agar ab predicate true hai, toh item nikaal lega.
+    > [!IMPORTANT]
+    > 
+    > Note: Wake hone ke baad thread ko koi priority nahi milti. Lock ke liye sab barabar se race karte hain.
+
+#### Waking Up Too Soon
+- Jab thread `wait()` se wapas aata hai, toh kya condition ab true hai?
+  - Nahi. Yeh zaroori nahi hai ki jis condition ka thread wait kar raha tha, wo abhi sach ho.
+- Kyun `wait()` ke baad bhi condition false ho sakti hai?
+  - Ek hi condition queue pe multiple condition predicates ho sakte hain.
+    - Jaise: ek bounded buffer mein,
+      - `put()` wait karega jab buffer full ho — condition: "not full"
+      - `take()` wait karega jab buffer empty ho — condition: "not empty"
+      - Dono alag conditions hain, par same queue pe wait kar rahe hain.
+  - Jab `notifyAll()` call hota hai:
+    - Har waiting thread uth jaata hai.
+    - Par har thread ko apna condition predicate check karna padta hai, kyunki notify kisi bhi reason se hua ho sakta hai.
+  - Aisa bhi ho sakta hai:
+    - Jab `notifyAll()` hua, tab condition true thi.
+    - Lekin jab tumhara thread wapas lock leke `wait()` se return kare, tab tak koi aur thread state change kar chuka ho.
+- For all these reasons, when you wake up from wait you must test the condition predicate again, and go back to waiting (or fail) if it is not yet true. Since you can wake up repeatedly without your condition predicate being true, you must therefore always call wait from within a loop,
+
+- Canonical Form (Sabse sahi, accepted, standard, ya recommended way) for State-dependent Methods.
+- Yeh niche bala template yad rakh lo, yahi standard (canonical) hai
+    ```java
+    void stateDependentMethod() throws InterruptedException {
+        // hamesa lock lo
+        synchronized (lock) {
+            // hamesa ek predicate rakho
+            while (!conditionPredicate()) {
+                // wait ko hamesa while loop mai hi call karo, kya pata
+                // kab hi jag jana pade...kya hi pata
+                // .......esley Bhagwan ko yad karte raho
+                lock.wait();
+                // Har baar wait() se return hone ke baad, condition check dobara karo.
+            }
+        }
+    }
+    ```
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
