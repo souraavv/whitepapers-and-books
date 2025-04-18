@@ -152,6 +152,7 @@
       - [Waking Up Too Soon](#waking-up-too-soon)
       - [Missed Signals](#missed-signals)
       - [Notification](#notification)
+      - [Example - A Gate Class](#example---a-gate-class)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -4991,6 +4992,50 @@ public class BoundedBuffer<V> extends BaseBoundedBuffer<V> {
     - Why $n^2$ - Each turn one thread process, so remaining $n - 1$ are still pending
       - $n$ wakeups + $(n - 1)$ wakeups + ... + $1$ wakeup -> $O(n^2)$
 
+#### Example - A Gate Class 
+- It is easy to develop a recloseable ThreadGate class using condition waits
+  - Kabhi-kabhi hume gate ko dobara band karne ki zarurat hoti hai
+  - Normal `countDown()` based gate ek baar open to ho jate hai pr bapis close nahi kar sakte
+
+```java
+@ThreadSafe
+public class ThreadGate {
+    @GuardedBy("this") private boolean isOpen;
+    @GuardedBy("this") private int generation;
+
+    public synchronized void close() {
+        isOpen = false;
+    }
+
+    public synchronized void open() {
+        ++generation;
+        isOpen = true;
+        notifyAll();
+    }
+
+    public synchronized void await() throws InterruptedException {
+        int arrivalGeneration = generation;
+        // Agar gate open nahi bhi hai abhi.. pr agar mai purani generation
+        // ka hu to mai ja sakta hu.. (esme mai purana esley bol raha hu
+        // kyuki hum gaurantee kar rahe hai generation strickly increase krega
+        // - badi faltu ki info h, pr hum proof mai aise hi time pass karte hai)
+        while (!isOpen && arrivalGeneration == generation) {
+            wait();
+        }
+    }
+}
+```
+- `isOpen` check karna enough kyun nahi hai?
+  - Maan lo:
+    - 5 threads gate pe wait kar rahe hain.
+    - Tumne `open()` call kiya → `notifyAll` gaya.
+    - Par usi waqt koi `close()` bhi call kar deta hai.
+    - Toh kuch threads jaag jaayenge par fir lock lene ke baad dekhenge ki gate toh ab band hai.
+    - Unko galat signal mil gaya — ye buggy hai.
+  - Solution kya hai?
+    - Har baar jab gate close hota hai, ek generation number increment kar do.
+    - Jab thread `await()` karta hai, woh current generation note kar leta hai.
+    - Jab woh dobara jaagta hai, toh check karta hai:
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
