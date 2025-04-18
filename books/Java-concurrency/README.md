@@ -150,6 +150,8 @@
       - [The Condition Predicate](#the-condition-predicate)
       - [Lock – Wait – Predicate ka 3-way Connection](#lock--wait--predicate-ka-3-way-connection)
       - [Waking Up Too Soon](#waking-up-too-soon)
+      - [Missed Signals](#missed-signals)
+      - [Notification](#notification)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -4893,9 +4895,10 @@ public class BoundedBuffer<V> extends BaseBoundedBuffer<V> {
     - Jab koi put() karega, toh notify() hoga.
     - Thread wake hoke lock dubara lega, predicate check karega. 
     - Agar ab predicate true hai, toh item nikaal lega.
-    > [!IMPORTANT]
-    > 
-    > Note: Wake hone ke baad thread ko koi priority nahi milti. Lock ke liye sab barabar se race karte hain.
+  
+> [!IMPORTANT]
+> 
+> Note: Wake hone ke baad thread ko koi priority nahi milti. Lock ke liye sab barabar se race karte hain.
 
 #### Waking Up Too Soon
 - Jab thread `wait()` se wapas aata hai, toh kya condition ab true hai?
@@ -4931,6 +4934,63 @@ public class BoundedBuffer<V> extends BaseBoundedBuffer<V> {
         }
     }
     ```
+
+#### Missed Signals
+- Missed Signals ka Matlab Kya Hai?
+  - Missed signal tab hota hai jab ek thread ko ek specific condition ke liye wait karna padta hai, lekin us condition ko check kiye bina wait() call kar deta hai. Isse kya hota hai?
+  - Thread ko already waisa event mil chuka hota hai, jo wo wait kar raha tha, lekin usne uss event ke hone se pehle condition check nahi kiya, aur ab wo wait kar raha hai jab event already ho chuka hai.
+- This is standard example of liveness failure
+    ```java
+    synchronized (buffer) {
+        while (buffer.isEmpty()) {
+            buffer.wait();  // Yeh wait karega, lekin har baar condition check karega
+        }
+        // Condition true hai, ab kaam karo
+    }
+    ```
+
+#### Notification
+- So far, we've described half of what goes on in a condition wait: waiting. The other half is notification.
+- In a bounded buffer, take blocks if called when the buffer is empty. In order for take to unblock when the buffer becomes nonempty, we must ensure that every code path in which the buffer could become nonempty performs a notification.
+- In `BoundedBuffer`, there is only one such place—after a put
+- So `put` calls `notifyAll` after successfully adding an object to the buffer. 
+- Similarly, `take` calls `notifyAll` after removing an element to indicate that the buffer may no longer be full, in case any threads are waiting on the “not full” condition.
+- Whenever you wait on a condition, make sure that someone will perform a notification whenever the condition predicate becomes true.
+- There are two notification methods in the condition queue API— `notify` and `notifyAll`
+  - [IMP]: **To call either, you must hold the lock associated with the condition queue object.**
+  - Calling `notify` causes the JVM to select one thread waiting on that condition queue to wake up; calling `notifyAll` wakes up all the threads waiting on that condition queue
+  - After that you should immediately release the lock, because the same lock gonna acquire by other who are notified
+- Acha, to notify jyada better lag raha h ? Ya nahi ? Socho .. 
+  - Because multiple threads could be waiting on the same condition queue for different condition predicates, using `notify` instead of `notifyAll` can be dangerous, primarily because single notification is prone to a problem akin to missed signals.
+  - `BoundedBuffer` provides a good illustration of why `notifyAll` should be preferred to single `notify` in most cases. The condition queue is used for two different condition predicates: “not full” and “not empty”
+- Missed Signal if notify is used ?
+  - Thread A aur Thread B dono ek hi condition queue pe wait kar rahe hain, lekin unki apni alag-alag conditions hain (A ko PA chahiye, B ko PB chahiye).
+  - Ab maan lo, PB true ho jata hai, matlab B ko jagana chahiye tha.
+  - Lekin Thread C ek notify call karta hai. JVM koi bhi ek thread jagata hai apni marzi se.
+    - Agar Thread A jag gaya, to wo dekhega ki PA abhi bhi false hai, to wo phir se wait pe chala jayega.
+    - Thread B, jo ab progress kar sakta tha, wo jagta nahi hai.
+  - Thread A ko galat signal mil gaya, jo signal Thread B ko milna chahiye tha.
+  - Isko “hijacked signal” kaha jaata hai.
+    - This is not exactly a missed signal—it's more of a “hijacked signal”
+
+> [!TIP]
+>
+> Single notify can be used instead of notifyAll only when both of the following conditions hold:
+> 
+> Uniform waiters. Only one condition predicate is associated with the condition queue, and each thread executes the same logic upon returning from wait; and
+>
+> One-in, one-out. A notification on the condition variable enables at most one thread to proceed.
+
+- `BoundedBuffer` meets the one-in, one-out requirement, but does not meet the uniform waiters requirement because waiting threads might be waiting for either the “not full” and “not empty” condition
+- Most classes don't meet these requirements, so the prevailing wisdom is to use `notifyAll` in preference to single `notify`
+- This “prevailing wisdom” makes some people uncomfortable, and for good reason (bhari english hai es line mai)
+  - Using `notifyAll` when only one thread can make progress is inefficient—sometimes a little, sometimes grossly so.
+  - If ten threads are waiting on a condition queue, calling notifyAll causes each of them to wake up and contend for the lock; then most or all of them will go right back to sleep
+  - This means a lot of context switches and a lot of contended lock acquisitions for each event that enables (maybe) a single thread to make progress. 
+  - In the worst case, using notify-All results in $O(n^2)$ wakeups where n would suffice.
+    - Why $n^2$ - Each turn one thread process, so remaining $n - 1$ are still pending
+      - $n$ wakeups + $(n - 1)$ wakeups + ... + $1$ wakeup -> $O(n^2)$
+
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
