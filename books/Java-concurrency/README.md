@@ -163,6 +163,11 @@
     - [AbstractQueuedSynchronizer](#abstractqueuedsynchronizer)
       - [Canonical Forms for Acquisition and Release in AQS.](#canonical-forms-for-acquisition-and-release-in-aqs)
       - [Binary Latch Using AbstractQueuedSynchronizer.](#binary-latch-using-abstractqueuedsynchronizer)
+    - [AQS in Java.util.concurrent Synchronizer Classes](#aqs-in-javautilconcurrent-synchronizer-classes)
+      - [ReentrantLock](#reentrantlock)
+        - [Tryacquire Implementation From Nonfair ReentrantLock.](#tryacquire-implementation-from-nonfair-reentrantlock)
+      - [Semaphore and CountDownLatch](#semaphore-and-countdownlatch)
+      - [FutureTask](#futuretask-1)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -5432,8 +5437,58 @@ public class OneShotLatch {
 
 ```
 
+### AQS in Java.util.concurrent Synchronizer Classes
+- Many of the blocking classes in `java.util.concurrent`, such as `ReentrantLock`, `Semaphore`, `ReentrantReadWriteLock`, `CountDownLatch`, `SynchronousQueue`, and `FutureTask`, are built using AQS
 
+#### ReentrantLock
+- `ReentrantLock` supports only exclusive acquisition, so it implements `tryAcquire`, `tryRelease`, and `isHeldExclusively`;
 
+#####  Tryacquire Implementation From Nonfair ReentrantLock.
+- Example
+    ```java
+    protected boolean tryAcquire(int ignored) {
+        final Thread current = Thread.currentThread();
+        int c = getState();
+        if (c == 0) {
+            if (compareAndSetState(0, 1)) {
+                owner = current;
+                return true;
+            }
+        } else if (current == owner) {
+            setState(c + 1);
+            return true;
+        }
+        return false;
+    }
+    ```
+#### Semaphore and CountDownLatch
+- `Semaphore` uses the AQS synchronization state to hold the count of permits currently available. 
+    ```java
+    protected int tryAcquireShared(int acquires) {
+        while (true) {
+            int available = getState();
+            int remaining = available - acquires;
+            if (remaining < 0 || compareAndSetState(available, remaining)) {
+                return remaining;
+            }
+        }
+    }
+
+    protected boolean tryReleaseShared(int releases) {
+        while (true) {
+            int p = getState();
+            if (compareAndSetState(p, p + releases)) {
+                return true;
+            }
+        }
+    }
+    ```
+
+#### FutureTask
+- At first glance, FutureTask doesn't even look like a synchronizer.
+- But `Future.get` has semantics that are very similar to that of a latch
+  - if some event (the completion or cancellation of the task represented by the `FutureTask`) has occurred, then threads can proceed, otherwise they are queued until that event occurs.
+- `FutureTask` uses the AQS synchronization state to hold the task status—running, completed, or cancelled
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
