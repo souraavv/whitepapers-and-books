@@ -160,6 +160,9 @@
     - [Anatomy (शरीर रचना) of a Synchronizer](#anatomy-शरीर-रचना-of-a-synchronizer)
       - [Bounded Buffer Using Explicit Condition Variables.](#bounded-buffer-using-explicit-condition-variables)
       - [Counting Semaphore Implemented Using `Lock`](#counting-semaphore-implemented-using-lock)
+    - [AbstractQueuedSynchronizer](#abstractqueuedsynchronizer)
+      - [Canonical Forms for Acquisition and Release in AQS.](#canonical-forms-for-acquisition-and-release-in-aqs)
+      - [Binary Latch Using AbstractQueuedSynchronizer.](#binary-latch-using-abstractqueuedsynchronizer)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -5359,6 +5362,78 @@ public class SemaphoreOnLock {
     ```
   - AQS based synchronizer mein:
     - Sirf ek jagah thread block hota hai (in its internal state logic + queue)
+
+### AbstractQueuedSynchronizer
+- Most developers will probably never use AQS directly;
+  - This is all about  how the standard synchronizers are implemented can help clarify how they work.
+- The basic operations that an AQS-based synchronizer performs are some variants of `acquire` and `release`.
+- Acquisition is the state-dependent operation and can always block
+- With a lock or semaphore, the meaning of acquire is straightforward—acquire the lock or a permit—and the caller may have to wait until the synchronizer is in a state where that can happen. 
+- For a class to be state-dependent, it must have some state. 
+- AQS takes on the task of managing some of the state for the synchronizer class:
+  - it manages a single integer of state information that can be manipulated through the protected `getState`, `setState`, and `compareAndSetState` methods.
+  - This can be used to represent arbitrary state;
+  - for example, `ReentrantLock` uses it to represent the count of times the owning thread has acquired the lock
+  - `Semaphore` uses it to represent the number of permits remaining
+  - `FutureTask` uses it to represent the state of the task (not yet started, running, completed, cancelled)
+  - Synchronizers can also manage additional state variables themselves
+    - for example, `ReentrantLock` keeps track of the current lock owner so it can distinguish between reentrant and contended lock-acquisition requests.
+
+
+#### Canonical Forms for Acquisition and Release in AQS.
+```java
+boolean acquire() throws InterruptedException {
+    while (state does not permit acquire) {
+        if (blocking acquisition requested) {
+            enqeue current thread if not already queued
+            block current thread
+        } else {
+            return failure;
+        }
+    }
+    possibly update synchronization state
+    dequeue thread if it was queued
+    return success;
+}
+
+void release() {
+    update synchronization state
+    if (new state may permits a blocked thread to acquire) 
+        unblock one or more queued threads
+}
+```
+
+#### Binary Latch Using AbstractQueuedSynchronizer.
+```java
+@ThreadSafe
+public class OneShotLatch {
+    private final Sync sync = new Sync();
+
+    public void signal() {
+        sync.releaseShared(0);
+    }
+
+    public void await() throws InterruptedException {
+        sync.acquireSharedInterruptibly(0);
+    }
+
+    private class Sync extends AbstractedQueuedSynchronizer {
+        protected int tryAcquireShared(int ignored) {
+            // succed if latch is open (state == 1)
+            return (getState() == 1) ? 1 : -1;
+        }
+
+        protected boolean tryReleaseShared(int ignored) {
+            setState(1); // latch is open now
+            return true; // other thread may acquire
+        }
+    }
+}
+
+```
+
+
+
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
