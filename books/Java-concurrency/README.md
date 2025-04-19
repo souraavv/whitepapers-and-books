@@ -156,6 +156,10 @@
       - [Subclass Safety Issue](#subclass-safety-issue)
       - [Encapsulating Condition Queues](#encapsulating-condition-queues)
       - [Entry and Exit Protocols](#entry-and-exit-protocols)
+    - [Explicit Condition Objects](#explicit-condition-objects)
+    - [Anatomy (शरीर रचना) of a Synchronizer](#anatomy-शरीर-रचना-of-a-synchronizer)
+      - [Bounded Buffer Using Explicit Condition Variables.](#bounded-buffer-using-explicit-condition-variables)
+      - [Counting Semaphore Implemented Using `Lock`](#counting-semaphore-implemented-using-lock)
   - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
     - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
     - [Platform Memory Models](#platform-memory-models)
@@ -5087,7 +5091,274 @@ public class ThreadGate {
 > Java ke concurrency tools jaise ReentrantLock, Semaphore, CountDownLatch etc. — sab AQS pe based hote hain.
 >
 
+### Explicit Condition Objects
+- Just like `Lock` is generalization of intrinsic locks, similarly `Condition` is generalization of intrinsic condition queues
+- Problem kya hai intrinsic condition queues ke sath?
+  - Ek lock = Ek hi condition queue:
+    - Har intrinsic lock (yaani `synchronized`) ke saath sirf ek hi condition queue ho sakti hai. Matlab agar tumhare paas multiple conditions hain (jaise `notFull`, `notEmpty` in a `BoundedBuffer`), toh sab threads ek hi queue mein wait karenge—even though unke wait karne ki reason alag ho sakti hai.
+  - `notify()` unreliable ban jata hai:
+    - Jab sab threads ek hi `queue` mein hain, toh notify() se ye decide nahi ho paata ki kaunsa thread wake hona chahiye. Shayad tum `notFull` ke liye `notify` kar rahe ho, lekin `notEmpty` wala thread uth jaata hai—galat thread uth jaata hai.
 
+```java
+public interface Condition {
+    void await() throws InterruptedException;
+    boolean await(long time, TimeUnit unit) throws InterruptedException;
+    long awaitNanos(long nanosTimeout) throws InterruptedException;
+    void awaitUninterruptibly();
+    boolean awaitUntil(Date deadline) throws InterruptedException;
+
+    void signal();
+    void signalAll();
+}
+```
+
+<details>
+<summary> Example se samjte </summary> 
+
+- Problematic Code: Using synchronized + wait/notify
+
+```java
+class BoundedBuffer {
+    private final Object[] items;
+    private int putPtr, takePtr, count;
+
+    public BoundedBuffer(int capacity) {
+        items = new Object[capacity];
+    }
+
+    public synchronized void put(Object x) throws InterruptedException {
+        while (count == items.length) {
+            wait();  // wait for space (notFull condition)
+        }
+        items[putPtr] = x;
+        putPtr = (putPtr + 1) % items.length;
+        count++;
+        notifyAll();  // wake up a waiting consumer (hoping it's notEmpty)
+    }
+
+    public synchronized Object take() throws InterruptedException {
+        while (count == 0) {
+            wait();  // wait for item (notEmpty condition)
+        }
+        Object x = items[takePtr];
+        takePtr = (takePtr + 1) % items.length;
+        count--;
+        notifyAll();  // wake up a waiting producer (hoping it's notFull)
+        return x;
+    }
+}
+```
+
+- Issue kya ho raha hai ? 
+  - Ek hi wait queue hai — dono put() aur take() ke liye:
+  - Producer aur consumer dono wait() karte hain same intrinsic condition queue pe.
+  - Jab notifyAll() hota hai, toh dono type ke threads jagte hain, bina guarantee ke ki sahi thread uthega.
+  - Ye inefficient bhi hai aur galat behavior bhi cause kar sakta hai.
+- Encapsulation break hoti hai:
+  - Tumhare thread ko this.wait() call karni padti hai, yaani tumhare object ke internals directly expose ho rahe hain.
+
+
+- Solution: Use Lock + multiple Condition
+```java
+import java.util.concurrent.locks.*;
+
+class BoundedBuffer {
+    private final Object[] items;
+    private int putPtr, takePtr, count;
+    private final Lock lock = new ReentrantLock();
+    private final Condition notFull = lock.newCondition();
+    private final Condition notEmpty = lock.newCondition();
+
+    public BoundedBuffer(int capacity) {
+        items = new Object[capacity];
+    }
+
+    public void put(Object x) throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == items.length) {
+                notFull.await();  // wait only for space
+            }
+            items[putPtr] = x;
+            putPtr = (putPtr + 1) % items.length;
+            count++;
+            notEmpty.signal();  // signal only consumer threads
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public Object take() throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == 0) {
+                notEmpty.await();  // wait only for item
+            }
+            Object x = items[takePtr];
+            takePtr = (takePtr + 1) % items.length;
+            count--;
+            notFull.signal();  // signal only producer threads
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+
+```
+</details>
+
+> [!WARNING]
+>
+> The equivalents of `wait`, `notify`, and `notifyAll` for Condition objects are `await`, `signal`, and `signalAll`. 
+> 
+> However, `Condition` extends `Object`, which means that it also has `wait` and `notify` methods. Be sure to use the proper versions—await and signal—instead!
+> 
+
+### Anatomy (शरीर रचना) of a Synchronizer
+- The interfaces of `ReentrantLock` and `Semaphore` have a lot in common
+- Both classes act as a “gate”, allowing only a limited number of threads to pass at a time;
+- threads arrive at the gate and are allowed through (`lock` or acquire returns successfully), are made to `wait` (lock or acquire blocks), or are turned away (`tryLock` or `tryAcquire` returns `false`, indicating that the lock or permit did not become available in the time allowed).
+- Further, both allow interruptible, uninterruptible, and timed acquisition attempts, and both allow a choice of fair or nonfair queueing of waiting threads.
+- Given this commonality, you might think that `Semaphore` was implemented on top of `ReentrantLock`, or perhaps `ReentrantLock` was implemented as a `Semaphore` with one permit
+  - This would be entirely practical; it is a common exercise to prove that a counting semaphore can be implemented using a lock and that a lock can be implemented using a counting semaphore.
+- *In actuality, they are both implemented using a common base class, Abstract-QueuedSynchronizer (AQS)—as are many other synchronizers.*
+- AQS is a framework for building locks and synchronizers, and a surprisingly broad range of synchronizers can be built easily and efficiently using it
+- Not only are `ReentrantLock` and `Semaphore` built using AQS, but so are `CountDownLatch`, `ReentrantReadWriteLock`, `SynchronousQueue`,and `FutureTask`.
+
+
+#### Bounded Buffer Using Explicit Condition Variables.
+
+```java
+@ThreadSafe
+public class ConditionBoundedBuffer<T> {
+    protected final Lock lock = new ReentrantLock();
+    // CONDITION PREDICATE: notFull (count < item.length)
+    private final Condition notFull = lock.newCondition();
+    // CONDITION PREDICATE: notEmpty (count > 0)
+    private final Condition notEmpty = lock.newCondition();
+    @GuardedBy("lock")
+    private final T[] items = (T[]) new Object[BUFFER_SIZE];
+    @GuardedBy("lock")
+    private int tail, head, count; 
+
+    // BLOCKS-UNTIL: notFull
+    public void put(T x) throws InterruptedException {
+        lock.lock();
+        try {
+            // jab tak #of element items ki length ke same hai
+            // await karte raho ..
+            while (count == items.length) {
+                notFull.await();
+            }
+            items[tail] = x;
+            if (++tail == items.length) {
+                tail = 0;
+            }
+            ++count;
+            notEmpty.signal();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // BLOCKS-UNTIL: notEmpty 
+    public T take() throws InterruptedException {
+        lock.lock();
+        try {
+            // jab tak khali hai wait karte raho 
+            while (count == 0) {
+                notEmpty.await();
+            }
+            T x = items[head];
+            items[head] = null;
+            if (++head == items.length) {
+                head = 0;
+            } 
+            --count;
+            notFull.signal();
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+#### Counting Semaphore Implemented Using `Lock`
+
+```java
+// not actual java.util.concurrent.Semaphore 
+
+@ThreadSafe 
+public class SemaphoreOnLock {
+    private final Lock lock = new ReentrantLock();
+    // CONDITION-PREDICATE: permitsAvailable (permits > 0)
+
+    private final Condition permitAvailable = lock.newCondition();
+    @GuardedBy("lock") private int permits;
+
+    SemaphoreOnLock(int initialPermits) {
+        // Q- Why locking is required in construction ??
+        lock.lock();
+        try {
+            permits = initialPermits;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // BLOCKS-UNTIL: permitsAvailable 
+
+    public void acquire() throws InterruptedException {
+
+        lock.lock();
+        try {
+            while (permits <= 0) {
+                // careful - await and not wait...
+                permitAvailable.await();
+            }
+            --permits;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void release() throws InterruptedExceptoin {
+        lock.lock();
+        try {
+            ++permits;
+            // carefull.. signal, not notify...
+            permitsAvailable.signal();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+- AQS ke benefits:
+  - Kam implementation effort:
+    - Tumhe thread-safe synchronizer likhne ke liye pura low-level logic nahi likhna padta—AQS already queueing, signaling, blocking handle karta hai.
+- Single point of contention:
+  - Normal:
+    ```java
+    class SemaphoreOnLock {
+        Lock lock = new ReentrantLock();
+        int permits;
+
+        void acquire() {
+            lock.lock();       // block here first
+            if (permits > 0) {
+                permits--;
+            } else {
+                // block again until permit available (await)
+            }
+            lock.unlock();
+        }
+    }
+    ```
+  - AQS based synchronizer mein:
+    - Sirf ek jagah thread block hota hai (in its internal state logic + queue)
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
