@@ -4607,13 +4607,14 @@ Yeh test chala 4-core Opteron machine pe, Solaris OS ke saath.
 - State-dependent methods on concurrent objects can sometimes get away with failing when their preconditions are not met, but there is often a better alternative: wait for the precondition to become true.
 - State-dependent operations that *block* until the operation can proceed are more convenient and less error-prone than those that simply fail
 - We first show how state dependence might be (painfully) tackled using polling and sleeping.
-    > [!IMPORTANT]
-    > The state variables that make up the precondition must be guarded by the object's lock, so that they can remain constant while the precondition is tested.
-    > 
-    > But if the precondition does not hold, the lock must be released so another thread can modify the object state - otherwise pre-condition will never become true
-    >
-    > The lock must then be reacquired before testing the precondition again.
-    >
+
+> [!IMPORTANT]
+> The state variables that make up the precondition must be guarded by the object's lock, so that they can remain constant while the precondition is tested.
+> 
+> But if the precondition does not hold, the lock must be released so another thread can modify the object state - otherwise pre-condition will never become true
+>
+> The lock must then be reacquired before testing the precondition again.
+>
 
 - Bounded buffers such as `ArrayBlockingQueue` are commonly used in producer-consumer design
 - A bounded buffer provides *put* and *take* operations, each of which has preconditions: you cannot take an element from an empty buffer, nor put an element into a full buffer.
