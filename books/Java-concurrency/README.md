@@ -1,179 +1,182 @@
 - [Java Concurrency in Practice](#java-concurrency-in-practice)
-  - [Chapter 1. Introduction](#chapter-1-introduction)
-    - [Benefits of Threads](#benefits-of-threads)
-      - [Exploiting Multiple Processors](#exploiting-multiple-processors)
-    - [Risks of Threads](#risks-of-threads)
-      - [Safety Hazards](#safety-hazards)
-      - [Liveness Hazards](#liveness-hazards)
-      - [Performance Hazards](#performance-hazards)
-  - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
-    - [What is Thread Safety?](#what-is-thread-safety)
-      - [Example: A Stateless Servlet](#example-a-stateless-servlet)
-    - [Atomicity](#atomicity)
-      - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
-      - [Compound Actions](#compound-actions)
-      - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
-    - [Locking](#locking)
-      - [Intrinsic Locks](#intrinsic-locks)
-      - [Reentracy](#reentracy)
-    - [Guarding State with Locks](#guarding-state-with-locks)
-    - [Liveness and Performance](#liveness-and-performance)
-  - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
-    - [Visibility](#visibility)
-      - [Stale Data](#stale-data)
-      - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
-      - [Locking and Visibility](#locking-and-visibility)
-      - [Volatile Variables](#volatile-variables)
-    - [Publication and Escape](#publication-and-escape)
-    - [Thread Confinement](#thread-confinement)
-      - [Stack Confinement](#stack-confinement)
-      - [ThreadLocal](#threadlocal)
-    - [Immutability](#immutability)
-      - [Final Fields](#final-fields)
-    - [Safe Publication](#safe-publication)
-      - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
-      - [Safe Publication Idioms](#safe-publication-idioms)
-    - [Summary](#summary)
-  - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
-    - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
-      - [State-dependent Operations](#state-dependent-operations)
-      - [State Ownership](#state-ownership)
-      - [Instance Confinement](#instance-confinement)
-      - [The Java Monitor Pattern](#the-java-monitor-pattern)
-      - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
-      - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
-      - [When Delegation Fails](#when-delegation-fails)
-    - [Publishing underlying state variables](#publishing-underlying-state-variables)
-    - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
-      - [Client-side Locking](#client-side-locking)
-  - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
-    - [Synchronized Collections](#synchronized-collections)
-      - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
-      - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
-      - [Hidden Iterators](#hidden-iterators)
-    - [Concurrent collections](#concurrent-collections)
-      - [ConcurrentHashMap](#concurrenthashmap)
-      - [Additional Atomic Map Operations](#additional-atomic-map-operations)
-      - [CopyOnWriteArrayList](#copyonwritearraylist)
-    - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
-      - [Serial thread confinement](#serial-thread-confinement)
-      - [Deques and work stealing](#deques-and-work-stealing)
-    - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
-    - [Synchronizers](#synchronizers)
-      - [Latches](#latches)
-      - [FutureTask](#futuretask)
-      - [Semaphores](#semaphores)
-  - [Chapter 6. Task Execution](#chapter-6-task-execution)
-    - [Executing Tasks in Threads](#executing-tasks-in-threads)
-      - [Executing Tasks Sequentially](#executing-tasks-sequentially)
-      - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
-      - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
-    - [The Executor Framework](#the-executor-framework)
-      - [Execution Policies](#execution-policies)
-      - [Thread Pools](#thread-pools)
-      - [Executor Lifecycle](#executor-lifecycle)
-      - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
-    - [Finding exploitable parallelism](#finding-exploitable-parallelism)
-      - [Example](#example)
-      - [Result-bearing tasks: Callable and Future](#result-bearing-tasks-callable-and-future)
-    - [Example: page renderer with Future](#example-page-renderer-with-future)
-    - [Limitations of parallelizing heterogeneous tasks](#limitations-of-parallelizing-heterogeneous-tasks)
-    - [CompletionService: Executor meets BlockingQueue](#completionservice-executor-meets-blockingqueue)
-    - [Placing time limits on tasks](#placing-time-limits-on-tasks)
-    - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
-    - [Summary](#summary-1)
-  - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
-    - [Task Cancellation](#task-cancellation)
-    - [Interruption](#interruption)
-    - [Interruption Policy](#interruption-policy)
-    - [Responding to Interruption](#responding-to-interruption)
-    - [Example (Timed Run)](#example-timed-run)
-      - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
-      - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
-    - [Cancellation via `Future`](#cancellation-via-future)
-    - [Dealing with Non-interruptible Blocking](#dealing-with-non-interruptible-blocking)
-    - [Encapsulating nonstandard cancellation with `newtaskFor`](#encapsulating-nonstandard-cancellation-with-newtaskfor)
-      - [Create CancellableTask Interface](#create-cancellabletask-interface)
-      - [Create CancellingExecutor](#create-cancellingexecutor)
-      - [Example](#example-1)
-    - [Stopping a Thread-based Service](#stopping-a-thread-based-service)
-      - [Java’s ExecutorService Approach](#javas-executorservice-approach)
-      - [Example: A Logging Service](#example-a-logging-service)
-      - [Producer-Consumer Logging Service with No Shutdown Support.](#producer-consumer-logging-service-with-no-shutdown-support)
-      - [Poison Pills](#poison-pills)
-      - [Limitations of Shutdownnow](#limitations-of-shutdownnow)
-    - [Handling Abnormal Thread Termination (Theory heavy section, but worth)](#handling-abnormal-thread-termination-theory-heavy-section-but-worth)
-      - [Uncaught Exception Handlers](#uncaught-exception-handlers)
-    - [JVM Shutdown](#jvm-shutdown)
-      - [Shutdown Hooks](#shutdown-hooks)
-      - [Daemon Threads](#daemon-threads)
-      - [Finalizers](#finalizers)
-  - [Chapter 8. Applying Thread Pools](#chapter-8-applying-thread-pools)
-    - [Implicit Couplings Between Tasks and Execution Policies](#implicit-couplings-between-tasks-and-execution-policies)
-      - [Thread Starvation Deadlock](#thread-starvation-deadlock)
-      - [Long Running Task](#long-running-task)
-    - [Sizing Thread Pools](#sizing-thread-pools)
-    - [Configuring `ThreadPoolExecutor`](#configuring-threadpoolexecutor)
-      - [Thread Creation and Teardown](#thread-creation-and-teardown)
-      - [Managing Queued Tasks](#managing-queued-tasks)
-      - [Saturation Policies](#saturation-policies)
-      - [Thread Factories](#thread-factories)
-    - [Extending `ThreadPoolExecutor`](#extending-threadpoolexecutor)
-    - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
-      - [Example: A Puzzle Framework](#example-a-puzzle-framework)
-    - [Summary](#summary-2)
-  - [Chapter 9. GUI Applications](#chapter-9-gui-applications)
-  - [Chapter 10. Avoiding Liveness Hazards](#chapter-10-avoiding-liveness-hazards)
-    - [Deadlock](#deadlock)
-      - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
-      - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
-      - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
-      - [Open Calls](#open-calls)
-  - [Advance Topics: Chapter 13 Explicity Locks](#advance-topics-chapter-13-explicity-locks)
-    - [Locks and Reentrant Locks](#locks-and-reentrant-locks)
-      - [Lock Interface](#lock-interface)
-      - [Polled and Timed Lock Acquisition](#polled-and-timed-lock-acquisition)
-      - [Interruptible Lock Acquisition](#interruptible-lock-acquisition)
-      - [Non-block-structured Locking](#non-block-structured-locking)
-    - [Peformance considerations](#peformance-considerations)
-    - [Fairness](#fairness)
-    - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
-    - [Read-write locks](#read-write-locks)
-    - [Summary](#summary-3)
-    - [References](#references)
-  - [Chapter 14. Buliding Custom Synchronizers](#chapter-14-buliding-custom-synchronizers)
-    - [Managing State Dependence](#managing-state-dependence)
-    - [Bounded Buffer that Balks When Preconditions are Not Met.](#bounded-buffer-that-balks-when-preconditions-are-not-met)
-      - [Example: Crude Blocking by Polling and Sleeping](#example-crude-blocking-by-polling-and-sleeping)
-      - [Condition Queues to the Rescue](#condition-queues-to-the-rescue)
-    - [Using Condition Queues](#using-condition-queues)
-      - [The Condition Predicate](#the-condition-predicate)
-      - [Lock – Wait – Predicate ka 3-way Connection](#lock--wait--predicate-ka-3-way-connection)
-      - [Waking Up Too Soon](#waking-up-too-soon)
-      - [Missed Signals](#missed-signals)
-      - [Notification](#notification)
-      - [Example - A Gate Class](#example---a-gate-class)
-      - [Subclass Safety Issue](#subclass-safety-issue)
-      - [Encapsulating Condition Queues](#encapsulating-condition-queues)
-      - [Entry and Exit Protocols](#entry-and-exit-protocols)
-    - [Explicit Condition Objects](#explicit-condition-objects)
-    - [Anatomy (शरीर रचना) of a Synchronizer](#anatomy-शरीर-रचना-of-a-synchronizer)
-      - [Bounded Buffer Using Explicit Condition Variables.](#bounded-buffer-using-explicit-condition-variables)
-      - [Counting Semaphore Implemented Using `Lock`](#counting-semaphore-implemented-using-lock)
-    - [AbstractQueuedSynchronizer](#abstractqueuedsynchronizer)
-      - [Canonical Forms for Acquisition and Release in AQS.](#canonical-forms-for-acquisition-and-release-in-aqs)
-      - [Binary Latch Using AbstractQueuedSynchronizer.](#binary-latch-using-abstractqueuedsynchronizer)
-    - [AQS in Java.util.concurrent Synchronizer Classes](#aqs-in-javautilconcurrent-synchronizer-classes)
-      - [ReentrantLock](#reentrantlock)
-        - [Tryacquire Implementation From Nonfair ReentrantLock.](#tryacquire-implementation-from-nonfair-reentrantlock)
-      - [Semaphore and CountDownLatch](#semaphore-and-countdownlatch)
-      - [FutureTask](#futuretask-1)
-  - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
-    - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
-    - [Platform Memory Models](#platform-memory-models)
-    - [Reordering](#reordering)
-    - [Java Memory Model in 500 words or less](#java-memory-model-in-500-words-or-less)
-    - [Piggybacking on synchronization](#piggybacking-on-synchronization)
+    - [Chapter 1. Introduction](#chapter-1-introduction)
+        - [Benefits of Threads](#benefits-of-threads)
+            - [Exploiting Multiple Processors](#exploiting-multiple-processors)
+        - [Risks of Threads](#risks-of-threads)
+            - [Safety Hazards](#safety-hazards)
+            - [Liveness Hazards](#liveness-hazards)
+            - [Performance Hazards](#performance-hazards)
+    - [Chapter 2. Thread Safety](#chapter-2-thread-safety)
+        - [What is Thread Safety?](#what-is-thread-safety)
+            - [Example: A Stateless Servlet](#example-a-stateless-servlet)
+        - [Atomicity](#atomicity)
+            - [Example: Race Conditions in Lazy Initialization](#example-race-conditions-in-lazy-initialization)
+            - [Compound Actions](#compound-actions)
+            - [Java's builtin mechanism for ensuring atomicity.](#javas-builtin-mechanism-for-ensuring-atomicity)
+        - [Locking](#locking)
+            - [Intrinsic Locks](#intrinsic-locks)
+            - [Reentracy](#reentracy)
+        - [Guarding State with Locks](#guarding-state-with-locks)
+        - [Liveness and Performance](#liveness-and-performance)
+    - [Chapter 3. Sharing Objects](#chapter-3-sharing-objects)
+        - [Visibility](#visibility)
+            - [Stale Data](#stale-data)
+            - [Nonatomic 64-bit Operations](#nonatomic-64-bit-operations)
+            - [Locking and Visibility](#locking-and-visibility)
+            - [Volatile Variables](#volatile-variables)
+        - [Publication and Escape](#publication-and-escape)
+        - [Thread Confinement](#thread-confinement)
+            - [Stack Confinement](#stack-confinement)
+            - [ThreadLocal](#threadlocal)
+        - [Immutability](#immutability)
+            - [Final Fields](#final-fields)
+        - [Safe Publication](#safe-publication)
+            - [Caching the Last Result Using a Volatile Reference to an Immutable Holder Object.](#caching-the-last-result-using-a-volatile-reference-to-an-immutable-holder-object)
+            - [Safe Publication Idioms](#safe-publication-idioms)
+        - [Summary](#summary)
+    - [Chapter 4. Composing Objects](#chapter-4-composing-objects)
+        - [Designing a Thread-safe Class](#designing-a-thread-safe-class)
+            - [State-dependent Operations](#state-dependent-operations)
+            - [State Ownership](#state-ownership)
+            - [Instance Confinement](#instance-confinement)
+            - [The Java Monitor Pattern](#the-java-monitor-pattern)
+            - [Example: Tracking Fleet Vehicles](#example-tracking-fleet-vehicles)
+            - [Example: Vehicle Tracker Using Delegation](#example-vehicle-tracker-using-delegation)
+            - [When Delegation Fails](#when-delegation-fails)
+        - [Publishing underlying state variables](#publishing-underlying-state-variables)
+        - [Adding Functionality to Existing Thread-safe Classes](#adding-functionality-to-existing-thread-safe-classes)
+            - [Client-side Locking](#client-side-locking)
+    - [Chapter 5. Building Blocks](#chapter-5-building-blocks)
+        - [Synchronized Collections](#synchronized-collections)
+            - [Problems with Synchronized Collections](#problems-with-synchronized-collections)
+            - [Iterators and ConcurrentModificationException](#iterators-and-concurrentmodificationexception)
+            - [Hidden Iterators](#hidden-iterators)
+        - [Concurrent collections](#concurrent-collections)
+            - [ConcurrentHashMap](#concurrenthashmap)
+            - [Additional Atomic Map Operations](#additional-atomic-map-operations)
+            - [CopyOnWriteArrayList](#copyonwritearraylist)
+        - [Blocking Queues \& The Producer-Consumer pattern](#blocking-queues--the-producer-consumer-pattern)
+            - [Serial thread confinement](#serial-thread-confinement)
+            - [Deques and work stealing](#deques-and-work-stealing)
+        - [Blocking and interruptible methods](#blocking-and-interruptible-methods)
+        - [Synchronizers](#synchronizers)
+            - [Latches](#latches)
+            - [FutureTask](#futuretask)
+            - [Semaphores](#semaphores)
+    - [Chapter 6. Task Execution](#chapter-6-task-execution)
+        - [Executing Tasks in Threads](#executing-tasks-in-threads)
+            - [Executing Tasks Sequentially](#executing-tasks-sequentially)
+            - [Explicitly Creating Threads for Tasks](#explicitly-creating-threads-for-tasks)
+            - [Disadvantages of Unbounded Thread Creation](#disadvantages-of-unbounded-thread-creation)
+        - [The Executor Framework](#the-executor-framework)
+            - [Execution Policies](#execution-policies)
+            - [Thread Pools](#thread-pools)
+            - [Executor Lifecycle](#executor-lifecycle)
+            - [Delayed and Periodic Tasks](#delayed-and-periodic-tasks)
+        - [Finding exploitable parallelism](#finding-exploitable-parallelism)
+            - [Example](#example)
+            - [Result-bearing tasks: Callable and Future](#result-bearing-tasks-callable-and-future)
+        - [Example: page renderer with Future](#example-page-renderer-with-future)
+        - [Limitations of parallelizing heterogeneous tasks](#limitations-of-parallelizing-heterogeneous-tasks)
+        - [CompletionService: Executor meets BlockingQueue](#completionservice-executor-meets-blockingqueue)
+        - [Placing time limits on tasks](#placing-time-limits-on-tasks)
+        - [Example: a travel reservations portal](#example-a-travel-reservations-portal)
+        - [Summary](#summary-1)
+    - [Chapter 7. Cancellation and Shutdown](#chapter-7-cancellation-and-shutdown)
+        - [Task Cancellation](#task-cancellation)
+        - [Interruption](#interruption)
+        - [Interruption Policy](#interruption-policy)
+        - [Responding to Interruption](#responding-to-interruption)
+        - [Example (Timed Run)](#example-timed-run)
+            - [Scheduling an Interrupt on Borrowed Thread. *Don't do this*.](#scheduling-an-interrupt-on-borrowed-thread-dont-do-this)
+            - [Interrupting a Task in a Dedicated Thread](#interrupting-a-task-in-a-dedicated-thread)
+        - [Cancellation via `Future`](#cancellation-via-future)
+        - [Dealing with Non-interruptible Blocking](#dealing-with-non-interruptible-blocking)
+        - [Encapsulating nonstandard cancellation with `newtaskFor`](#encapsulating-nonstandard-cancellation-with-newtaskfor)
+            - [Create CancellableTask Interface](#create-cancellabletask-interface)
+            - [Create CancellingExecutor](#create-cancellingexecutor)
+            - [Example](#example-1)
+        - [Stopping a Thread-based Service](#stopping-a-thread-based-service)
+            - [Java’s ExecutorService Approach](#javas-executorservice-approach)
+            - [Example: A Logging Service](#example-a-logging-service)
+            - [Producer-Consumer Logging Service with No Shutdown Support.](#producer-consumer-logging-service-with-no-shutdown-support)
+            - [Poison Pills](#poison-pills)
+            - [Limitations of Shutdownnow](#limitations-of-shutdownnow)
+        - [Handling Abnormal Thread Termination (Theory heavy section, but worth)](#handling-abnormal-thread-termination-theory-heavy-section-but-worth)
+            - [Uncaught Exception Handlers](#uncaught-exception-handlers)
+        - [JVM Shutdown](#jvm-shutdown)
+            - [Shutdown Hooks](#shutdown-hooks)
+            - [Daemon Threads](#daemon-threads)
+            - [Finalizers](#finalizers)
+    - [Chapter 8. Applying Thread Pools](#chapter-8-applying-thread-pools)
+        - [Implicit Couplings Between Tasks and Execution Policies](#implicit-couplings-between-tasks-and-execution-policies)
+            - [Thread Starvation Deadlock](#thread-starvation-deadlock)
+            - [Long Running Task](#long-running-task)
+        - [Sizing Thread Pools](#sizing-thread-pools)
+        - [Configuring `ThreadPoolExecutor`](#configuring-threadpoolexecutor)
+            - [Thread Creation and Teardown](#thread-creation-and-teardown)
+            - [Managing Queued Tasks](#managing-queued-tasks)
+            - [Saturation Policies](#saturation-policies)
+            - [Thread Factories](#thread-factories)
+        - [Extending `ThreadPoolExecutor`](#extending-threadpoolexecutor)
+        - [Parallelizing Recursive Algorithms](#parallelizing-recursive-algorithms)
+            - [Example: A Puzzle Framework](#example-a-puzzle-framework)
+        - [Summary](#summary-2)
+    - [Chapter 9. GUI Applications](#chapter-9-gui-applications)
+    - [Chapter 10. Avoiding Liveness Hazards](#chapter-10-avoiding-liveness-hazards)
+        - [Deadlock](#deadlock)
+            - [Lock-ordering Deadlocks](#lock-ordering-deadlocks)
+            - [Dynamic Lock Order Deadlocks](#dynamic-lock-order-deadlocks)
+            - [Deadlocks Between Cooperating Objects](#deadlocks-between-cooperating-objects)
+            - [Open Calls](#open-calls)
+    - [Advance Topics: Chapter 13 Explicity Locks](#advance-topics-chapter-13-explicity-locks)
+        - [Locks and Reentrant Locks](#locks-and-reentrant-locks)
+            - [Lock Interface](#lock-interface)
+            - [Polled and Timed Lock Acquisition](#polled-and-timed-lock-acquisition)
+            - [Interruptible Lock Acquisition](#interruptible-lock-acquisition)
+            - [Non-block-structured Locking](#non-block-structured-locking)
+        - [Peformance considerations](#peformance-considerations)
+        - [Fairness](#fairness)
+        - [Choosing between Synchronized and Reentrant Lock](#choosing-between-synchronized-and-reentrant-lock)
+        - [Read-write locks](#read-write-locks)
+        - [Summary](#summary-3)
+        - [References](#references)
+    - [Chapter 14. Buliding Custom Synchronizers](#chapter-14-buliding-custom-synchronizers)
+        - [Managing State Dependence](#managing-state-dependence)
+        - [Bounded Buffer that Balks When Preconditions are Not Met.](#bounded-buffer-that-balks-when-preconditions-are-not-met)
+            - [Example: Crude Blocking by Polling and Sleeping](#example-crude-blocking-by-polling-and-sleeping)
+            - [Condition Queues to the Rescue](#condition-queues-to-the-rescue)
+        - [Using Condition Queues](#using-condition-queues)
+            - [The Condition Predicate](#the-condition-predicate)
+            - [Lock – Wait – Predicate ka 3-way Connection](#lock--wait--predicate-ka-3-way-connection)
+            - [Waking Up Too Soon](#waking-up-too-soon)
+            - [Missed Signals](#missed-signals)
+            - [Notification](#notification)
+            - [Example - A Gate Class](#example---a-gate-class)
+            - [Subclass Safety Issue](#subclass-safety-issue)
+            - [Encapsulating Condition Queues](#encapsulating-condition-queues)
+            - [Entry and Exit Protocols](#entry-and-exit-protocols)
+        - [Explicit Condition Objects](#explicit-condition-objects)
+        - [Anatomy (शरीर रचना) of a Synchronizer](#anatomy-शरीर-रचना-of-a-synchronizer)
+            - [Bounded Buffer Using Explicit Condition Variables.](#bounded-buffer-using-explicit-condition-variables)
+            - [Counting Semaphore Implemented Using `Lock`](#counting-semaphore-implemented-using-lock)
+        - [AbstractQueuedSynchronizer](#abstractqueuedsynchronizer)
+            - [Canonical Forms for Acquisition and Release in AQS.](#canonical-forms-for-acquisition-and-release-in-aqs)
+            - [Binary Latch Using AbstractQueuedSynchronizer.](#binary-latch-using-abstractqueuedsynchronizer)
+        - [AQS in Java.util.concurrent Synchronizer Classes](#aqs-in-javautilconcurrent-synchronizer-classes)
+            - [ReentrantLock](#reentrantlock)
+                - [Tryacquire Implementation From Nonfair ReentrantLock.](#tryacquire-implementation-from-nonfair-reentrantlock)
+            - [Semaphore and CountDownLatch](#semaphore-and-countdownlatch)
+            - [FutureTask](#futuretask-1)
+    - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
+        - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
+        - [Platform Memory Models](#platform-memory-models)
+        - [Reordering](#reordering)
+        - [Java Memory Model in 500 words or less](#java-memory-model-in-500-words-or-less)
+        - [Piggybacking on synchronization](#piggybacking-on-synchronization)
+        - [Publication](#publication)
+        - [Initialization Safety](#initialization-safety)
+        - [Summary](#summary-4)
 
 
 # Java Concurrency in Practice
@@ -5621,3 +5624,123 @@ public class PossibleReordering {
 
 > [!WARNING]
 > This technique is very sensitive to the order in which statements occur and is therefore quite fragile; it is an advanced technique that should be reserved for squeezing the last drop of performance out of the most performance-critical classes like ReentrantLock.
+
+### Publication
+- Safe publication techniques dervice their safety guarantees provided by the JMM
+- Risk of improper publication are consequences of the absence of happens-before ordering between publishing a shared object and accessing it from another thread
+
+1. Unsafe Publication
+- Initializing a new object involves writing to variables - the new object's fields
+- Publishing a reference involves writing to another variable - the reference to the new object
+- If we do not ensure that publishing the shared reference happens-before another thread loads that shared reference, then the write of the reference to the new object can be re-ordered (from the perspective of the thread consuming the object) with the writes to its fields
+- Example : Unsafe Lazy Initialization, Don't do this
+    - Do threads A and B, same `getInstance` method to invoke karte hai
+    - Thread A `resource` ko `null` dekhkar instantiate karta hai new `Resource` object se
+    - Thread B `resource` ki non-null value dekhkar, pehle se constructed `reference` object ko return karta hai
+    - But thread A ne joh resource ko write kiya and thread B ne joh resource ko read kiya usme happens-before ordering nahi thi
+    - Iski vagah se reordering ho sakti hai and thread B partially constructed `resource` object (invalid state) ke reference ko access kar sakta hai
+```java
+@NotThreadSafe
+public class UnsafeLazyInitialization {
+    private static Resource resource;
+    public static Resource getInstance() {
+        if (resource == null) 
+            resource = new Resource();
+        return resource;
+    }
+}
+```
+> [!NOTE]
+> With the exception of immutable objects, it is not safe to use an object that has been initialized by another thread unless the publication happens-before the consuming thread uses it.
+
+2. Safe Publication
+- Ensure that publication happens-before the consuming thread loads a reference to the published object
+    - Shared variable guarded by a lock or a shared volatile variable ensures that reads and writes of that variable are ordered by happens-befoe
+    - BlockingQueue implementation have sufficient internal synchronization to ensure that the put happens-before the take
+- Happens-before relation na sirf visibility par ordering ki bhi guarantee deta hai jo ki safe publication se stronger promise hua
+    - If thread A purs X on a queue happens-before B fetches X from that queue, not only B see X in the state that A left it but B see everything A did before the handoff (assuming X has not been subsequently modified by A or anyone else)
+- Hume @GuardedBy and safe publication ki kya jarurat hai jab JMM already happens-before de raha hai ?
+    - happens-before ordering operates at the level of individual memory accesses
+    - safe publication operates at a level closer to that of your program's design
+
+3. Safe Initialization Idioms
+- Sometimes it makes sense to defer the initialization of object that are expensive to initialize until they are needed, but we have already seen how the misuse of lazy initialization can lead to trouble
+- Solution 1 : making the getResource method `synchronized`
+    - This approach offers adequate performance only when `getInstance` is not called frequently by many threads which will create lesser contention for the SafeLazyInitialization lock
+```java
+@ThreadSafe
+public class SafeLazyInitialization {
+    private static Resource resource;
+    public synchronized static Resource getInstance() {
+        if (resource == null) 
+            resource = new Resource();
+        return resource;
+    }
+}
+```
+- Solution 2 : Eager Initialization using **Static Initializers**
+    - Static initializers are run by the JVM at the class initialization time, after class loading but before class is used by any thread
+    - JVM acquires lock during initialization and this lock is acquired by each thread at least once to ensure that the class has been loaded, memory writes made during static initialization are automatically visible to all threads
+    - Statically initialized objects require no explicit synchronization either during construction or when being referenced
+```java
+@ThreadSafe
+public class EagerInitialization {
+    private static Resource resource = new Resource();
+    public static Resource getResource() {
+        return resource;
+    }
+}
+```
+- Solution 3 : Lazy Initialization Holder Class Idiom
+    - Static Initializers + JVM's lazy class loading to create lazy initialization technique that does not require synchronization on the common code path
+    - JVM defers initializing the ResourceHolder class until it is actually used and because the Resource is initialized with a static initializer, no additional synchronization is needed
+```java
+@ThreadSafe
+public class ResourceFactory {
+    private static class ResourceHolder {
+        public static Resource resource = new Resource();
+    }
+    public static Resource getResource() {
+        return ResourceHolder.resource;
+    }
+}
+```
+
+4. Double Checked Locking(DCL)
+- In very early JVMs, even uncontent synchronization had a significant performance cost
+- DCL offers best of both worlds - lazy initialization without paying the synchronization penalty on the common code path
+    - The way it worked was first to check whether initialization was needed without synchronizing, and if the resource reference was not null, use it.
+    - Otherwise, synchronize and check again if the Resource is initialized, ensuring that only one thread actually initializes the shared Resource.
+    - The **common code path** : fetching a reference to an already constructed Resource—doesn't use synchronization. 
+```java
+@NotThreadSafe
+public class DoubleCheckedLocking {
+    private static Resource resource;
+    public static Resource getInstance() {
+        if (resource == null) {
+            synchronized (DoubleCheckedLocking.class) {
+                if (resource == null) {
+                    resource = new Resource();
+                }
+            }
+        }
+        return resource;
+    }
+}
+```
+- But in worst case, it is possible to see a current value of the reference but stale values for the object's state, meaning that object could be seen to be in an invalid or incorrect state without synchronization or happens-before relation
+
+### Initialization Safety
+- Initialization safety guarantees that for properly constructed objects, all threads will see the correct values of final fields that were set by the constructor, regardless of how the object is published. 
+- Further, any variables that can be reached through a final field of a properly constructed object (such as the elements of a final array or the contents of a HashMap referenced by a final field) are also guaranteed to be visible to other threads.
+- How it works ?
+    - For objects with final fields, initialization safety prohibits reordering any part of construction with the initial load of a reference to that object.
+    - All writes to final fields made by the constructor, as well as to any variables reachable through those fields, become “frozen” when the constructor completes, and any thread that obtains a reference to that object is guaranteed to see a value that is at least as up to date as the frozen value.
+> [!WARNING]
+> - Initialization safety makes visibility guarantees only for the values that are reachable through final fields as of the time the constructor finishes. 
+> - For values reachable through nonfinal fields, or values that may change after construction(non-final), you must use synchronization to ensure visibility.
+
+### Summary
+- The Java Memory Model specifies when the actions of one thread on memory are guaranteed to be visible to another. 
+- The specifics involve ensuring that operations are ordered by a partial ordering called happens-before, which is specified at the level of individual memory and synchronization operations.
+- However, the higher-level rules offered in Chapters 2 and 3, such as `@GuardedBy` and **safe publication**, can be used to ensure thread safety without resorting to the low-level details of happens-before.
