@@ -168,6 +168,10 @@
                 - [Tryacquire Implementation From Nonfair ReentrantLock.](#tryacquire-implementation-from-nonfair-reentrantlock)
             - [Semaphore and CountDownLatch](#semaphore-and-countdownlatch)
             - [FutureTask](#futuretask-1)
+    - [Chapter 15. Atomic Variables and Nonblocking Synchronization](#chapter-15-atomic-variables-and-nonblocking-synchronization)
+        - [Disadvantages of Locking](#disadvantages-of-locking)
+        - [Hardware support for concurrency](#hardware-support-for-concurrency)
+        - [Atomic Variable Classes](#atomic-variable-classes)
     - [Chapter 16. The Java Memory Model](#chapter-16-the-java-memory-model)
         - [What is Memory Model and Why would I Want One ?](#what-is-memory-model-and-why-would-i-want-one-)
         - [Platform Memory Models](#platform-memory-models)
@@ -5493,6 +5497,77 @@ public class OneShotLatch {
 - But `Future.get` has semantics that are very similar to that of a latch
   - if some event (the completion or cancellation of the task represented by the `FutureTask`) has occurred, then threads can proceed, otherwise they are queued until that event occurs.
 - `FutureTask` uses the AQS synchronization state to hold the task status—running, completed, or cancelled
+
+## Chapter 15. Atomic Variables and Nonblocking Synchronization
+- Non blocking algorithms : uses low-level atomic machine instructions such as compare-and-swap instead of locks to ensure data integrity under concurrent access
+    - offer significant scalability and liveness advantages
+    - don't block when multiple threads contend for the same data
+    - immune to deadlock and other liveness problems
+- Atomic variables :
+    - __better volatile variables__ offer the same memory semantics as volatile variables but with additional support for atomic updates
+    - used for building efficient non-blocking algorithms in java
+    - Ex : `AtomicInteger` and `AtomicReference`
+- Atomic Variables and Non-Blocking synchronization are the primary source of performance and scalability in many of the classes in `java.util.concurrent` package such as `Semaphore` and `ConcurrentLinkedQueue`
+
+### Disadvantages of Locking
+- Coordinating access to shared state using a consistent locking protocol ensures that whichever thread holds the lock guarding a set of variables has exclusive access to those variables
+- Ratio of scheduling overhead to useful work can be quite high when the lock is frequently contentded
+    - Multiple threads requests the lock at the same time, some unfortunate thread will be suspended and have to be resumed later
+    - Suspended and resuming a thread has a lot of overhead and generally entails a lengthy interruption
+- Volatile variable are lighter-weight synchronization than locking as they do not involve context switches or thread scheduling
+    - Have some limitations compared to locking, while they provide similar visibility guarantees, they cannot be used to construct atomic compound actions
+- When a thread is waiting for a lock it cannot do anything else
+- If the blocked thread is a high-priority thread but the thread holding the lock is a low-priority thread the performance hazard known as priority inversion
+- If a thread holding a lock is permanently blocked (infinite loop, deadlock, or other liveness failure), any threads waiting for that lock can never make progress
+- Locking is a heavy-weight mechanism for fine-grained operations such as incrementing a counter
+
+### Hardware support for concurrency
+- Exclusive lock is a **pessimistic** technique : it assumes the worst and doesn't proceed until you can guarantee by acquiring the appropriate locks, that other threads will not interfere
+- **Optimistic** approach, proceed with an update, hopeful that we can complete it without interference
+    - This approach relies on collision detection to determine if there has been interference from other parties during the update, in which case the operation failes and can be retried or not
+- Every modern processor has some form of atomic read-modify-write instruction such as compare-and-swap or load-linked/store-conditional. 
+- Operating systems and JVMs use these instructions to implement locks and concurrent data structures.
+
+1. Compare and Swap
+- Optimistic technique proceeds with the update in the hope of success, and detect failure if another thread has updated the variable since it was last examined
+- CAS has three operands - a memory location V on which to operate, the expected old value A and the new value B.
+    - I think V should have the value A; if it does, put B there, otherwise don't change it but tell me I was wrong
+- Benefits
+    - Because a thread that loses a CAS is not blocked, it can decide whether it want to try again, take some other recovery action or do nothing
+    - This flexibility eliminates many of the liveness hazards associated with the locking which in unsual cases may lead to livelock
+
+2. A Nonblocking Counter
+```java
+@ThreadSafe
+public class CasCounter {
+    private SimulateCAS value;
+    public int getValue() {
+        return value.get();
+    }
+
+    public int increment() {
+        int v;
+        do {
+            v = value.get();
+        } while (v != value.compareAndSwap(v, v+1));
+        return v + 1;
+    }
+}
+```
+- CAS based counter significant outperform lock-based counters if there is a even a small amount of contention and often even if there is no contention
+- What looks like a longer code path at the application level is in fact is much shorter code path when JVM and OS activity are taken into account
+- Only disadvantage of CAS it forces the caller to deal with contention whereas locks deal with contention automatically by blocking until the lock is available
+
+3. CAS support in the JVM
+- How does the java convince the processor to execute a CAS on its behalf ?
+    - On platforms supporing CAS, the runtime inlines them into the appropriate machine instructions; in the worst case if a CAS like instructions is not available the JVM uses a spin lock
+- Low-level JVM support is used by the atomic variable classes to provide an efficient CAS operation on numeric and reference types
+
+### Atomic Variable Classes
+- Atomic variables are fine-grained and ligher-weight than locks, and are critical for implementing high-performance concurrent code on multiprocessor systems
+- The fast (uncontended) path for updating an atomic variable is no slower than the fast path for acquiring a lock and usually faster; the slow path is definately faster than the slow path for locks because it does not involve suspending and rescheduling threads
+- Twelve atomic variable classes, divided into four groups : scalars, field updaters, arrays and compound variables
+    - Commmonly used atomic variables are the scalars : `AtomicInteger`, `AtomicLong`, `AtomicBoolean`, `AtomicReference`
 
 ## Chapter 16. The Java Memory Model
 - Higher-level design issues such as safe publication, specification of, and adherence to synchronization policies derive their safety from the JMM
