@@ -1,4 +1,7 @@
 
+- [Acing the System Design Interview](#acing-the-system-design-interview)
+- [Part 1](#part-1)
+
 # Acing the System Design Interview 
 
 The books is written by Zhiyong Tan 
