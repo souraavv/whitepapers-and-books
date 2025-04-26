@@ -1,6 +1,9 @@
 
 - [Acing the System Design Interview](#acing-the-system-design-interview)
 - [Part 1](#part-1)
+  - [Chapter 1. A walkthrough of system design concepts](#chapter-1-a-walkthrough-of-system-design-concepts)
+    - [A discussion about tradeoffs](#a-discussion-about-tradeoffs)
+    - [Should you read this book?](#should-you-read-this-book)
 
 # Acing the System Design Interview 
 
@@ -27,3 +30,36 @@ The books is written by Zhiyong Tan
 - A large system may serve hundreds of millions of users and receive billions of data read and write requests every day. We discuss in chapter 4 how we can scale our databases to handle such traffic.
 - The system may be divided into services, and we may need to write related data to these multiple services, which we discuss in chapter 5.
 - Many systems require certain common functionalities. In chapter 6, we discuss how we can centralize such cross-cutting functionalities into services that can serve many other systems.
+
+## Chapter 1. A walkthrough of system design concepts
+- This chapter covers
+  - Learning the importance of the system design interview  
+  - Scaling a service
+  - Using cloud hosting vs. bare metal
+- A system design interview is a discussion between the candidate and the interviewer about designing a software system that is typically provided over a network.
+- The interviewer begins the interview with a *short* and *vague* request to the candidate to design a particular software system.
+
+### A discussion about tradeoffs
+- System design interviews are given more weight in interviews for senior positions
+- This means that a typical engineer will go through system design interviews many times in their career. So these inevitable and there is no escape. 
+- Engineers employed at a highly desirable company will go through even more system design interviews as an interviewer.
+- As an interview candidate, you have less than one hour to make the best possible impression, and the other candidates who are your competition are among the smartest and most motivated people in the world.
+- System design is an art, not a science. It is not about perfection
+- We make tradeoffs and compromises to design the system we can achieve with the given resources and time that most closely suits current and possible future requirements.
+- A system design interview is not about the right answer.
+- It is about one’s ability to discuss multiple possible approaches and weigh their tradeoffs in satisfying the requirements
+
+### Should you read this book?
+- The open-ended nature of system design interviews makes it a challenge to prepare for and know how or what to discuss during an interview
+- An engineer or student who searches for online learning materials on system design interviews will find a vast quantity of content that varies in quality and diversity of the topics covered.
+- This is confusing and hinders learning
+- Moreover, until recently, there were few dedicated books on this topic, though a trickle of such books is beginning to be published.
+- This is not an introductory software engineering book. At least intermediate proficiency in coding and SQL is assumed.
+- This book is best used after one has acquired a minimal level of industry experience.
+- This book discusses how to approach system design interviews and minimizes duplication of introductory material that we can easily find online or in other books
+- This book offers a structured and organized approach to start preparing for system design interviews or to fill gaps in knowledge and understanding from studying the large amount of fragmented material.
+- Equally valuably, it teaches how to demonstrate one’s engineering maturity and communication skills during a system design interview, such as clearly and concisely articulating one’s ideas, knowledge, and questions to the interviewer within the brief ~50 minutes.
+- A system design interview, like any other interview, is also about communication skills, quick thinking, asking good questions, and performance anxiety. 
+- From personal experience, with seniority one spends an increasing amount of time in meetings, and essential abilities include quick thinking, being able to ask good questions, steering the discussion to the most critical and relevant topics, and communicating one’s thoughts succinctly
+- This book emphasizes that one must effectively and concisely express one’s system design expertise within the <1 hour interview and drive the interview in the desired direction by asking the interviewer the right questions.
+- System design interviews are biased in favor of engineers with good verbal communication and against engineers less proficient in verbal communication, even though the latter may have considerable system design expertise and have made valuable system design contributions in the organizations where they worked.
