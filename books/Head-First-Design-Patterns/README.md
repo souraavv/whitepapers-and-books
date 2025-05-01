@@ -70,6 +70,20 @@
   - [Chapter 9i. The Bridge Pattern](#chapter-9i-the-bridge-pattern)
   - [Chapter 10i. The Chain of Responsibility Pattern](#chapter-10i-the-chain-of-responsibility-pattern)
   - [Chapter 11. The Proxy Pattern](#chapter-11-the-proxy-pattern)
+  - [Chapter 12. DAO Pattern](#chapter-12-dao-pattern)
+    - [A simple implementation](#a-simple-implementation)
+    - [The Domain Class](#the-domain-class)
+    - [The DAO API](#the-dao-api)
+    - [The UserDao Class](#the-userdao-class)
+    - [Using the Pattern With JPA](#using-the-pattern-with-jpa)
+      - [The JpaUserDao Class](#the-jpauserdao-class)
+      - [Refactoring the User Class](#refactoring-the-user-class)
+      - [Bootstrapping a JPA Entity Manager Programmatically](#bootstrapping-a-jpa-entity-manager-programmatically)
+      - [The UserApplication Class](#the-userapplication-class)
+    - [More details](#more-details)
+      - [Basic DAO Implementation (Less Flexible)](#basic-dao-implementation-less-flexible)
+      - [Improved: Pluggable DAO with Factory (More Flexible)](#improved-pluggable-dao-with-factory-more-flexible)
+      - [What is diff between DTO and DAO ?](#what-is-diff-between-dto-and-dao-)
 
 
 # Head First Design Patterns
@@ -2135,8 +2149,353 @@ public class Main {
 
 ## Chapter 9i. The Bridge Pattern
 
-
-
 ## Chapter 10i. The Chain of Responsibility Pattern 
 
 ## Chapter 11. The Proxy Pattern 
+
+## Chapter 12. DAO Pattern
+
+[Reference Material](https://www.baeldung.com/java-dao-pattern)
+
+- Data Access Object (DAO) pattern is a structural pattern
+- Allows us to isolate the application/business layer from the persistence layer 
+- The API hides from the application all the complexity of performing CRUD operations in the underlying storage mechanism.
+- This permits both layers to evolve separately without knowing anything about each other.
+
+### A simple implementation 
+- Let’s say that we want to develop an application that manages users. 
+- We want to keep the application’s domain model completely agnostic about the database
+- So, we’ll create a simple DAO class that will take care of keeping these components neatly decoupled from each other.
+
+### The Domain Class 
+- As our application will work with users, we need to define just one class for implementing its domain model:
+    ```java
+    public class User {
+        private String name;
+        private String email;
+    }
+    ```
+- The `User` class is just a plain container for user data, so it doesn’t implement any other behavior worth stressing.
+- The important design choice here is how to keep the application using this class isolated from any persistence mechanism that could be implemented.
+- And that’s exactly the issue that the DAO pattern attempts to address.
+
+### The DAO API
+- Let’s define a basic DAO layer so we can see how it can keep the domain model completely decoupled from the persistence layer.
+```java
+
+public interface DAO<T> {
+    Optional<T> get(long id);
+
+    List<T> getAll();
+
+    void save(T t);
+
+    void update(T t, String[] params);
+
+    void delete(T t);
+}
+```
+- From a bird’s-eye view, it’s clear that the Dao interface defines an abstract API that performs CRUD operations on objects of type T.
+- Due to the high level of abstraction that the interface provides, it's easy to create a concrete, fine-grained implementation that works with `User` objects
+
+### The UserDao Class
+- Let’s define a user-specific implementation of the Dao interface:
+    ```java
+    public class UserDao implements DAO<User> {
+
+        private List<User> users = new ArrayList<>();
+
+        public UserDaO() {
+            users.add(new User("John", "john@email.com"));
+            users.add(new User("ABC", "abc@email.com"));
+        }
+
+            @Override
+        public Optional<User> get(long id) {
+            return Optional.ofNullable(users.get((int) id));
+        }
+        
+        @Override
+        public List<User> getAll() {
+            return users;
+        }
+        
+        @Override
+        public void save(User user) {
+            users.add(user);
+        }
+        
+        @Override
+        public void update(User user, String[] params) {
+            user.setName(Objects.requireNonNull(
+            params[0], "Name cannot be null"));
+            user.setEmail(Objects.requireNonNull(
+            params[1], "Email cannot be null"));
+            
+            users.add(user);
+        }
+        
+        @Override
+        public void delete(User user) {
+            users.remove(user);
+        }
+    }
+
+    ```
+- For simplicity’s sake, the users List acts like an in-memory database, which is populated with a couple of User objects in the constructor.
+- While both the `User` and `UserDao` classes coexist independently within the same application, we still need to see how the latter can be used for keeping the persistence layer hidden from application logic:
+    ```java
+    public class UserApplication {
+        private static Dao<User> userDao;
+
+        public static void main(String[] args) {
+            userDao = new UserDao();
+            
+            User user1 = getUser(0);
+            System.out.println(user1);
+            userDao.update(user1, new String[]{"Jake", "jake@domain.com"});
+            
+            User user2 = getUser(1);
+            userDao.delete(user2);
+            userDao.save(new User("Julie", "julie@domain.com"));
+            
+            userDao.getAll().forEach(user -> System.out.println(user.getName()));
+        }
+
+        private static User getUser(long id) {
+            Optional<User> user = userDao.get(id);
+            
+            return user.orElseGet(
+            () -> new User("non-existing user", "no-email"));
+        }
+    }
+    ```
+- The above example is contrived (काल्पनिक) but it shows the imporatance of DAO pattern
+
+> The most relevant facet of this process is how UserDao hides from the application all the low-level details on how the objects are persisted, updated and deleted.
+>
+
+### Using the Pattern With JPA
+
+- There's tedency (प्रवृत्ति) among developers to think that the release of JPA downgraded to zero the DAO pattern’s functionality. 
+- Lekin yeh poori tarah sahi nahi hai — kuch scenarios mein DAO ab bhi useful hai. This is true in some scenarios. 
+- We sometimes just want to expose to our application only a few domain-specific methods of the entity manager’s API
+- The DAO pattern has its place in such cases.
+
+#### The JpaUserDao Class
+
+```java
+
+public class JpaUserDao implements Dao<User> {
+    
+    private EntityManager entityManager;
+
+    @Override
+    public Optional<User> get(long id) {
+        return Optional.ofNullable(entityManager.find(User.class, id));
+    }
+
+    @Override 
+    public List<User> getAll() {
+        Query query = entityManager.createQuery("SELECT e FROM USER e");
+        return query.getResultList();
+    }
+
+    @Override 
+    public void save(User user) {
+        executeInsideTransaction(entityManager -> entityManager.persist(user));
+    }
+
+    @Override
+    public void update(User user, String[] params) {
+        user.setName(Objects.requireNonNull(params[0], "Name cannot be null"));
+        user.setEmail(Objects.requireNonNull(params[1], "Email cannot be null"));
+        executeInsideTransaction(entityManager -> entityManager.merge(user));
+    }
+
+    @Override 
+    public void delete(User user) {
+        executeInsideTransaction(entityManager -> entityManager.remove(user));
+    }
+
+    private void executeInsideTransaction(Consumer<EntityManager> action) {
+        EntityTransaction txn = entityManager.getTransaction();
+        try {
+            txn.begin();
+            action.accept(entityManager);
+            txn.commit();
+        } catch (Exception e) {
+            txn.rollback();
+            throw e;
+        }
+    }
+}
+```
+
+- The `JpaUserDao` class can work with any relational database supported by the JPA implementation.
+
+#### Refactoring the User Class
+- In this case, we’ll use Hibernate as the JPA default implementation, so we’ll refactor the User class accordingly:
+
+    ```java
+    @Entity 
+    @Table(name = "users")
+    public class User {
+
+        @Id
+        @GenerateValue(strategy = GenerationType.AUTO)
+        private long id;
+
+        private String name;
+        private String email;
+    }
+    ``` 
+
+#### Bootstrapping a JPA Entity Manager Programmatically
+- Assuming that we already have a working instance of MySQL running either locally or remotely and a database table “users” populated with some user records, we need to get a JPA entity manager so we can use the `JpaUserDao` class for performing CRUD operations in the database.
+- In most cases, we accomplish this via the typical persistence.xml file, which is the standard approach.
+- In this case, we’ll take an XML-less approach and get the entity manager with plain Java through Hibernate’s handy `EntityManagerFactoryBuilderImpl` class.
+  - More details [Bootstrap JPA](https://www.baeldung.com/java-bootstrap-jpa)
+
+####  The UserApplication Class
+- Finally, let’s refactor the initial `UserApplication` class so it can work with a `JpaUserDao` instance and run CRUD operations on the `User` entities:
+    ```java
+    public class UserApplication {
+        
+        private static Dao<User> jpaUserDao;
+
+        public static void main(String[] args) {
+            User user1 = getUser(1);
+            updateUser(user1, new String[]{"jake", "ok.email.com"});
+            saveUser(new User("Monica", "monica@domain.com"));
+            deleteUser(getUser(2));
+            getAllUsers().forEach(user -> System.out.println(user.getName()));
+        }
+
+        public static User getUser(long id) {
+            Optional<User> user = jpaUserDao.get(id);
+            return user.orElseGet(() -> new User("non-existing-user", "no-email"));
+        }
+
+        public static List<User> getAllUsers() { 
+            return jpaUserDao.getAll();
+        }
+
+        public static void updateUser(User user, String[] params) {
+            jpaUserDao.update(user, params);
+        }
+
+    }
+    ```
+- The example here is pretty limited. But it’s useful for showing how to integrate the DAO pattern’s functionality with the one that the entity manager provides.
+- In most applications, there’s a DI framework, which is responsible for injecting a JpaUserDao instance into the UserApplication class. 
+- The most relevant point to stress here is how the `JpaUserDao` class helps to keep the UserApplication class completely agnostic about how the persistence layer performs CRUD operations
+
+
+### More details
+- Reference: [Oracle blog](https://www.oracle.com/java/technologies/data-access-object.html)
+
+#### Basic DAO Implementation (Less Flexible)
+
+- Implement an inteface
+    ```java
+
+    public interface ScreenDefinitionsDAO {
+
+        ScreenDefinition getById(String id);
+        
+        void save(ScreenDefinition screen);
+    }
+
+    public class FileBasedScreenDefinitionsDAO implements ScreenDefinitionsDAO {
+            @Override
+        public ScreenDefinition getById(String id) {
+            // Read from file
+            System.out.println("Reading screen from file...");
+            return new ScreenDefinition(id, "Sample Screen");
+        }
+
+        @Override
+        public void save(ScreenDefinition screen) {
+            // Save to file
+            System.out.println("Saving screen to file...");
+        }
+    }
+    ```
+
+- Client code (Tighly coupled)
+    ```java
+    ScreenDefinitionsDAO dao = new FileBasedScreenDefinitionsDAO();
+    ScreenDefinition screen = dao.getById("screen123");
+    dao.save(screen);
+    ```
+
+#### Improved: Pluggable DAO with Factory (More Flexible)
+- Interface remains same (reusability)
+    ```java
+    public interface ScreenDefinitionsDAO {
+
+        ScreenDefinition getById(String id);
+
+        void save(ScreenDefinition screen);
+    }
+
+
+    ```
+- Implementations
+    ```java
+    public class FileBasedScreenDefinitionsDAO implements ScreenDefinitionsDAO {
+        public ScreenDefinition getById(String id) {
+            System.out.println("File DAO");
+            return new ScreenDefinition(id, "From File");
+        }
+
+        public void save(ScreenDefinition screen) {
+            System.out.println("Saved to File");
+        }
+    }
+
+    public class DatabaseScreenDefinitionsDAO implements ScreenDefinitionsDAO {
+        public ScreenDefinition getById(String id) {
+            System.out.println("Database DAO");
+            return new ScreenDefinition(id, "From DB");
+        }
+
+        public void save(ScreenDefinition screen) {
+            System.out.println("Saved to DB");
+        }
+    }
+    ```
+
+- DAO Factory (make it loosely coupled - moving the new away)
+    ```java
+    public class ScreenDaoFactory {
+        public static ScreenDefinitionDao getDao(Stirng type) {
+            if (type.equalsIgnoreCase("file")) {
+                return new FileBasedScreenDefinitionsDAO();
+            } else if (type.equalsIgnoreCase("db")) {
+                return new DatabaseScreenDefinitionsDAO();
+            } else {
+                throw new RuntimeException("Unknown DAO type");
+            }
+        }
+    }
+    ```
+- Client code
+    ```java
+    String daoType = ConfigLoader.get("screen.dao.type"); 
+    ScreenDefinitionsDAO dao = ScreenDAOFactory.getDAO(daoType);
+
+    ScreenDefinition screen = dao.getById("123");
+    ```
+- Bhai, chahe JDBC ho, Hibernate ho, ya REST API access karna ho — factory + interface + implementation pattern se hum loosely coupled aur configurable architecture build karta hai.
+
+#### What is diff between DTO and DAO ?
+- DTO: plain old Java object, used to pass data between layers (http <> controller, controller <> service)
+  - `UserDTO { id, name, email }`
+  - Contains only data, belongs to service or API layer
+  - Data ko transfer karna between layers
+- DAO: like the service layer but focusing purely on data modification/reading
+  - `UserDAO { getById(), save(), delete() }`
+  - Contains the logic to interact with the database
+  - Data ko access karna from persistence (DB)
