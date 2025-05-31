@@ -1,0 +1,119 @@
+
+
+### Scalability 
+- Reference: [Harvard Lect 9. Scalability](https://www.youtube.com/watch?v=-W9F__D3oY4)
+- Data Privacy & Security 
+    - Physical servers hosted in-premise are more safer interms of data safety
+    - VPSes (Virtual Private Server) - non-shared machine (e.g., AWS EC2) 
+        - Let you Self service & spawn any number of VMs
+        - Scaling these systems is easy - No need to purchase new hardware. It is service provider responsibility to help the client meet SLAs
+        - Scaling here refers to both scale-up and scale-down
+
+- [Interview Zone] 
+    - How would you define/measure a system is scalable or when you say a system is scalable ?
+        - If it shows graceful growth in resource usage, and stable or linear degradation in performance ?
+    - Is a scalable system always high-performing ? Justify 
+    - What does it means when we say a system scales linearly ? Is that ideal ? Do we have these kind of system in real ? list if any
+    - How important is cache for the scalability ? Or is it just independent and doesn't impact scalability ?
+    - Can a system be scalable but not reliable ? 
+    - Why might a system scale well for reads but not for writes ?
+        - Reads paths are cacheable ? CDNs, replicas ? 
+        - Is it that no coordination requires ?
+    - List out some architectural patterns which improve scalability ?
+        - Stateful vs stateless (http)
+        - Load balancer ?
+        - mico-services ?
+            - does using microservices automatically makes a system more scalable ? Justify 
+        - Caching CDN, Redis ? 
+        - Sharding / partition ? 
+        - Asynchronous processing ? (queues - Kafka) 
+        - What is event-driven design and those easily scalable ? 
+    - I horizonatally scaled my service but latency increase, why ? 
+        - Increase hops ? More cross-node communication ? cache misses ? coordination ?
+    - After answering all of the above questions, if there are so many issue with scaling what are the benefits ?
+- Vertical Scaling 
+    - Adding more resources to the same machine 
+    - [Inteview zone - Try to think and answer on your own] 
+    - But then why don't we just keep adding more and more resources ?
+        - Upper limit - Interms of CPU frequency, cores that can be packed
+    - Is there a real world scneario where you might want to use vertical scaling ? 
+    - List some cons of vertical scaling ?
+    - If you double the CPU cores on a vertically scaled server, will your app always see 2x performance gain ? Justify your answer
+        - Amdahl's law ? Lock contention ? Shared resource bottle-neck ? 
+    - How would you desing for graceful degradation in a vertically scaled system ?
+        - Request prioritization ? Rate limits / throttling ? Load shedding ? Queuing ?
+        - Have you heard about timeouts or circut breakers ? 
+        - Can you degrade some fancy features under heavy load ? 
+        - Think of more and list
+- Horizontal Scaling 
+    - Multiple server to build the topology 
+    - Distribution of request 
+    - [Interview zone]
+        - List some cons of horizontal scaling ?
+        - How do you manage consistency in a horizontally scaled system with multiple writers ?
+            - Have you heard about CAP, distributive locks ? consensus protocols (RAFT/Paxos) ? 
+            - BTW first question back to interview should be which consistency we are talking here - eventual or strong ?
+        - Can horizontal scaling ever reduce performance ? list few 
+            - Is this coordination and too much chit-chat on network ? complexity in debugging to the programmer ? Hot-spots creation ? Ornetwork is the bottleneck ? Think and also try to reason how to mitigate or are there tradeoffs always ?
+        - Are there any risks of scaling horizontally ? Like in case of asynchronous even-driven architectures ?
+            - Out-of-order packets ? duplicate messages ? Idempotency ? Think of these cases
+        - List cases when horizontal scaling actually not helps ?
+            - When you process is inhertely single threaded ? global lock ? What about stateful systems ?What about stragglers ?
+        - Have you heard about "thundering herd" problem in the cache layer ? Any strategy to mitigate those ?
+        - What metrics would tell you that your horizontally scaled system is becoming in-efficient ? 
+            - High network chit-chat ? High I/O cross-node 
+        - You've horizontally scaled a stateless web application, but users are still reporting inconsistent behavior. Reason why ?
+            - Cache inconsistency ? Eventual consistency ? Have you heard session stickiness ? 
+    - Load Balancing    
+        - How client will decide to which machine to connect ? 
+            - Client request to Load balancer
+            - Load balancer can do magic - Many options
+                - Route request on its own by locating the server
+                - Or Just return the IP of the machine to the client (act as DNS)
+                    - May be round-robin (simple algo for load balance)
+                    - Simple but costly if all heavy request goes to one server
+                - 
+    - [Interview zone - Evaluate your self & try to answer on your own] 
+        - Define Load ?
+            - Utilization of current resource. Higher the utilization, higher the load is
+        - Which all resources ?
+            - Resources like CPU, Memory, Disk I/O, Network
+        - How to quantify the load ?
+            - Mathematic formulation
+            - For individual resource, mathemtaically we can define Load(norm) = current usuage / total capacity
+        - How to combine load from multiple resource ?
+            - Based on the type of workload
+            - Weighted average : Load = w(cpu) * Load-cpu(norm) + w(network) * Load-network(norm)
+        - Say if you have N reading for load, how would you derive some meaning from that ?
+            - Adjustments - Load(smooth) = alpha * Load(current) + (1 - alpha) * Load(previous), where 0 < alpha < 1
+        - Now you know the load, what criteria you will set to define you machine is under load ?
+            - Machine under load when certain threshold is passed i.e., load(smooth) > threshold 
+        - How to define "total capacity" for different resource - like memory, sockets, network cards, disk I/O ?
+        - How would you determine the weights ?
+            - List out some weight proportion for different resource in different use case 
+            - CPU-bound apps, Memory bound apps, Network bound app and reason why those weight are chosen.
+        - Post selection of weight how would you know that weights choose are correct ? How would you evaluate those ?
+        - In a shared horizontally scaled system, how do you rebalance load when traffic spikes unevenly ? 
+            - Have you heard about consistent hashing ? Load-aware routing (fancy term for load balancer ?)
+            - Auto-scale ? If yes, how auto-scale work
+- Identifying single point of failures 
+    - Disks, Power supply, File servers
+    - Redundancy tradeoffs - cost vs reliability 
+        - RAID0 (stripping), RAID1(Mirroring), RAID5, 6, RAID 10 (mixuture of raid 0, raid1)
+- Load Balancing
+    - Software
+        - ELB (Elastic Load Balancer)
+        - HAProxy (Free open software)
+        - LVS (Linux Virtual Server - Free software)
+    - Hardware
+- Sticky Sessions
+    - When you visit a website mulitple time your session is preserved per server
+        - To make you end up on same backend server 
+    - Earlier we notice the redundancy (RAID) or storing on same data servers 
+    - Cookies ? 
+        - Is that solution with sticky session 
+        - Cookies in browser
+        - Any downside ?
+- Cache 
+    - Static content - Good contendor for caching 
+- 
