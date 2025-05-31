@@ -63,3 +63,4 @@ The books is written by Zhiyong Tan
 - From personal experience, with seniority one spends an increasing amount of time in meetings, and essential abilities include quick thinking, being able to ask good questions, steering the discussion to the most critical and relevant topics, and communicating one’s thoughts succinctly
 - This book emphasizes that one must effectively and concisely express one’s system design expertise within the <1 hour interview and drive the interview in the desired direction by asking the interviewer the right questions.
 - System design interviews are biased in favor of engineers with good verbal communication and against engineers less proficient in verbal communication, even though the latter may have considerable system design expertise and have made valuable system design contributions in the organizations where they worked.
+
