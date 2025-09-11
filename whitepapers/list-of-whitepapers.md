@@ -41,3 +41,5 @@
 40. Meta FlexiRAFT
 41. Apache Cassandra
 42. Google Monarch
+
+Useful resource - https://github.com/codenet/col733-cloud
