@@ -1617,6 +1617,7 @@ A: You’re right that the subclasses do look a lot like Simple Factory; however
 - Factory method relied on inheritance whereas abstract factory relies on object composition
 - All factory patterns promotes loose coupling by reducing dependency of our application on concrete classes
 
+- [What are the differences between Abstract Factory and Factory design patterns?](https://stackoverflow.com/questions/5739611/what-are-the-differences-between-abstract-factory-and-factory-design-patterns)
 
 ## Chapter 5. The Singleton Pattern: One of a Kind Objects
 
