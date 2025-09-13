@@ -1,4 +1,5 @@
 ### Prereq 
+- https://start.spring.io/  (Maven, Java, Spring boot 3.5.5, Packaging: jar, java: 24(later change in pom.xml based on what you have) 
 - Requires postgres to be installed
  - for configuration check demo/src/main/resources/*.yml file 
 - Java 23
