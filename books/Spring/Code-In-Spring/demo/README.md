@@ -22,9 +22,11 @@
 Note to set no proxy if not set explicitly in this command 
 
 ##### create
+```
 curl --noproxy localhost -X POST http://localhost:8080/api/persons \
   -H "Content-Type: application/json" \
   -d '{"name":"Alice","email":"alice@example.com"}'
+```
   
 ##### get all
 `curl --noproxy localhost http://localhost:8080/api/persons`
