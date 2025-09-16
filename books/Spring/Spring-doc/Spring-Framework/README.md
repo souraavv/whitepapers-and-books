@@ -29,6 +29,10 @@
   - [Annotation-based container configuration](#annotation-based-container-configuration)
   - [Fine-tuning Annotation-based Autowiring with @Primary or @Fallback](#fine-tuning-annotation-based-autowiring-with-primary-or-fallback)
   - [Fine-tuning Annotation-based Autowiring with Qualifiers](#fine-tuning-annotation-based-autowiring-with-qualifiers)
+  - [Using Generics as Autowiring Qualifiers](#using-generics-as-autowiring-qualifiers)
+  - [Injectino with @Resource](#injectino-with-resource)
+  - [Using @Value](#using-value)
+  - [Using @PostConstruct and @PreDestory](#using-postconstruct-and-predestory)
 
 
 ## The IoC container
@@ -822,23 +826,38 @@ public class DefaultServiceLocator {
 - __Common Fix__: Using `getBean()` from the Spring container provides new prototype instances but couples your code to Spring.
 - __Method Injection__: Allows Spring to automatically inject a new prototype instance each time, without coupling your code to Spring.
 
-<details>
-<summary></summary>
+    <details>
+    <summary>Not Desirable Code - Tighly couple with framework</summary>
 
-```java
+    ```java
 
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
+    import org.springframework.context.ApplicationContext;
+    import org.springframework.context.ApplicationContextAware;
 
-public class CommandManager implements ApplicationContextAware {
-    private ApplicationContext applicationContext;
+    public class CommandManager implements ApplicationContextAware {
+        private ApplicationContext applicationContext;
 
-    public Object process(Map)
-}
+        public Object process(Map commandState) {
+            Command command = createCommand();
+            command.setState(commandState);
+            return command.execute();
+        }
+
+        protected Command createCommand() {
+            // notice the Spring API dependency!
+            return this.applicationContext.getBean("command", Command.class);
+        }
+
+        public void setApplicationContext(
+            ApplicationContext applicationContext) throws BeansException {
+            this.applicationContext = applicationContext;
+        }
+    }
+
+    ```
+    </details>
 
 
-```
-</details>
 
 
 ### Bean Scopes
@@ -1213,3 +1232,178 @@ public class LoginAction {
         // ...
     }
     ```
+- [Q] Is there a way to do this conditionally ? like if I want to inject beans based on the feature toggle ? 
+    - Yes, it possible via `@ConditionalOnProperty`
+        ```java
+        @Configuration
+        public class MyFeatureConfiguration {
+
+            @Bean
+            @ConditionalOnPropoerty(
+                name = "my.feature.enabled",
+                havingValue = "true",
+                matchIfMissing = false
+            )
+            public MyFeatureService myFeatureService() {
+                return new MyFeatureService();
+            }
+        }
+        ```
+- There is also `@Profile` like `@Profile("dev")` or `@Profile("prod")`
+- Fallback Style
+    ```java
+    @Bean
+    @ConditionalOnMissingBean(MovieCatalog.class)
+    public MovieCatalog fallbackMovieCatalog() {
+        return new DefaultMovieCatalog();
+    }
+    ```
+
+### Using Generics as Autowiring Qualifiers
+- In addition to `@Qualifier` annotation, you can use Java generic types as an implicit form of qualification. For example, suppose you have following 
+    ```java
+    @Configuration
+    public class MyConfiguration {
+        @Bean
+        public StringStore stringStore() {
+            return new StringStore();
+        }
+
+        @Bean
+        public IntegerStore integerStore() {
+            return new IntegerStore();
+        }
+    }
+
+    public interface Store<T> {
+        void save(T value);
+    }
+
+    public class StringStore implements Store<String> {
+        public void save(String value) {}
+    }
+
+    public class IntegerStore implements Store<Integer> {
+        public void save(Integer value) {}
+    }
+    ```
+- Now we can `@Autowire` the `Store` interface and the generic is used as a qualifier, as the following 
+    ```java
+    @Autowired
+    private Store<String> s1; // <String> qualifier injects stringStore bean
+
+    @Autowired
+    private Store<Integer> s2;  // <Integer> qualifier inject integerStore bean
+
+    // Inject all store beans as long as they have an <Integer> generic
+    // Store<String> beans will not appear in this list.
+    @Autowired
+    private List<Store<Integer>> s;
+
+    ```
+
+### Injectino with @Resource
+
+- Spring also supports injection using the JSR-250 `@Resource` annotation (`jakarta.annotation.Resource`) on fields or bean property setter methods
+- This is common pattern in Jakarta EE
+- `@Resource` takes a name attribute. By default, Spring interprets the value as the bean name to be injected. 
+
+    ```java
+    public class SimpleMovieLister {
+
+        private MovieFinder movieFinder;
+
+        @Resource(name = "myMovieFinder")
+        public void setMovieFinder(MovieFinder movieFinder) {
+            this.movieFinder = movieFinder;
+        }
+    }
+    ```
+- If no name is specified, the deault name is derived from the field name or setter method. In case of a field, it takes the field name.
+- In case of setter method it takes the bean property name. 
+
+<details>
+<summary> @Resource vs @Autowired </summary>
+
+- ref: https://stackoverflow.com/questions/4093504/resource-vs-autowired
+- `@Resource` means get me a known resource by name
+- `@Inject` or `@Autowrired` try to wire in a suitable other component by type.
+- Spring twist with `@Resource`
+  - It first tries by name (strict jsr 250 style)
+  - If no bean with that name exists, Spring falls backs to type-based injection like (`@Autowired`)
+  - 
+</details>
+
+### Using @Value
+- `@Value` is typically used to inject externalized properties:
+    ```java
+    @Component 
+    public class MovieRecommender {
+        private final String catalog;
+
+        public MovieRecommender(@Value("${catalog.name}" String catalog)) {
+            this.catalog = catalog;
+        }
+    }
+    ```
+- With the following configuration  
+    ```java
+
+    @Configuration
+    @PropertySource("classpath:application.properties")
+    public class AppConfig { }
+    ```
+
+- Default value
+    ```java
+    @Component 
+    public class MovieRecommender {
+        private final String catalog;
+
+        public MovieRecommender(@Value("${catalog.name:defaultCataglog}") 
+                String catalog) {
+            this.catalog = catalog;
+        }
+    }
+    ```
+- and `application.properties` file:
+    ```yml
+    catalog.name=MovieCatalog
+    ```
+
+- Two placeholder style `${..}` and `#{..}`
+  - `${..}` is the property placeholder syntax. It asks Spring to resolve a property from the Environment or property source (application.properties, system properties, env vars etc)
+  - `#{...}` is SpEL (Spring Expression Language) expression. It is evaulated aas an expression at runtime and can reference system properties, beans, do arithmetic, create maps/list, call methods, etc. 
+    ```java
+    @Component
+    public class MovieRecommender {
+
+        private final String catalog;
+
+        public MovieRecommender(@Value("#{systemProperties['user.catalog'] + 
+                'Catalog'}") String catalog) {
+            this.catalog = catalog;
+        }
+    }
+    ```
+- The lenient default resolver and what "linient" means ?
+  - Spring provides a lenient placeholder revolver by defualt. If Spring cannot find a property for `${catalog.name}`, it will not throw an exception by default. Instead it will inject the unresolved placeholder text itself as the value
+- Making placeholder resolution strict:
+  - `PropertySourcesPlaceholderConfigure`
+  - If you want Spring startup to fail when a `${..}` placeholder is unresolved, declare a `PropertySourcesPlaceholderConfigure` bean
+    ```java
+
+    @Configuration
+    public class AppConfig {
+
+        @Bean
+        public static PropertySourcesPlaceholderConfigure propertyPlaceHolderConfigure() {
+            PropertySourcesPlaceholderConfigure cfg =
+                    new PropertySourcePlaceHolderConfigure();
+
+            return cfg;
+        }
+    }
+    ```
+
+### Using @PostConstruct and @PreDestory
