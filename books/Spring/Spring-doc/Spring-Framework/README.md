@@ -1407,3 +1407,20 @@ public class LoginAction {
     ```
 
 ### Using @PostConstruct and @PreDestory
+- Lifecycle annotation `jakarta.annotation.PostConstruct` and `jakarta.annotation.PreDestroy`
+- `@PreDestory`
+  - Automatically be called just before the bean is destoryed
+    ```java
+    public class CachingMovieLister {
+
+        @PostConstruct 
+        public void populateMovieCache() {
+
+        }
+
+        @PreDestroy
+        public void clearMovieCache() {
+            
+        }
+    }
+    ```
