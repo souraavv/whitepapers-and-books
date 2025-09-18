@@ -62,6 +62,18 @@
     - [Influencing Startup Order](#influencing-startup-order)
     - [Background Initialization (Spring 6.2+)](#background-initialization-spring-62)
     - [Conditional Beans (`@Profile`, `@Conditional`)](#conditional-beans-profile-conditional)
+  - [Environment Abstraction](#environment-abstraction)
+    - [What is this abstraction ?](#what-is-this-abstraction-)
+    - [Profiles - what are they and why needed ?](#profiles---what-are-they-and-why-needed-)
+    - [Using `@Profile` on methods vs classes](#using-profile-on-methods-vs-classes)
+    - [Profile expressions (boolean logic)](#profile-expressions-boolean-logic)
+    - [Custom composed profile annotations](#custom-composed-profile-annotations)
+    - [PropertySource abstraction — properties everywhere](#propertysource-abstraction--properties-everywhere)
+      - [Precedence and search order — who wins when the same key is in multiple places](#precedence-and-search-order--who-wins-when-the-same-key-is-in-multiple-places)
+      - [Adding custom PropertySource](#adding-custom-propertysource)
+      - [`@PropertySource` — easy way to add a properties file](#propertysource--easy-way-to-add-a-properties-file)
+      - [Placeholder resolution in `@PropertySource` locations](#placeholder-resolution-in-propertysource-locations)
+    - [Practical guidelines](#practical-guidelines)
 
 
 ## The IoC container
@@ -1847,4 +1859,144 @@ public class AppConfig {
 
 #### Conditional Beans (`@Profile`, `@Conditional`)
 - `@Profile("dev")`:  bean only created in dev environment.
-- 
+
+
+### Environment Abstraction
+
+#### What is this abstraction ?
+- `Environment` is an abstraction inside spring container that models two things:
+  - profiles: which set of beans should be active
+  - properties: key-value settings coming from many places.
+- `Environment` is like container's runtime context manager that answers questions like
+  - which profile is active now ?
+  - where do i read property `x` and what value should I get ?
+
+#### Profiles - what are they and why needed ?
+- A profile is a named logical group of bean definitions, used to register different bean in different runtime env
+- Use case:
+  - Development: use in-memory DB for fast local and dev test
+  - QA/Production: Use externally provided data source
+  - Feature toggle per customer: customer-A beans and customer-B beans
+- Example:
+    ```java
+    @Bean
+    public DataSource dataSource() {
+        return new EmbeddedDataSourceBuilder()
+                .setType("my-schema.sql")
+                .addScript("my-test-data.sql")
+                .build();
+    }
+
+    @Bean(destoryMethod = "")
+    public DataSource dataSource() throws Exception {
+        Context ctx = new InitialContext();
+        return (DataSource) ctx.lookup("java:com/env/jdbc/datasource");
+    }
+
+    ```
+- Now how to switch between two based on the env ? Answer: profile
+    ```java
+    @Configuration
+    @Profile("development")
+    public class StandAloneDataConfig {
+        @Bean
+        public DataSource dataSource() {
+            return new EmbeddedDataSourceBuilder()
+                    .setType("my-schema.sql")
+                    .addScript("my-test-data.sql")
+                    .build();
+        }
+    }
+
+    @Configuration
+    @Profile("production")
+    public class JndiDataConfig {
+        @Bean(destoryMethod = "")
+        public DataSource dataSource() throws Exception {
+            Context ctx = new InitialContext();
+            return (DataSource) ctx.lookup("java:com/env/jdbc/datasource");
+        }
+    }
+    ```
+
+#### Using `@Profile` on methods vs classes
+- `@Profile` on a class: everything in the class (`@Bean` methods and `@Imports`) is skipped unless the profile is active.
+- `@Profile` on a method: only that bean is registered if the profile is active — useful for different variants of a single logical bean (like two dataSource beans).
+- Example: same bean name, two method variants
+    ```java
+    @Configuration
+    public class AppConfig {
+        @Bean("dataSource")
+        @Profile("development")
+        public DataSource standaloneDataSource() { ... }
+
+        @Bean("dataSource")
+        @Profile("production")
+        public DataSource jndiDataSource() throws Exception { ... }
+    }
+    ```
+
+#### Profile expressions (boolean logic)
+- `@Profile` supports small expressions with operators:
+  - `!`, `&` and `|`
+  - Examples
+    - `@Profile("production & us-east")` = active when both 'production' and 'us-east' are active.
+    - `@Profile("!test")`
+
+#### Custom composed profile annotations
+- You can create your own annotation as a meta-annotation that wraps `@Profile`
+    ```java
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    @Profile("production")
+    public @interface Production {}
+    ```
+- Then use `@Prodcution` instead of `@Profile("production")`
+
+#### PropertySource abstraction — properties everywhere
+- `Environment` also manages property sources, i.e., key-value collections from various places:
+  - JVM system properties (`-D...`)
+  - OS env variables
+  - JNDI entries
+  - properties via `@PropertySource`
+
+##### Precedence and search order — who wins when the same key is in multiple places
+- Property search is hierarchical; earlier sources override later ones. Values are replaced (not merged)
+
+##### Adding custom PropertySource
+
+```java
+ConfigurableApplicationContext ctx = new GenericApplicationContext();
+MutablePropertySources sources = ctx.getEnvironment().getPropertySources();
+sources.addFirst(new PropertySource());
+```
+
+##### `@PropertySource` — easy way to add a properties file
+- Put `@PropertySource("classpath:/com/myco/app.properties")` on a `@Configuration` class to add that file as a `PropertySource`
+    ```java
+    @Configuration
+    @PropertySource("classpath:/com/myco/app.properties")
+    public class AppConfig {
+        @Autowired Environment env;
+
+        @Bean
+        public TestBean testBean() {
+            TestBean t = new TestBean();
+            t.setName(env.getProperty("testbean.name"))
+            return t;
+        }
+
+    }
+    ```
+
+##### Placeholder resolution in `@PropertySource` locations
+- You can write `@PropertySource("classpath:/com/${my.placeholder:default/path}/app.properties")`
+- The `${...}` values are resolved against already-registered property sources (e.g., system properties, environment variables).
+- If a placeholder is not found and has no default, an `IllegalArgumentException` is thrown.
+
+#### Practical guidelines 
+- Avoid heavy `@Autowired` in `@Configuration` fields — configuration classes are created early.
+- Beware of circular initialization:
+  - Don’t access local `@Bean` methods from a `@PostConstruct` on the same config (leads to circular reference).
+- When defining alternative beans with `@Profile`, use distinct method names and bean name attribute if you want multiple variants of the same logical bean.
+- Activate profiles explicitly in production environments (e.g., JVM arg, environment variable). Don’t rely on defaults unless intended.
