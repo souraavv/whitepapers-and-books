@@ -33,6 +33,22 @@
   - [Injectino with @Resource](#injectino-with-resource)
   - [Using @Value](#using-value)
   - [Using @PostConstruct and @PreDestory](#using-postconstruct-and-predestory)
+  - [Classpath Scanning and Managed Components](#classpath-scanning-and-managed-components)
+  - [Java Based Container Configuration](#java-based-container-configuration)
+  - [Instantiating the Spring Container by Using `AnnotationConfigApplicationContext`](#instantiating-the-spring-container-by-using-annotationconfigapplicationcontext)
+    - [What is AnnnotationConfigApplicationContext ?](#what-is-annnotationconfigapplicationcontext-)
+    - [Using `@Configuration` classes](#using-configuration-classes)
+    - [Using `@Component` and JSR-330 classes](#using-component-and-jsr-330-classes)
+    - [Building context programmatically](#building-context-programmatically)
+  - [Using the @Bean Annotation](#using-the-bean-annotation)
+    - [What is a Bean ?](#what-is-a-bean-)
+    - [Where Bean is used ?](#where-bean-is-used-)
+    - [Return type of a bean method](#return-type-of-a-bean-method)
+    - [Dependencies in Bean method](#dependencies-in-bean-method)
+    - [LifeCycle Support](#lifecycle-support)
+    - [Bean Scope](#bean-scope)
+    - [Customizing bean names](#customizing-bean-names)
+    - [Bean aliases](#bean-aliases)
 
 
 ## The IoC container
@@ -1373,7 +1389,7 @@ public class LoginAction {
 
 - Two placeholder style `${..}` and `#{..}`
   - `${..}` is the property placeholder syntax. It asks Spring to resolve a property from the Environment or property source (application.properties, system properties, env vars etc)
-  - `#{...}` is SpEL (Spring Expression Language) expression. It is evaulated aas an expression at runtime and can reference system properties, beans, do arithmetic, create maps/list, call methods, etc. 
+  - `#{...}` is SpEL (Spring Expression Language) expression. It is evaulated as an expression at runtime and can reference system properties, beans, do arithmetic, create maps/list, call methods, etc. 
     ```java
     @Component
     public class MovieRecommender {
@@ -1420,7 +1436,188 @@ public class LoginAction {
 
         @PreDestroy
         public void clearMovieCache() {
-            
+
         }
+    }
+    ```
+
+### Classpath Scanning and Managed Components
+
+Ronak bhai aap add kr dena 
+
+
+
+### Java Based Container Configuration 
+- `@Bean` annotation is used to indicate that a method instantiates, configures, and initializes a new object to be managed by Spring IoC container 
+- Annotating a class with `@Configuration` indicates that its primary purpose is a source of bean definitions. 
+    ```java
+    @Configuration
+    public class AppConfig {
+
+        @Bean
+        public MyServiceImpl myService() {
+            return new MyServiceImpl();
+        }
+    }
+    ```
+
+### Instantiating the Spring Container by Using `AnnotationConfigApplicationContext`
+- When `@Configuration` classes are provided as input, the `@Configuration` class itself is registered as a bean definition and all declared `@Bean` methods within the class are also registered as bean definitions.
+
+#### What is AnnnotationConfigApplicationContext ?
+- It's a Spring container implementation that:
+  - Can take `@Configuration` classes with `@Bean` methods
+  - Can take `@Component` classes with `@Autowired` and `@Inject` for dependencies
+  - Build the entire application context based on annotation 
+
+#### Using `@Configuration` classes 
+- If you pass a class annotated with `@Configuration`, Spring will:
+  - Register that class as a bean
+  - Look inside for all `@Bean` method and register those beans too
+
+    ```java
+    public static void main(String[] args) {
+        ApplicationContext ctx = new AnnotationConfigApplicationContext(AppConfig.class);
+        MyService myService = ctx.getBean(MyService.class);
+        myService.doStuff();
+    }
+    ```
+- Here 
+  - `AppConfig` is a `@Configuration` class
+  - Beans defined inside `AppConfig` are available in the container
+
+#### Using `@Component` and JSR-330 classes
+- Instead of `@Configuration`, you can directly give Spring your classes that are annotated with `@Component` (or `@Service`, `@Repository`, etc).
+- Spring will handle dependencies with `@Autowired`/`@Inject`
+
+    ```java
+    ApplicationContext ctx = new AnnotationConfigApplicationContext(
+        MyServiceImpl.class, Depedency1.class, Dependency2.class
+    );
+
+    MyService myService = ctx.getBean(MyService.class);
+    myService.doStuff();
+    ```
+
+#### Building context programmatically
+- You can start with empty container and register things step by steps
+    ```java
+    AnnotationConfigApplicationContext ctx = 
+            new AnnotationConfigApplicationContext();
+    ctx.register(AppConfig.class, OtherConfig.class);
+    ctx.refresh(); // must step
+    MyService myService = ctx.getBean(MyService.class);
+    ```
+
+### Using the @Bean Annotation
+
+#### What is a Bean ? 
+- `@Bean` is used on a method to tell Spring: The object returned by this method should be managed as a bean in the Spring Container 
+- `@Bean` method name is the bean id
+
+#### Where Bean is used ?
+- Inside `@Component` class, inside a `@Configuration` class, Even in an interface with default methods
+
+    ```java
+    public interface BaseConfig {
+
+        @Bean
+        default TransferServiceImpl transferService() {
+            return new TransferServiceImpl();
+        }
+    }
+
+    @Configuration 
+    public class AppConfig implements BaseConfig {
+
+    }
+    ```
+
+#### Return type of a bean method 
+- It can be concrete class
+- It can be interface type
+
+#### Dependencies in Bean method 
+- This is constructor injection, but done through method parameter
+
+    ```java
+    @Bean
+    public TransferService transferService(AccountRepository accountRepository) {
+        return new TransferServiceImpl(accountRepository);
+    }
+
+    ```
+
+#### LifeCycle Support
+- Beans create via `@Bean`:
+  - Can use `@PostConstruct` and `@PreDestroy`
+  - Can implement Spring lifecycle interface (`InitializingBean`, `DisposableBean`, etc)
+  - Can specify init and destory method directly:
+    ```java
+    @Bean(initMethod = "init", destoryMethod = "clenaup")
+    public BeanOne beanOne() {
+        return new BeanOne();
+    }
+    ```
+- To disable auto-destroy. Else if bean has `close()` or `shutdown()` method, Spring will call them by default on shutdown
+    ```java
+    @Bean(destoryMethod = "")
+    public DataSource dataSource() {...}
+    ```
+
+#### Bean Scope
+- By default singleton (one instance)
+- You can change scope with `@Scope`
+
+    ```java
+    @Bean
+    @Scope("prototype")
+    public Encryptor encryptor() {
+        return new Encryptor();
+    }
+    ```
+- Common scope - `singleton`, `prototype`, `request`, `session`
+- The problem
+  - Let’s say you have:
+    - A singleton bean `UserService` - created only once.
+    - A session-scoped bean `UserPreferences` - new for each logged-in user session.
+    - Now, your singleton `UserService` needs to use `UserPreferences`
+    - The Solution to this is Scoped Proxy
+      - Spring solve this using proxies:
+        - Instead of injecting the actual `UserPreference` object
+        - It injects a proxy object (wrapper)
+        - When the proxy is called, it automatically looks up the real session-scoped bean for the current user sessions
+        - So spring handles the lifecycle
+        - When `userService` calls `userPreferences.getTheme()`, the proxy looks up the correct `UserPreferences` object for the current session.
+    ```java
+
+    @Bean
+    @SessionScope
+    public UserPreferences userPreferences() {
+        return new UserPreferences();
+    }
+
+    @Bean
+    public UserService userService() {
+        UserService service = new SimpleUserService();
+        // proxy - this will inject a proxy, not a real instance
+        service.setUserPreferences(userPreferences());
+        // proxy
+        return service;
+    }
+    ```
+#### Customizing bean names
+    ```java
+    @Bean("mythign")
+    public Thing thing() {
+        return new Thing();
+    }
+    ```
+
+#### Bean aliases
+    ```java
+    @Bean({"dataSource", "othername", "anotehrname"})
+    public DataSource dataSource() {
+        return new DataSource();
     }
     ```
