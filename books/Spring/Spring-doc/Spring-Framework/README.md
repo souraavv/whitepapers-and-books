@@ -30,7 +30,7 @@
   - [Fine-tuning Annotation-based Autowiring with @Primary or @Fallback](#fine-tuning-annotation-based-autowiring-with-primary-or-fallback)
   - [Fine-tuning Annotation-based Autowiring with Qualifiers](#fine-tuning-annotation-based-autowiring-with-qualifiers)
   - [Using Generics as Autowiring Qualifiers](#using-generics-as-autowiring-qualifiers)
-  - [Injectino with @Resource](#injectino-with-resource)
+  - [Injection with `@Resource`](#injection-with-resource)
   - [Using @Value](#using-value)
   - [Using @PostConstruct and @PreDestory](#using-postconstruct-and-predestory)
   - [Classpath Scanning and Managed Components](#classpath-scanning-and-managed-components)
@@ -48,7 +48,11 @@
     - [LifeCycle Support](#lifecycle-support)
     - [Bean Scope](#bean-scope)
     - [Customizing bean names](#customizing-bean-names)
-    - [Bean aliases](#bean-aliases)
+  - [Using the `@Configuration` annotation](#using-the-configuration-annotation)
+    - [What is `@Configuration`](#what-is-configuration)
+    - [Injecting Inter-bean depedencies](#injecting-inter-bean-depedencies)
+    - [Lookup method injection](#lookup-method-injection)
+    - [Behind the scenes](#behind-the-scenes)
 
 
 ## The IoC container
@@ -1318,7 +1322,7 @@ public class LoginAction {
 
     ```
 
-### Injectino with @Resource
+### Injection with `@Resource`
 
 - Spring also supports injection using the JSR-250 `@Resource` annotation (`jakarta.annotation.Resource`) on fields or bean property setter methods
 - This is common pattern in Jakarta EE
@@ -1520,7 +1524,6 @@ Ronak bhai aap add kr dena
 
     ```java
     public interface BaseConfig {
-
         @Bean
         default TransferServiceImpl transferService() {
             return new TransferServiceImpl();
@@ -1590,7 +1593,6 @@ Ronak bhai aap add kr dena
         - So spring handles the lifecycle
         - When `userService` calls `userPreferences.getTheme()`, the proxy looks up the correct `UserPreferences` object for the current session.
     ```java
-
     @Bean
     @SessionScope
     public UserPreferences userPreferences() {
@@ -1607,17 +1609,91 @@ Ronak bhai aap add kr dena
     }
     ```
 #### Customizing bean names
-    ```java
-    @Bean("mythign")
-    public Thing thing() {
-        return new Thing();
-    }
+```java
+@Bean("mythign")
+public Thing thing() {
+    return new Thing();
+}
     ```
 
 #### Bean aliases
+```java
+@Bean({"dataSource", "othername", "anotehrname"})
+public DataSource dataSource() {
+    return new DataSource();
+}
+```
+
+### Using the `@Configuration` annotation
+
+#### What is `@Configuration`
+- It is a class level annotation
+- Tells spring - "this class contains beans defintions"
+- inside it we write `@Bean` methods that create and configure beans
+
     ```java
-    @Bean({"dataSource", "othername", "anotehrname"})
-    public DataSource dataSource() {
-        return new DataSource();
+    @Configuration 
+    public class AppConfig {
+        @Bean
+        public BeanOne beanOne() {
+            return new BeanOne();
+        }
     }
     ```
+#### Injecting Inter-bean depedencies
+- If one bean needs another, you can just call another `@Bean` method 
+
+    ```java
+    @Configuration
+    public class AppConfig {
+        @Bean
+        public BeanOne beanOne() {
+            return new BeanOne(beanTwo());
+        }
+
+        @Bean
+        public BeanTwo beanTwo() {
+            return new BeanTwo();
+        }
+    }
+    ```
+- the above only works in `@Configuration` classes and `@Compnent` classes
+
+#### Lookup method injection 
+- Spring beans are singleton by default
+- when spring injects dependencies into a singleton Bean, it injects them once (at startup)
+- If that dependency is a prototype bean (suppose to be new every time you ask), the singelton will still hold on to just one instance - the one created at startup
+- Soution - Lookup method injection
+  - Using proxy 
+#### Behind the scenes
+
+```java
+@Configuration
+public class AppConfig {
+    @Bean
+    public ClientService clientService1() {
+        return new ClientServiceImpl(clientDao());
+    }
+
+    @Bean
+    public ClientService clientService2() {
+        return new ClientServiceImpl(clientDao());
+    }
+
+    @Bean
+    public ClientDao clientDao() {
+        return new ClientDaoImpl();
+    }
+}
+```
+
+- Here:
+  - `clientDao()` is called twice.
+  - Normally, that would create two `ClientDaoImpl` objects.
+  - But Spring guarantees singleton by default → only one instance will exist.
+- How ?
+  - Spring uses CGLIB (bytecode subclassing) to enhance the `@Configuration` class at runtime 
+  - It replaces your clientDao() call with logic like:
+    - Check if clientDao is already created in the container.
+    - If yes, return the cached one.
+    - If no, create it, cache it, and return it.
