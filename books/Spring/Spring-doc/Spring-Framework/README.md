@@ -53,6 +53,15 @@
     - [Injecting Inter-bean depedencies](#injecting-inter-bean-depedencies)
     - [Lookup method injection](#lookup-method-injection)
     - [Behind the scenes](#behind-the-scenes)
+  - [Composing Java based Configurations](#composing-java-based-configurations)
+    - [Injecting Dependencies across Config Classes](#injecting-dependencies-across-config-classes)
+    - [Config Classes Are Beans Too](#config-classes-are-beans-too)
+    - [Avoid Circular References](#avoid-circular-references)
+    - [Fully-Qualifying Imported Beans](#fully-qualifying-imported-beans)
+    - [Looser Coupling with Interfaces](#looser-coupling-with-interfaces)
+    - [Influencing Startup Order](#influencing-startup-order)
+    - [Background Initialization (Spring 6.2+)](#background-initialization-spring-62)
+    - [Conditional Beans (`@Profile`, `@Conditional`)](#conditional-beans-profile-conditional)
 
 
 ## The IoC container
@@ -1697,3 +1706,145 @@ public class AppConfig {
     - Check if clientDao is already created in the container.
     - If yes, return the cached one.
     - If no, create it, cache it, and return it.
+
+### Composing Java based Configurations
+- Similar to xml `<import>` here also we have `@Import` to pull in other config
+    ```java
+    @Configuration
+    public class ConfigA {
+        @Bean
+        public A a() {
+            return new A();
+        }
+    }
+
+    @Configuration 
+    @Import(ConfigA.class) // include ConfigA into this config
+    public class ConfigB {
+        @Bean
+        public B b() {
+            return new B();
+        }
+    }
+    ```
+- Now if you start you app with `ConfigB`, then spring will automatically load `ConfigA`
+    ```java
+    public static void main(String[] args) {
+        ApplicationContext ctx = new AnnotationConfigApplicationContext(
+            ConfigB.class
+        );
+
+        A a = ctx.getBean(A.class);
+        B b = ctx.getBean(B.class);
+    }
+    ```
+- Before only `@configuration` class were allowed to import, but now `@Component` classes are also allowed
+
+#### Injecting Dependencies across Config Classes
+- Problem: Beans often depend on each other across configurations.
+- Example:
+    ```java
+    @Configuration
+    public class ServiceConfig {
+        @Bean
+        public TransferService transferService(AccountRepository 
+                accountRepository) {
+            return new TransferService(accountRespository);
+        }
+    }
+
+    @Configuration
+    public class RepositoryConfig {
+        @Bean
+        public AccountRepository accountRepository(DataSource dataSource) {
+            return new JdbcAccountRespository(dataSource);
+        }
+    }
+
+    @Configuration
+    @Import({ServiceConfig.class, RepositoryConfig.class})
+    public class SystemTestConfig {
+        @Bean
+        public DataSource dataSource() {
+            return new DataSource();
+        }
+    }
+    ```
+
+    ```java
+    ApplicationContext ctx = new AnnotationConfigApplicationContext(
+            SystemTestConfig.class);
+    TransferService ts = ctx.getBean(TransferService.class);
+    ```
+
+#### Config Classes Are Beans Too
+- `@Configuration` classes themselves are beans.
+- That means you can use `@Autowired` or `@Value` inside them.
+    ```java
+    @Configuration
+    public class ServiceConfig {
+        @Autowired
+        private AccountRepository accountRepository;
+
+        @Bean
+        public TransferService transferService() {
+            return new TransferServiceImpl(accountRepository);
+        }
+    }
+    ```
+
+#### Avoid Circular References
+- Don’t call your own `@Bean` methods in `@PostConstruct`.
+- Why? Because at that point, the config class itself isn’t fully ready → circular creation issues.
+
+#### Fully-Qualifying Imported Beans
+- Problem: In `ServiceConfig`, you see an `@Autowired AccountRepository`, but where is it defined?
+- It could be in many configs. Slightly ambiguous.
+- Solution
+    ```java
+    @Configuration
+    public class ServiceConfig {
+        @Autowired
+        private RepositoryConfig respositoryConfig;
+
+        @Bean
+        public TransferService transferService() {
+            return new TransferService(respositoryConfig.accountRespository());
+        }
+    }
+    ```
+- Now it’s crystal clear that `accountRepository()` comes from `RepositoryConfig`.
+- Tradeoff ? Yes, Tighter coupling between config classes. Solution ? think before going to next section
+
+#### Looser Coupling with Interfaces 
+- To reduce tight coupling, define config as inteface
+    ```java
+    @Configuration
+    public interface RepositoryConfig {
+        @Bean
+        AccountRepository accountRepository();
+    }
+
+    @Configuration
+    public class DefaultRespositoryConfig implements RespositoryConfig {
+        @Bean
+        public AccountRespository accountRespository() {
+            return new JdbcAccountRespository(...);
+        }
+    }
+    ```
+- Now `ServiceConfig` can depend on `RepositoryConfig` interface, not concrete class. Cleaner and flexible.
+
+#### Influencing Startup Order
+- Use `@Lazy`, bean created only when first needed.
+- Use `@DependsOn`, bean X must be initialized before bean Y.
+
+#### Background Initialization (Spring 6.2+)
+- `@Bean(bootstrap=BACKGROUND)` -> bean created in background thread.
+- Dependencies wait if they need it early.
+- Needs a bean of type `Executor` (bootstrapExecutor) to run.
+- Great for heavy beans at startup (speed up app startup)
+
+#### Conditional Beans (`@Profile`, `@Conditional`)
+- `@Profile("dev")`:  bean only created in dev environment.
+- 
