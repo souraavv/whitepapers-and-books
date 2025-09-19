@@ -87,6 +87,8 @@
     - [ByteArrayResource](#bytearrayresource)
   - [The `ResourceLoader` interface](#the-resourceloader-interface)
   - [The `ResourcePatternResolver` Interface](#the-resourcepatternresolver-interface)
+  - [The `ResourceLoaderAware` Interface](#the-resourceloaderaware-interface)
+    - [Examples](#examples)
 
 
 ## The IoC container
@@ -2162,3 +2164,108 @@ sources.addFirst(new PropertySource());
 
 ### The `ResourcePatternResolver` Interface
 - Extension to the `ResourceLoader`
+    ```java
+    public interface ResourcePatternResolver extends ResourceLoader {
+        String CLASSPATH_ALL_URL_PREFIX = "classpath*:";
+        Resource[] getResources(String locationPattern) 
+                throws IOException;
+    }
+    ```
+- `*` matches zero or more character
+- `**` matches zero or more directories in a path
+- `?` matches exactly one character
+
+    ```java
+    ApplicationContext ctx = new ClassPathXmlApplicationContext("conf/app.xml");
+    Resource[] resources = ctx.getResource("classpath*:com/example/**/*.html");
+
+    for (Resource r: resources) {
+        ...
+    }
+    ```
+
+    ```java
+    ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+    Resource[] res = resolver.getResource("classpath*:META-INF/*-spring.xml");
+    ```
+
+    ```java
+    ResourcePatternResolver resoler = new PathMatchingResourcePatternResolver();
+    Resource[] res = resolver.getResource("file:./config/**/*.yml");
+    ```
+
+- Example: Injecting multiple resource with `@Value`
+    ```yml
+    templates.path=classpath*:com/myapp/**/templates/*.html
+    ```
+
+    ```java
+    @Component
+    public class MyBean {
+        private final Resource[] templates;
+
+        public MyBean(@Value("${templates.path}") Resource[] templates) {
+            this.templates = templates
+        }
+    }
+    ```
+
+### The `ResourceLoaderAware` Interface
+- A special callback interface which identifies components that expect to be provided a `ResourceLoader` reference
+    ```java
+    public interface ResourceLoaderAware {
+        void setResourceLoader(ResourceLoader resourceLoader);
+    }
+    ```
+
+- When a class implements `ResourceLoaderAware` and is deployed into an application context (a spring-managed bean), it is recognized as `ResourceLoaderAware` by the application context
+- The application context then invoke `setResourceLoader(ResourceLoader)`, supplying itself as argument (remember all application context in Spring implements the `ResourceLoader` interface)
+- Even better than above is to use constructor injection with `@Autowired` instead of callback interface
+
+#### Examples
+- Implementing `ResourceLoaderAware` (callback style)
+    ```java
+    @Component
+    public class MyBean implements ResourceLoaderAware {
+        private ResourceLoader resourceLoader;
+
+        @Override
+        public void setResourceLoader(ResourceLoader resourceLoader) {
+            this.resourceLoader = resourceLoader;
+        }
+
+        public void load() throws IOException {
+            Resource res = resourceLoader.getResource("callpath:config/my.yml");
+        }
+    }
+    ```
+- Constructor Injection 
+    ```java
+    @Component
+    public class MyBean {
+        private final ResourceLoader resourceLoader;
+
+        public MyBean(ResourceLoader resourceLoader) {
+            this.resourceLoader = resourceLoader;
+        }
+
+        public void load() throws IOException {
+            Resource r = resourceLoader.getResource("file:/etc/app/conf.yml");
+        }
+    }
+    ```
+- Autowiring the `ResourcePatternResolver` (for wildcards)
+    ```java
+    @Component
+    public class TemplateLoader {
+        private final ResourcePatternResolver resolver;
+
+        public TemplateLoader(ResourcePatternResolver resolver) {
+            this.resolver = resolver;
+        }
+
+        public Resource[] findAllTemplates() throws IOException {
+            return resolver.getResource("classpath*:com/example/**/templates/*.html");
+        }
+    }
+    ```
