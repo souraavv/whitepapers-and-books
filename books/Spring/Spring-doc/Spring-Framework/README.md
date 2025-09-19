@@ -74,6 +74,19 @@
       - [`@PropertySource` — easy way to add a properties file](#propertysource--easy-way-to-add-a-properties-file)
       - [Placeholder resolution in `@PropertySource` locations](#placeholder-resolution-in-propertysource-locations)
     - [Practical guidelines](#practical-guidelines)
+- [Resources](#resources)
+  - [Introduction](#introduction)
+  - [The Resource Interface](#the-resource-interface)
+  - [Built-in Resource Implementation](#built-in-resource-implementation)
+    - [UrlResource](#urlresource)
+    - [ClassPathResource](#classpathresource)
+    - [FileSystemResource](#filesystemresource)
+    - [PathResource](#pathresource)
+    - [ServletContextResource](#servletcontextresource)
+    - [InputStreamResource](#inputstreamresource)
+    - [ByteArrayResource](#bytearrayresource)
+  - [The `ResourceLoader` interface](#the-resourceloader-interface)
+  - [The `ResourcePatternResolver` Interface](#the-resourcepatternresolver-interface)
 
 
 ## The IoC container
@@ -2000,3 +2013,152 @@ sources.addFirst(new PropertySource());
   - Don’t access local `@Bean` methods from a `@PostConstruct` on the same config (leads to circular reference).
 - When defining alternative beans with `@Profile`, use distinct method names and bean name attribute if you want multiple variants of the same logical bean.
 - Activate profiles explicitly in production environments (e.g., JVM arg, environment variable). Don’t rely on defaults unless intended.
+
+
+## Resources
+- This chapter cover how Spring handles resources and how you acn work with resources in Spring 
+
+### Introduction
+- Java's standard `java.net.URL` class and standard handler for various URL prefixes
+
+### The Resource Interface
+- Spring's `Resource` interface located in the `org.springframework.core.io` package is meant to be more capable interface for abstracting access to low-level resources.
+- The following listing provides an overview of the `Resource` interface.
+    ```java
+    public interface Resource extends InputStreamSource {
+        boolean exists();
+        boolean isReadable();
+        boolean isOpen();
+        boolean isFile();
+
+        URL getURL() throws IOException;
+        URI getURI() throws IOException;
+        // Only works when file resides on the filesystem
+        // doesn't work if resource is inside the JAR
+        File getFile() throws IOException;
+
+        ReadableByteChannel readableChannel() throws IOException;
+
+        long contentLength() throws IOException;
+        long lastModified() throws IOException;
+
+        Resource createRelative(String relativePath) throws IOException;
+
+        String getFilename();
+        String getDescription();
+    }
+    ```
+
+    ```java
+    public interface InputStreamSource {
+        InputStream getInputStream() throws IOException;
+    }
+    ```
+
+- Some important method of `Resource` interface are:
+  - `getInputStream()`: Locate and opens the resource, returning an `InputStream` for reading from the resource.
+    - Every invocation return fresh `InputStream` and it's user responsibility to close the stream
+  - `exists()`: Returns a `boolean` indicating whether this resource actually exists
+  - `isOpen()`: Return a `boolean` indicating whether this resource represents a handle with open stream. If `true`, the `InputStream` cannot be read multiple times and must be read once only and then closed to avoid resource leaks. Return `false` for all usual resource implementation, with the exception of `InputStreamResource`
+  - `getDescription()`: Returns a description for this resource, to be used for error output when working with the resource. This is often the fully qualified file name or the actual URL of the resource
+
+    >[!NOTE]
+    > The `Resource` abstraction doesn't replace functionality. It wraps it where possible. For example, a `UrlResource` wrpas a URL and uses the wrapped `URL` to do its work
+
+### Built-in Resource Implementation
+- Spring includes several bulit-in `Resource` implementations:
+  - `UrlResource`
+  - `ClassPathResource`
+  - `FileSystemResource`
+  - `PathResource`
+  - `ServletContextResource`
+  - `InputStreamResource`
+  - `ByteArrayResource`
+
+#### UrlResource
+- `UrlResource` wraps a `java.net.URL` and can be used to access any object that is normally accessible with a URL, such as file, an HTTP targer, and FTP target and others
+- All URLs have standarized `String` representation, such that appropriate standardized prefixes are used to indicate one URL type from another. This includes `file:`, `https:`, `ftp:` and others
+- A `UrlResource` is created by Java code by explicity using the `UrlResource` constructor but is often created implicitly when you call an API method that takes a `String` argument meant to represent a path.
+    ```java
+    Resource res = new UrlResource("https://example.com/data.txt");
+    ```
+#### ClassPathResource
+- This class represents a resource that should be obtained from the classpath. 
+- It uses either the thread context class loader, a given class loader, or a given class for loading resources
+- This `Resource` implementation supports resolution as a `java.io.File` if the class path resource resides in the file system but not for classpath resources that reside in a jar and have not been expanded to the filesystem. 
+    ```java
+    Resource res = new ClassPathResource("com/example/config.properties");
+    ```
+
+#### FileSystemResource
+- This is a `Resource` implementation for `java.io.File` handles.
+- Also supports `java.nio.file.Path` handles, applying Spring standard String-based path transformation but performing all operation via the `java.nio.file.Files` API.
+- For pure `java.nio.path.Path` based support use a `PathResource` instead `FileSystemResource` 
+    ```java
+    Resource res = new FileSystemResource("/data/app/config.yml");
+    ```
+#### PathResource
+- This is `Resource` implementation for `java.nio.file.Path` handles, performing all operations and transformatives via the `Path` API.
+- It support resolution as `File` and as a `URL` and also implements the extended `WritableResource` interface
+- `PathResource` is effectively a pure `java.nio.path.Path` based alternative to `FileSystemResource`
+    ```java
+    Path path = Paths.get("/data/app/config.yml");
+    Resource res = new PathResource(path);
+    ```
+
+#### ServletContextResource
+- Resources relative to a web application root.
+- Interprets paths within the relevant web application's root directory
+
+    ```java
+    Resource res = new ServeletContextResource(
+            servletContext, "/WEB-INF/views/home/jsp");
+    ```
+
+#### InputStreamResource
+- An `InputStreamResource` is a `Resource` implementation for a given `InputStream`
+- It should be used only if no specific `Resource` implementation is applicable
+- Used when no specific `Resource` implementation is applicable. 
+- In particular, prefere `ByteArrayResource` or any of the file-based `Resource` implementations where possible
+
+    ```java
+    InputStream is = new FileInputStream("data.txt");
+    Resource res = new InputStreamResource(is);
+    ```
+- In contrast to other `Resource` implementations, this is a descriptor for an already-opened resource. Therefore, it returns `true` from `isOpen()`
+
+#### ByteArrayResource
+
+- Wraps a `byte[]` as a resource
+- Create a fresh `ByteArrayInputStream` each time.
+    ```java
+    byte[] data = "hello World".getBytes(StandardCharsets.UTF_8);
+    Resource res = new ByteArrayResource(data);
+    ```
+
+### The `ResourceLoader` interface
+- The interface is meant to be implemented by objects that can return `Resource` instances
+    ```java
+    public interface ResourceLoader {
+        Resource getResource(String location);
+        ClassLoader getClassLoader();
+    }
+    ```
+- All application contexts implements the `ResourceLoader` interace. Therefore, all application contexts may be used to obtain `Resource` instances
+- When you call `getResource()` on a specific application context, and the location path specified doesn't have specific prefix, you get back a `Resource` type that is appropriate to that particular application context
+- For example, assume the following snippet run agains `ClassPathXmlApplicationContext`
+    ```java
+    Resource template = ctx.getResource("some/resource/path/myTemplte.txt");
+    ```
+- The above return `ClassPathResource` 
+- If the same method is run agains a `FileSystemXmlApplicatoinContext` instance, it would return a `FileSystemResource`
+- For a `WebApplicationContext`, it would return a `ServletContextResource`
+- On the other hand you can also force 
+    ```java
+    Resource template = ctx.getResource("classpath:some/resource/path/a.txt");
+    Resource template = ctx.getResource("file:///some/resource/path/a.txt");
+    Resource template = ctx.getResource("https://myhost.com/path/a.txt);
+    ```
+
+### The `ResourcePatternResolver` Interface
+- Extension to the `ResourceLoader`
