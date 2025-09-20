@@ -87,6 +87,8 @@
     - [Returning events from listener methods](#returning-events-from-listener-methods)
     - [Asynchronous listeners](#asynchronous-listeners)
       - [Why async listeners cannot return events that will be auto-published](#why-async-listeners-cannot-return-events-that-will-be-auto-published)
+      - [Default (problem): void async listener - exception disappears into executor thread](#default-problem-void-async-listener---exception-disappears-into-executor-thread)
+        - [Publish explicitly inside the async method (recommended and simplest):](#publish-explicitly-inside-the-async-method-recommended-and-simplest)
     - [Ordering listeners](#ordering-listeners)
     - [Multicaster customization - asynchronous dispatch and error handling](#multicaster-customization---asynchronous-dispatch-and-error-handling)
     - [Transactional concerns](#transactional-concerns)
@@ -2224,6 +2226,99 @@ sources.addFirst(new PropertySource());
 - Spring only auto-publishes a listener method’s return value when that method has actually completed on the calling thread
 - When you mark a listener @Async, the method is executed in a separate thread and the caller doesn't wait for the result
 
+##### Default (problem): void async listener - exception disappears into executor thread
+
+- Default (problem): void async listener - exception disappears into executor thread
+    ```java
+    @EventListener
+    @Async
+    public void asyncFailingListener(BlockedListEvent e) {
+        throw new RunTimeException("boom");
+    }
+    ```
+- Handle exceptions locally (inside listener)
+    ```java
+    @EventListener
+    @Async
+    public void safeAsync(BlockedListEvent e) {
+        try {
+            // work...
+        } catch (Exception ex) {
+            // handle, log, publish a failure event, or retry
+            publisher.publishEvent(new ListenerFailedEvent(this, e, ex));
+        }
+    }
+    ```
+
+###### Publish explicitly inside the async method (recommended and simplest):
+
+- Publish explicitly inside the async method (recommended and simplest):
+    ```java
+    @Component 
+    public class AsyncListener {
+        private final ApplicationEventPublisher publisher;
+        public AsyncListener(ApplicationEventPublisher publisher) {
+            this.publisher = publisher;
+        }
+
+        @EventListener
+        @Async
+        public void handleAndPublishFollowup(BlockedListEvent e) {
+            FollowupEvent f = new FollowupEvent(this, e.getAddress());
+            publisher.publishEvent(f);
+        }
+    }
+    ```
+- Return a CompletableFuture and publish when it completes (explicit chaining):
+    ```java
+    @EventListener
+    @Async
+    public CompletableFuture<FollowupEvent> handle(BlockedListEvent e) {
+        return CompletableFuture.supplyAsync(() -> {
+            return new FollowupEvent(this, e.getAddress());
+        }).thenApply(f -> {
+            publish.publishEvent(f);
+            return f;
+        })
+    }
+    ```
+- Configure a multicaster with an ErrorHandler (
+    ```java
+    @Bean
+    public ApplicationEventMulticaster applicationEventMulticaster(
+                TaskExecutor taskExecutor) {
+        SimpleApplicationEventMulticaster multicaster = new SimpleApplicationEventMulticaster();
+        multicaster.setTaskExecutor(taskExecutor);
+        multicaster.setErrorHanlder(t -> {
+            logger.error("Event listener failed", t);
+        });
+        return multicaster;
+    }
+    ```
+  - This `ErrorHandler` is invoked for exceptions that escape listener invocation when the multicaster itself is submitting runnables to its `TaskExecutor`
+- Handle uncaught exception from `@Async` methods via `AsyncUncaughtExceptionHandler`
+    ```java
+    @Configuration
+    @EnableAsync
+    public class AsyncConfig implements AsyncConfigure {
+
+        @Override
+        public Executor getAsyncExecutor() {
+            ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+            exec.initialize();
+            return exec;
+        }
+
+        @Override
+        public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHanlder() {
+            return (ex, method, params) -> {
+                logger.error("Uncaught asycn exception in method: " 
+                        + method, ex);
+            };
+        }
+
+    }
+    ```
 
 #### Ordering listeners
 - User `@Order` on listener methods or implements `Ordered`
