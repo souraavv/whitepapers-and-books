@@ -74,6 +74,28 @@
       - [`@PropertySource` — easy way to add a properties file](#propertysource--easy-way-to-add-a-properties-file)
       - [Placeholder resolution in `@PropertySource` locations](#placeholder-resolution-in-propertysource-locations)
     - [Practical guidelines](#practical-guidelines)
+  - [Registering a LoadTimeWeaver(बुनकर)](#registering-a-loadtimeweaverबुनकर)
+  - [Additional Capabilities of `ApplicationContext`](#additional-capabilities-of-applicationcontext)
+    - [Internationalization - MessageSource (i18n)](#internationalization---messagesource-i18n)
+    - [Resources and ResourceLoader](#resources-and-resourceloader)
+    - [Events - ApplicationEvent, ApplicationListener, `@EventListener`](#events---applicationevent-applicationlistener-eventlistener)
+    - [Built-in Lifecycle events](#built-in-lifecycle-events)
+    - [Creating custom event](#creating-custom-event)
+    - [Publishing Event](#publishing-event)
+    - [Listening Styles](#listening-styles)
+    - [Conditional listeners (SpEL)](#conditional-listeners-spel)
+    - [Returning events from listener methods](#returning-events-from-listener-methods)
+    - [Asynchronous listeners](#asynchronous-listeners)
+      - [Why async listeners cannot return events that will be auto-published](#why-async-listeners-cannot-return-events-that-will-be-auto-published)
+    - [Ordering listeners](#ordering-listeners)
+    - [Multicaster customization - asynchronous dispatch and error handling](#multicaster-customization---asynchronous-dispatch-and-error-handling)
+    - [Transactional concerns](#transactional-concerns)
+    - [Generics and ResolvableType edge cases](#generics-and-resolvabletype-edge-cases)
+    - [MDC / ThreadLocal and observability](#mdc--threadlocal-and-observability)
+    - [Error handling and retries](#error-handling-and-retries)
+    - [Example](#example)
+  - [The BeanFactory API](#the-beanfactory-api)
+    - [What is the BeanFactory API ?](#what-is-the-beanfactory-api-)
 - [Resources](#resources)
   - [Introduction](#introduction)
   - [The Resource Interface](#the-resource-interface)
@@ -2016,6 +2038,375 @@ sources.addFirst(new PropertySource());
 - When defining alternative beans with `@Profile`, use distinct method names and bean name attribute if you want multiple variants of the same logical bean.
 - Activate profiles explicitly in production environments (e.g., JVM arg, environment variable). Don’t rely on defaults unless intended.
 
+### Registering a LoadTimeWeaver(बुनकर)
+
+### Additional Capabilities of `ApplicationContext`
+- `ApplicationContext` = `BeanFactory` + framework features that matters to real applications 
+- Key additions
+  - Internationalization (i18n) via `MessageSource`
+  - Resource access via `ResourceLoader`
+  - Eventing via `ApplicationEventPublisher`/`ApplicationListener`
+  - Parent/child context for layering
+  - Startup instrumentation via `ApplicationStartup`
+
+#### Internationalization - MessageSource (i18n)
+- `ApplicationContext` implements `MessageSource`, so you can call `getMessage(...)` on context directly
+    ```java
+    @Bean
+    public MessageSource messageSource() {
+        ResourceBundleMessageSource ms 
+                = new ResourceBundleMessageSource();
+        ms.setBasenames("message", "errors");
+        ms.setDefaultEncoding("UTF-8");
+        return ms;
+    }
+    ```
+#### Resources and ResourceLoader
+- `ApplicationContext` extends `ResourceLoader`; calls `getResource(String location)` to get a `Resource`
+- Location prefix:
+  - `classpath:`, `file:`, `http:`
+  
+    ```java
+    Resource res = context.getResource("classpath:sql/schema.sql");
+    try (InputStream in = res.getInputStream()) {
+        // read script
+    }
+    ```
+
+#### Events - ApplicationEvent, ApplicationListener, `@EventListener`
+- Spring events are in-process pub/sub mechanism for decoupling components inside the same `ApplicationContext`
+- User events when you want to notify zero-or-more observers of something that happened without tight coupling between publisher and the consumer 
+- Typical use cases
+  - Domain events (entity created/updated)
+  - Cache invalidation 
+  - Audit/logging
+  - startup/shutdown hooks
+  - translating internal events to external system (Kafka) asynchronously
+
+#### Built-in Lifecycle events
+- `ContextRefreshedEvent`
+  - Published when the ApplicationContext is initialized or refreshed
+  - Means: bean definitions loaded, singletons pre-instantiated, post-processors active. Useful for cache warm-up and post-initialization work.
+- `ContextStartedEvent`
+  - Published when `ConfigurableApplicationContext.start()` is invoked. Triggers `Lifecycle` beans to start.
+- `ContextStoppedEvent`
+  - Published when `ConfigurableApplicationContext.stop()` is invoked. Triggers `Lifecycle` beans to stop.
+- `ContextClosedEvent`
+  - Published when `close()` is invoked or on JVM shutdown hook. Means singletons are being destroyed.
+- `RequestHandledEvent`
+  - Indicate completed HTTP request handling
+  - Useful for request-level logging/metrics.
+
+#### Creating custom event
+
+- Classical
+    ```java
+    public class BlockedListEvent implements ApplicationEvent {
+        @Getter
+        private final String address;
+        @Getter
+        private final String content; 
+
+        public BlockedListEvent(Object source, String address,
+                String content) {
+            super(source);
+            this.address = address;
+            this.content = content;
+        }
+    }
+    ```
+- Or just a POJO: Spring will wrap plain objects into an event envelope internally when published.
+    ```java
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public class UserCreated {
+        private final Long id;
+    }
+    ```
+
+#### Publishing Event 
+- Two common ways - 
+    ```java
+    @Component
+    public class EmailService {
+        private final ApplicationEventPublisher publisher;
+
+        public EmailService(ApplicationEventPublisher publisher) {
+            this.publisher = publisher;
+        }
+
+        public void sendEmail(String address, String content) {
+            if (blocked(address)) {
+                publisher.pubishEvent(
+                    new BlockListEvent(this, address, content)
+                );
+                return;
+            }
+        }
+    }
+    ```
+- Note that:
+  - Events are published inside a running transaction will be handled synchronously by default, and listeners invoked in publisher's thread - so they share thread-local and transaction context 
+  - If you want to publish an event post commit in a transaction then use `@TransactionalEventListener`
+
+#### Listening Styles
+- Classical
+    ```java
+    public class BlockedListNotifier 
+            implements ApplicationListener<BlockedListEvent> {
+        @Override 
+        public void onApplicationEvent(BlockedListEvent e) {
+            // handles synchronously
+        }
+    }
+    ```
+
+- Modern 
+    ```java
+    @Component 
+    public class BlockedListNotifier {
+
+        @EventListener
+        public void onBlock(BlockedListEvent e) { ... }
+
+        @EventListener(condition = "#event.severity == 'HIGH'")
+        public void onHighBlock(BlockedListEvent e)  { ... }
+
+        @EventListener({ContextRefreshedEvent.class,
+                ContextStartedEvent.class})
+        public void onContextStart() { ... }
+    }
+    ```
+    - Advantages:
+      - Use SpEL
+      - Multiple handler in one bean 
+
+#### Conditional listeners (SpEL)
+- `condition` is evaluated in a SpEL context with values you can reference:
+  - `#root.event` or `event` - the event object
+  - `#root.args` or `args` - method arguments array
+  - argument names (if compiled with -parameters) or `#p0`, `#a0` indexes
+    ```java
+    @EventListener(condition = "#event.level == 'CRITICAL' and 
+            #p0.source == 'internal'")
+    public void handleCritical(BlockedListEvent event) { ... }
+    ```
+
+#### Returning events from listener methods
+- Synchronous `@EventListener` methods may return an event (or Collection/array) and Spring will publish it automatically:
+    ```java
+    @EventListener
+    public ListUpdateEvent onBlocked(BlockedListEvent e) {
+        return new ListUpdateEvent(this, ....);
+    }
+    ```
+- This enables simple event-chaining without explicit publisher wiring.
+- Not supported for async listeners.
+
+#### Asynchronous listeners
+- Two ways:
+  - Annotate listener with `@Async` and enable `@EnableAsync`.
+    ```java
+    @EventListener
+    @Asycn 
+    public void sendNotification(EmailEvent e) { ... }
+    ```
+- As guessed by you - Async listeners execute in executor threads - they do not share the publisher thread's transaction or `ThreadLocal` context.
+- Exceptions thrown in async listeners do not propagate to the publisher
+- Async listeners cannot return events that will be auto-published.
+- When to use ?
+  - Long-running or blockig tasks
+  - Offloading non-critical workflow
+
+##### Why async listeners cannot return events that will be auto-published
+- Short answer: return-based event chaining is inherently synchronous
+- Spring only auto-publishes a listener method’s return value when that method has actually completed on the calling thread
+- When you mark a listener @Async, the method is executed in a separate thread and the caller doesn't wait for the result
+
+
+#### Ordering listeners
+- User `@Order` on listener methods or implements `Ordered`
+    ```java
+    @EventListener
+    @Order(10)
+    public void first(BlockedListEvent e) {...}
+
+    ```
+- Lower value = higher precedence 
+- Use ordering sparingly; prefer designing independent listeners when possible. Ordering is helpful when one listener sets up context for another.
+
+#### Multicaster customization - asynchronous dispatch and error handling
+- Spring uses an `ApplicationEventMulticaster` to distribute events.
+- By default it is a `SimpleApplicationEventMulticaster` with synchronous dispatch
+- Replace or configure it for async behavior or custom error handling:
+
+    ```java
+    @Bean
+    ApplicationEventMulticaster applicationEventMulticaster(
+        TaskExecutor taskExecutor, ErrorHandler errorHandler) {
+        SimpleApplicationEventMulticaster multicaster = 
+                new SimpleApplicationEventMulticaster();
+        // enables async dispatch
+        multicaster.setTaskExecutor(taskExecutor);
+        // central error handling
+        multicaster.setErrorHandler(errorHandler);
+        return multicaster;
+    }
+    ```
+- `taskExecutor` not only affects `@Async` usage for listeners if the multicaster uses it for dispatch, but it also controls dispatch behavior when using the multicaster directly
+- `ErrorHandler` lets you centralize how exceptions from listeners are handled in **async dispatch**.
+
+#### Transactional concerns
+- Synchronous listeners share transaction context with the publisher if published inside a transaction
+- For listeners that must run after a commit, use `@TransactionalEventListener`
+    ```java
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void afterCommitHanlder(DomainEvent e) { ... }
+    ```
+#### Generics and ResolvableType edge cases
+- Generic event dispatch works when the framework can resolve the concrete generic type at runtime.
+- Due to type erasure, this works only if the event that is fired resolves the generic parameters on which the event listener filters
+- If you publish a generic `EntityCreatedEvent<T>` and want listeners to receive only for `T=Person`, ensure your concrete event class retains the generic resolution:
+  - Option 1: create concrete subclass `PersonCreatedEvent extends EntityCreatedEvent<Person>`
+  - Option 2: implement `ResolvableTypeProvider` on the event to expose the **runtime generic type**: to guide the framework beyond what the runtime environment provides
+    ```java
+    public class EntityCreatedEvent<T> extends ApplicationEvent
+            implements ResolvableTypeProvider {
+        
+        private final T entity;
+        public EntityCreatedEvent(T entity) {
+
+        }
+
+        @Override
+        public ResolvableType getResolvableType() {
+            return ResolvableType.forClassWithGenerics(
+                getClass(),
+                ResolvableType.forInstance(getSource())
+            );
+        }
+    }
+    ```
+- The above works for any events not only `ApplicationEvent`
+
+#### MDC / ThreadLocal and observability
+- MDC in the context of Spring refers to Mapped Diagnostic Context. It is a powerful feature provided by logging frameworks like Logback and Log4j, which allows you to enrich log messages with contextual information specific to the current thread's execution.
+- Async listeners are executed on separate threads - MDC and ThreadLocal values are not propagated automatically.
+- Strategies for MDC propagation:
+  - Capture MDC from publisher and restore in listener wrapper.
+  - Use executors that propagate context (e.g. `DelegatingSecurityContextExecutor` or custom wrappers).
+- Strategy 1
+  - Spring Boot's `ThreadPoolTaskExecutor` supports a `TaskDecorator` that wraps each `Runnable` before submission.
+    ```java
+    @Bean
+    public TaskDecorator mdcTaskDecorator() {
+        return runnable -> {
+            Map<String, String> contextMap = MDC.getCopyOfContextMap();
+
+            return () -> {
+                Map<String, String> previous = MDC.getCopyOfContextMap();
+                try {
+                    if (contextMap != null) {
+                        MDC.setContextMap(contextMap);
+                    }
+                    runnable.run();
+                } finally {
+                    if (previous != null) {
+                        MDC.setContextMap(previous);
+                    } else {
+                        MDC.clear();
+                    }
+                }
+            }
+        }
+    }
+    ```
+    ```java
+    @Bean("asyncExecutor")
+    public ThreadPoolTaskExecutor asyncExecutor(TaskDecorator taskDecorator) {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(10);
+        exec.setMaxPoolSize(50);
+        // inject decorator
+        exec.setTaskDecorator(taskDecorator);
+        exec.initialize();
+        return exec;
+    }
+    ```
+- Strategy 2 - Pass MDC data as part of the event payload
+    ```java
+    public class BlockedListEvent {
+        private final Map<String,String> mdc;
+    }
+
+    publisher.publishEvent(new BlockedListEvent(this, 
+            addr, MDC.getCopyOfContextMap()));
+    
+    ```
+- Strategy 3: Use tracing libraries that propagate context automatically
+  - Spring Cloud Sleuth
+  - **OpenTelemetry** - automatically propagates trace ids/span context into MDC
+  - 
+#### Error handling and retries
+- Synchronous listeners: exceptions propagate to publisher - design accordingly.
+- Async listeners: exceptions are handled by the executor. 
+  - Use `ErrorHandler` on multicaster or catch/handle in listener.
+- For retries: events are in-memory and non-durable - if you need retries, translate event handling to resilient messaging (e.g. publish to JMS/Kafka and rely on broker-level retries or consumer-side retry with dead-lettering).
+
+#### Example
+- A sample
+    ```java
+    @Service
+    public class UserService {
+
+        private final ApplicationEventPublisher publisher;
+        public UserService(ApplicationEventPublishser publisher) {
+            this.publisher = publisher;
+        }
+
+        @Transactional
+        public void createUser(UserDto dto) {
+            User u = userRepo.save(dto.toEntity());
+            publisher.publishEvent(new UserCreatedEvent(
+                this, u.getId()
+            ));
+        }
+    }
+    ```
+- Listener that indexes
+    ```java
+    @Component
+    public class UserIndexingListener {
+
+        @TransactionalEventListener(phase = TransactionalPhase.AFTER_COMMIT);
+        public void onUserCreated(UserCreatedEvent e) {
+            indexService.index(e.getUserId());
+        }
+    }
+    ```
+- Async notifier listener
+    ```java
+    @Component
+    public class NotificationListener {
+
+        @EventListener
+        @Async
+        public void sendWelcomeEmail(UserCreatedEvent e) {
+            emailService.sendWelcome(e.getUserId());
+        }
+    }
+    ```
+
+### The BeanFactory API 
+
+#### What is the BeanFactory API ?
+- Core DI Engine, while `ApplicationContext` is the feature-rich enterprice container build on top of it.
+- It defines the fundamental contract for dependency injection
+  - You ask a bean by name or type
+  - The factory instantiates the bean, wire dependencies, and return it
+- `DefaultListableBeanFactory` is the standard implementation of `BeanFactory`
+- We will not be using this directly and most we will use `ApplicationContext`, else if you are just using `BeanFactory`, then you must have to register multiple things (`BeanPostProcessor`, `BeanFactoryPostProcessor` etc)
 
 ## Resources
 - This chapter cover how Spring handles resources and how you acn work with resources in Spring 
