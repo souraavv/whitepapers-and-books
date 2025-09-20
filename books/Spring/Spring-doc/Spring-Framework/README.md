@@ -87,7 +87,6 @@
     - [Returning events from listener methods](#returning-events-from-listener-methods)
     - [Asynchronous listeners](#asynchronous-listeners)
       - [Why async listeners cannot return events that will be auto-published](#why-async-listeners-cannot-return-events-that-will-be-auto-published)
-      - [Default (problem): void async listener - exception disappears into executor thread](#default-problem-void-async-listener---exception-disappears-into-executor-thread)
         - [Publish explicitly inside the async method (recommended and simplest):](#publish-explicitly-inside-the-async-method-recommended-and-simplest)
     - [Ordering listeners](#ordering-listeners)
     - [Multicaster customization - asynchronous dispatch and error handling](#multicaster-customization---asynchronous-dispatch-and-error-handling)
@@ -1467,7 +1466,7 @@ public class LoginAction {
     }
     ```
 - The lenient default resolver and what "linient" means ?
-  - Spring provides a lenient placeholder revolver by defualt. If Spring cannot find a property for `${catalog.name}`, it will not throw an exception by default. Instead it will inject the unresolved placeholder text itself as the value
+  - Spring provides a lenient placeholder revolver by default. If Spring cannot find a property for `${catalog.name}`, it will not throw an exception by default. Instead it will inject the unresolved placeholder text itself as the value
 - Making placeholder resolution strict:
   - `PropertySourcesPlaceholderConfigure`
   - If you want Spring startup to fail when a `${..}` placeholder is unresolved, declare a `PropertySourcesPlaceholderConfigure` bean
@@ -2225,8 +2224,6 @@ sources.addFirst(new PropertySource());
 - Short answer: return-based event chaining is inherently synchronous
 - Spring only auto-publishes a listener method’s return value when that method has actually completed on the calling thread
 - When you mark a listener @Async, the method is executed in a separate thread and the caller doesn't wait for the result
-
-##### Default (problem): void async listener - exception disappears into executor thread
 
 - Default (problem): void async listener - exception disappears into executor thread
     ```java
