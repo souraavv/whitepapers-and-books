@@ -95,6 +95,7 @@
     - [MDC / ThreadLocal and observability](#mdc--threadlocal-and-observability)
     - [Error handling and retries](#error-handling-and-retries)
     - [Example](#example)
+    - [Hierarchical contexts](#hierarchical-contexts)
   - [The BeanFactory API](#the-beanfactory-api)
     - [What is the BeanFactory API ?](#what-is-the-beanfactory-api-)
 - [Resources](#resources)
@@ -2489,6 +2490,28 @@ sources.addFirst(new PropertySource());
         }
     }
     ```
+
+#### Hierarchical contexts
+- Useful pattern: create a layered context graph so each layer focuses on one concern:
+  - Root context - service/repository beans
+  - Web child context - controllers, view resolvers
+- Child context can reference beans in parent; parent cannot see child beans.
+    ```java
+    AnnotationConfigApplicationContext parent = 
+            new AnnotationConfigApplicationContext(ParentConfig.class);
+    AnnotationConfigWebApplicationContext child =
+            new AnnotationConfigWebApplicationContext();
+        
+    child.register(WebConfig.class);
+    child.setParent(parent);
+    child.refresh();
+    ```
+- Best practices:
+  - Put shared infrastructure (DataSource, TransactionManager) in parent context.
+  - Put web-specific beans (controllers, view resolvers) in the child context.
+- Pitfalls:
+  - Bean name collisions - child wins for local lookups; parent beans are visible but not vice versa
+  - Lifecycle: parent must be initialized before or same time as child depending on wiring.
 
 ### The BeanFactory API 
 
