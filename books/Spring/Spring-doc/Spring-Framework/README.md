@@ -118,6 +118,12 @@
   - [Data binding](#data-binding)
   - [Spring Type conversion](#spring-type-conversion)
   - [Spring Field Formatting](#spring-field-formatting)
+    - [The formatter SPI](#the-formatter-spi)
+    - [Annotation Driven Formatting](#annotation-driven-formatting)
+  - [Java Bean Validator](#java-bean-validator)
+    - [Configuring a Bean Validation Provider](#configuring-a-bean-validation-provider)
+    - [Injecting Jakarta Validator](#injecting-jakarta-validator)
+    - [Configure Custom Constraints](#configure-custom-constraints)
 
 
 ## The IoC container
@@ -2869,7 +2875,8 @@ sources.addFirst(new PropertySource());
 
 ### Spring Field Formatting
 
-- The formatter SPI
+#### The formatter SPI
+- SPI
     ```java
     package org.springframework.format;
 
@@ -2912,7 +2919,8 @@ sources.addFirst(new PropertySource());
     }
     ```
 
-- Annotation Driven Formatting
+#### Annotation Driven Formatting
+- Annotation driven 
     ```java
     public interface AnnotationFormatterFactory<A extends Annotation> {
         Set<Class<?>> getFieldTypes();
@@ -2967,4 +2975,65 @@ sources.addFirst(new PropertySource());
         private BigDecimal decimal;
     }
     ```
+    ```java
+    public class Form {
+        @MyDate(pattern = "dd/MM/yyyy")
+        private LocalDate dob;
+    }
+    ```
 
+### Java Bean Validator
+- Bean Validation provides a common way of validation through constraint declaration and metadata for Java applications.
+    ```java
+    public class PersonForm {
+
+        @NotNull
+        @Size(max=64)
+        private String name;
+
+        @Min(0)
+        private int age;
+    }
+    ```
+#### Configuring a Bean Validation Provider
+- Spring provides full support for the Bean Validation API including the bootstrapping of a Bean Validation provider as a Spring bean. This lets you inject a `jakarta.validation.ValidatorFactory` or `jakarta.validation.Validator` wherever validation is needed in your application.
+- You can use the `LocalValidatorFactoryBean` to configure a default Validator as a Spring bean, as the following example shows:
+    ```java
+    @Configuration
+    public class AppConfig {
+
+        @Bean
+        public LocalValidatorFactoryBean validator() {
+            return new LocalValidatorFactoryBean();
+        }
+    }
+    ```
+#### Injecting Jakarta Validator
+
+```java
+@Service
+public class MyService {
+    @Autowired
+    private Validator validator;
+}
+```
+
+#### Configure Custom Constraints
+
+```java
+
+@Target({ElementType.METHOD, ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy=MyConstraintValidator.class)
+publc @interface MyConstraint {
+
+}
+```
+
+```java
+public class MyConstraintValidator implements ConstraintValidator {
+
+    @Autowired;
+    private Foo aDependency;
+}
+```
