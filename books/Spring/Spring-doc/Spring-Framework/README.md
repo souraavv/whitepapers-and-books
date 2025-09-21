@@ -117,6 +117,7 @@
   - [Validation by Using Spring’s Validator Interface](#validation-by-using-springs-validator-interface)
   - [Data binding](#data-binding)
   - [Spring Type conversion](#spring-type-conversion)
+  - [Spring Field Formatting](#spring-field-formatting)
 
 
 ## The IoC container
@@ -2863,6 +2864,107 @@ sources.addFirst(new PropertySource());
                 return (T) Enum.valueOf(this.enumType, source.trim());
             }
         }
+    }
+    ```
+
+### Spring Field Formatting
+
+- The formatter SPI
+    ```java
+    package org.springframework.format;
+
+    public interface Formatter<T> extends Printer<T>, Parser<T> {
+
+    }
+
+    public interface Printer<T> {
+        String print(T fieldValue, Locale locale);
+    }
+
+    public interface Parser<T> {
+        T parse(String clientValue, Locale locale) throws ParseException;
+    }
+    ```
+- Example
+    ```java
+
+    public final class DateFormatter implements Formatter<Date> {
+        private String pattern;
+
+        public DateFormatter(String pattern) {
+            this.pattern = pattern;
+        }
+
+        public String print(Date date, Locale locale) {
+            if (date == null) {
+                return "";
+            }
+            return getDateFormat(locale).format(date);
+        }
+
+        public Date parse(String formatted, Locale locale) throws
+                ParseException {
+            if (formatted.length() == 0) {
+                return null;
+            }
+            return getDateFormat(locale).parse(formatted);
+        }
+    }
+    ```
+
+- Annotation Driven Formatting
+    ```java
+    public interface AnnotationFormatterFactory<A extends Annotation> {
+        Set<Class<?>> getFieldTypes();
+
+        Printer<?> getPrinter(A annotation, Class<?> fieldType);
+
+        Parser<?> getParser(A annotation, Class<?> fieldType);
+    }
+    ```
+
+    ```java
+    public final class NumberFormatAnnotationFormatterFactory
+            implements AnnotationFormatterFactory<NumberFormat> {
+        private static final Set<Class<?>> FIELD_TYPES = 
+                Set.of(Short.class, Integer.class, Long.class, Float.class,
+                        Double.class, BigDecimal.class, BigInteger.class);
+            
+        public Set<Class<?>> getFieldType() {
+            return FIELD_TYPES;
+        }
+
+        public Printer<Number> getPrinter(NumberFormat annotation, 
+                Class<?> fieldType) {   
+            return configureFormatterFrom(annotation, fieldType);
+        }
+
+        public Parser<Number> getParser(NumberFormat annotation, 
+                Class<?> fieldType) {
+            return configureFormatterFrom(annotation, fieldType);
+        }
+
+        private Formatter<Number> configureFormatterFrom(
+                NumberFormat annotation, Class<?> fieldType) {
+            if (!annotation.pattern().isEmpty()) {
+                return new NumberStyleFormatter(annotation.pattern());
+            }
+
+            return switch(annotation.style()) {
+                case Style.PERCENT -> new PercentStyleFormatter();
+                case Style.CURRENCY -> new CurrencyStyleFormatter();
+                default -> new NumberStyleFormatter();
+            }
+        }
+    }
+    ```
+
+- To trigger formatting
+    ```java
+    public class MyModel {
+
+        @NumberFormat(style = Style.CURRENCY)
+        private BigDecimal decimal;
     }
     ```
 
