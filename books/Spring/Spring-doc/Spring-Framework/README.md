@@ -113,6 +113,10 @@
   - [The `ResourcePatternResolver` Interface](#the-resourcepatternresolver-interface)
   - [The `ResourceLoaderAware` Interface](#the-resourceloaderaware-interface)
     - [Examples](#examples)
+- [Validation, Data Binding, and Type Conversion](#validation-data-binding-and-type-conversion)
+  - [Validation by Using Spring’s Validator Interface](#validation-by-using-springs-validator-interface)
+  - [Data binding](#data-binding)
+  - [Spring Type conversion](#spring-type-conversion)
 
 
 ## The IoC container
@@ -2775,3 +2779,90 @@ sources.addFirst(new PropertySource());
         }
     }
     ```
+
+
+## Validation, Data Binding, and Type Conversion
+
+### Validation by Using Spring’s Validator Interface
+
+- Spring features a `Validator` interface that you can use to validate objects
+
+    ```java
+    public class PersonValidator implements Validator {
+
+        @Override
+        public boolean supports(Class clazz) {
+            return Person.class.equals(clazz);
+        }
+
+        @Override
+        public void validate(Object obj, Errors e) {
+            ValidationUtils.rejectIfEmpty(e, "name", "name.empty");
+            Person p = (Person) obj;
+
+            if (p.getAge() < 0) {
+                e.rejectValue("age", "negativevalue");
+            } else if (p.getAge() > 110) {
+                e.rejectvalue("age", "too.darn.old");
+            }
+        }
+    }
+    ```
+- The static `rejectIfEmpty` method on the `ValidationUtils` class is used to reject the `name` property if it is `null` or the empty string 
+
+### Data binding
+- Data binding is useful to binding user input to a target object where user input is a map with property as keys
+- `DataBinder` is main class which supports
+  - Constructor Binding
+    - Binds user input to public data constructor, looking up constructor argument values in the user input
+  - Property Binding 
+    - Bind user input to setters, matching keys from the user input to properties of the target object structure
+
+### Spring Type conversion
+
+- `core.convert` package
+    ```java
+    public interface Converter<S, T> {
+        T convert(S source);
+    }
+    ```
+
+    ```java
+    final class StringToInteger implements Converter<String, Integer> {
+        public Integer convert(String source) {
+            return Integer.valueOf(source);
+        }
+    }
+    ```
+- Parameterize `S` to be the type you are converting from and `R` to be the base type defining the range of classes you can convert to
+    ```java
+    public interface ConverterFactory<S, R> {
+        <T extends R> Converter<S, T> getConverter(Class<T> targetType);
+    }
+    ```
+
+- Consider following
+    ```java
+    final class StringToEnumConverterFactory implements 
+            ConverterFactory<String, Enum> {
+        public <T extends Enum> Converter<String, T> getConverter(
+            Class<T> targetType
+        ) {
+            return new StringToEnumConverter(targetType);
+        }
+
+        private final class StringToEnumConverter<T extends Enum> implements
+                Converter<String, T> {
+            private Class<T> enumType;
+
+            public StringToEnumConverter(Class<T> enumType) {
+                this.enumType = enumType;
+            }
+
+            public T convert(String source) {
+                return (T) Enum.valueOf(this.enumType, source.trim());
+            }
+        }
+    }
+    ```
+
