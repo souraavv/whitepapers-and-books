@@ -1,0 +1,4 @@
+- Follow existing markdown format
+- Use block quotes like info, tip, note, warning and caution
+- Use code blocks and inline code
+- Use <detail> when adding extra details which are optional but useful in cases where reader is looking for extra
