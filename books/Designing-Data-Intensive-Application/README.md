@@ -41,6 +41,12 @@
     - [Leader and Followers](#leader-and-followers)
   - [Chapter 6. Partitioning](#chapter-6-partitioning)
   - [Chapter 7. Transaction](#chapter-7-transaction)
+    - [Introduction](#introduction)
+    - [The meaning of ACID](#the-meaning-of-acid)
+      - [Atomicity](#atomicity)
+      - [Consistency](#consistency)
+      - [Isolation](#isolation)
+      - [Durability](#durability)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
@@ -732,6 +738,54 @@ CREATE
 ## Chapter 6. Partitioning
 
 ## Chapter 7. Transaction 
+
+### Introduction
+- A transaction is a way for an application to group several reads and writes together into a logical unit.
+- Conceptually, all the reads and writes in a transaction are executed as one operation: either the entire transaction succeeds (commit) or it fails (abort, rollback). If it fails, the application can safely retry.
+- With txn in place error handling becomes much simpler for the applications, because they don't really need to worry about partial failures
+- Transactions are not a law of nature; they were created with a purpose, namely to simplify the programming model for applications accessing a database
+- How do you figure out whether you need transactions? In order to answer that question, we first need to understand exactly what safety guarantees transactions can provide, and what costs are associated with them. 
+- We will go especially deep in the area of concurrency control, discussing various kinds of race conditions that can occur and how databases implement isolation levels such as **read committed**, **snapshot isolation**, and **serializability**.
+- We will examine the two-phase commit protocol and the challenge of achieving atomicity in a distributed transaction.
+
+### The meaning of ACID 
+- The safety guarantees provided by transactions are often described by the well-known acronym ACID
+- However, A programmer should see ACID as *(AC=Linearizability)*, *(I=Serializability)* D. [Read more here](https://github.com/souraavv/whitepapers-and-books/blob/main/whitepapers/google-spanner.md#serializability-versus-linearizability) 
+
+#### Atomicity
+- The atomic is used at multiple place and has several meanings
+  - Like in multi-threaded program, if one thread execute an atomic operation, that means there is no way the other thread can see the half-finished operations
+  - By contrast, in the context of ACID, atomicity is not about concurrency
+  - It doesn't describe what happens if several processes try to access the same data at the same time, because that is covered under letter 'I' Isolation 
+  - Rather, ACID atomicity describes what happens if a client wants to make several writes, but a fault occurs after some of the writes have been processed
+- If the writes are grouped together into an atomic transaction, and the txn cannot complete (i.e., not commited) due to fault, then the txn is aborted and database must discard any write it has made so far in that tx
+- Perhaps abortability would have been a better term than atomicity
+
+#### Consistency
+- Similar to A, C is also over-loaded
+- The idea of ACID **consistency** is that you have certain statements about your data (invariants) that must always be true
+- An invariant may be temporarily violated during transaction execution, but it should be satisfied again at transaction commit.
+- If you want the database to enforce your invariants, you need to declare them as constraints as part of the schema e.g.,  foreign key constraints, uniqueness constraints, or check constraints
+- More complex consistency requirements can sometimes be modeled using triggers or materialized views
+- However, complex invariants can be difficult or impossible to model using the constraints that databases usually provide.
+- In that case, it’s the application’s responsibility to define its transactions correctly so that they preserve consistency.
+- As such, the C in ACID often depends on how the application uses the database, and it’s not a property of the database alone.
+
+#### Isolation
+- Most databases are accessed by several clients at the same time. That is no problem if they are reading and writing different parts of the database, but if they are accessing the same database records, you can run into concurrency problems (race conditions).
+- Isolation in the sense of ACID means that concurrently executing transactions are isolated from each other: they cannot step on each other’s toes.
+- The classic database textbooks formalize isolation as serializability, which means that each transaction can pretend that it is the only transaction running on the entire database.
+- The database ensures that when the transactions have committed, the result is the same as if they had run serially (one after another), even though in reality they may have run concurrently 
+- However, serializability has a performance cost. In practice, many databases use forms of isolation that are weaker than serializability: that is, they allow concurrent transactions to interfere with each other in limited ways.
+-  Oracle, don’t even implement it (Oracle has an isolation level called “serializable,” but it actually implements snapshot isolation, which is a weaker guarantee than serializability)
+
+#### Durability
+- Durability is the promise that once a transaction has committed successfully, any data it has written will not be forgotten, even if there is a hardware fault or the database crashes
+- Many databases therefore use the fsync() system call to ensure the data really has been written to disk. 
+- Databases usually also have a write-ahead log or similar, which allows them to recover in the event that a crash occurs part way through a write. [See more](https://github.com/souraavv/whitepapers-and-books/discussions/5#discussioncomment-14540651)
+- Perfect durability does not exist: if all your hard disks and all your backups are destroyed at the same time, there’s obviously nothing your database can do to save you.
+
+
 
 ## Chapter 8. The Trouble with Distributed Systems 
 *Hey I just met you*

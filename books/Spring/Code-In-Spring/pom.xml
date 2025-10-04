@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--  $Header: oak/jsrc/dcs/agent/sdk/oda-java-sdk/pom.xml souravsh_automate-sdkdocupdates/4 2025/09/24 06:45:32 souravsh Exp $ -->
+
+<!-- 
+ Copyright (c) 2020, 2025, Oracle and/or its affiliates. 
+
+   NAME
+     pom.xml - <one-line expansion of the name>
+
+   DESCRIPTION
+     <short description of component this file declares/defines>
+
+   NOTES
+     <other useful comments, qualifications, etc.>
+
+   MODIFIED   (MM/DD/YY)
+   souravsh    09/22/25 - Bug 38466100: Automate SDK Doc generation
+   dharm       07/29/25 - Bug 38267001: 19.29 Post Branching changes
+   dharm       05/29/25 - Bug 37978528: 19.28 Post Branching changes
+   dharm       02/18/25 - Bug 37577936: 19.27 Post Branching changes
+   nkurudi     11/25/24 - Bug 37221194: MIGRATING UNDERLYING LOGGING FRAMEWORK
+                          IN DCS FROM THIRD PARTY LOGBACK TO JUL IN 19.26
+   apfwkr      11/12/24 - CI# 37271823 of nkurudi_bug-36906121 from main
+                          (apfwkr_ci_backport_36906121_19.26.0.0odabp).
+   dharm       10/18/24 - Bug 37178201: 19.26 Post Branching changes
+   nkurudi     11/03/24 - Bug 36906121: Upgrade 3rd party jobrunr from 6.0.0 to
+                          6.3.5 in 19.26
+                          Upgrade 3rd party slf4j-* libraries from 2.0.7 to
+                          2.0.16 in 19.26
+                          Upgrade 3rd party freemarker from 2.3.32 to 2.3.33
+                          in 19.26
+   ricacarr    09/09/24 - Bug 37028125: Upgrade jackson-* to 2.17.2 in 19.25
+   dharm       08/01/24 - Bug 36899548 : 19.25 Post Branching changes
+   gsantosv    05/01/24 - Change DCS version to 19.24.0.0.0
+   nkurudi     04/08/24 - Bug 36375503: Refresh jackson-* to latest 2.17.0 in
+                          19.23
+   gsantosv    02/07/24 - Change DCS version to 19.23.0.0.0
+   nkurudi     02/06/24 - Bug 36113142: Remove commons-lang3 dependency
+   nkurudi     01/23/24 - Bug 36081996: Refresh logback to latest 1.3.14 and
+                          removed unused logback-access in 19.22
+   gsantosv    12/14/23 - Change DCS version to 19.22.0.0.0
+   gsantosv    08/10/23 - Bug 35694977: Change DCS version to 19.21.0.0.0
+   nkurudi     07/27/23 - Bug 35503307: Update jackson-* to latest 2.15.2 
+                          to address memory leak. Using existing 
+                          jackson-dataformat-yaml 2.14.0-rc1 which is 
+                          compatible with latest jackson 2.15.2   
+                          Bug 35482765: Upgrade 3rd party slf4j-* libraries
+                          from 1.7.32 to 2.0.7 and logback-* from 1.2.10 to
+                          1.3.7 in 19.20
+   sandekot    05/29/23 - Bug 35420665 - Change DCS version to 23.1.0.0.0
+   sandekot    05/24/23 - Fix label build because of RDBMS banner version
+                          change
+   nkurudi     04/20/23 - Bug 35179093: Change dependency scope for logback-*
+                          to provided as LGPL license expects shipping them
+                          separately
+   nkurudi     10/18/22 - Bug 34644518 : Refresh jackson-* to 2.14.0-rc1 and
+                          snakeyaml 1.32 by picking them from db3party
+   nkurudi     05/02/22 - Bug 33999782 - Refresh jackson-* to 2.13.2 and
+			  jackson-databind to 2.13.2.2 via OSCS repo 
+   nkurudi     03/01/22 - Bug 33719826 - UPDATE LOGBACK TO THE LATEST VERSION
+                          1.2.10 TO RESOLVE : CVE-2021-42550
+   jmunozn     01/20/22 - Bug 33775797: downgrade Maven plugins causing
+                          incorrect packaging of ADE files
+   jmunozn     01/04/22 - ER 31706261: upgrade Maven to 3.8.2
+   nkurudi     10/08/21 - 33401145 - UPDATE POM.XML FOR INCLUSION OF UPDATED
+                          3RD-PARTY COMPONENTS FOR 19.13   
+   jmunozn     03/11/21 - Bug 32620298: update DCS version to 23.1.0.0.0
+   avraghav    03/04/21 - Bug 32445652 : 3rd party refresh for 19.11
+   hethakur    01/03/21 - Bug 32197861: use sso wallet in oda java sdk
+                          instead of cacerts file
+   jmunozn     09/11/20 - Bug 31877008: Add .ade_path exclusions per POM file
+   jmunozn     09/03/20 - Parameterize DCS version
+   jmunozn     08/28/20 - Bug 31818839: exclude .ade_path from DCS final jars
+   jmunozn     07/17/20 - Use correct version
+   nkurudi     06/18/20 - MR 10811
+                          (Merge-Request-10811-from-nkurudi_
+                          bug-31468331-jackson_oda-java-sdk_master):
+                          master Fix for Bug 31478059 - THIRD PARTY SOFTWARE
+                          APPROVAL - MOVE JACKSON-CORE FROM 2.9.10 TO 2.10.2
+   nkurudi     04/10/20 - MR 10246
+                          (Merge-Request-10246-from-nkurudi_bug-31160501_
+                          oda-java-sdk):
+                          On master, Fix for Bug 31160501 - UPDATE DROPWIZARD
+                          FROM 1.3.20 TO 1.3.22, UPDATE SnakeYAML from 1.23 to
+                          1.26 and use slf4j-api 1.7.26
+   avraghav    03/31/20 - MR 10095
+                          (Merge-Request-10095-from-avraghav_bug-31018128_
+                          oda-java-sdk_master)
+   susmonda    02/11/20 - MR 9616 (susmonda_bug-30869667_oda-java-sdk_master)
+   avraghav    12/26/19 - MR 9232 (avraghav_bug-30676785_oda-java-sdk_master)
+   paggupta    10/22/19 - Author: Pankaj Gupta
+                          MR 8790 (paggupta_bug-30281060_oda-java-sdk-master)
+   paggupta    10/16/19 - Author: Pankaj Gupta
+                          removing-swagger-zip-and-making-changes-for-adding-
+                          api-doc-html
+   paggupta    10/15/19 - Author: Pankaj Gupta
+                          changing-rel-versions
+   paggupta    10/14/19 - Author: Pankaj Gupta
+                          removing-zipVersion-property
+   paggupta    09/26/19 - Author: Pankaj Gupta
+                          logback-changes
+   paggupta    09/26/19 - Author: Pankaj Gupta
+                          zip-version
+   paggupta    09/26/19 - Author: Pankaj Gupta
+                          removing-dependency-on-sl4j-simple
+   paggupta    09/26/19 - Author: Pankaj Gupta
+                          changing-jar-versions
+   paggupta    09/23/19 - Author: Pankaj Gupta
+                          formatting
+   paggupta    09/23/19 - Author: Pankaj Gupta
+                          removing-snapshot
+   paggupta    09/23/19 - Author: Pankaj Gupta
+                          changing-project-name
+   paggupta    09/18/19 - Author: Pankaj Gupta
+                          assembly-changes
+   paggupta    09/18/19 - Author: Pankaj Gupta
+                          adding-util-code-to-the-same-project
+   paggupta    09/17/19 - Author: Pankaj Gupta
+                          changing-names-of-the-files-generated
+   paggupta    09/17/19 - Author: Pankaj Gupta
+                          adding-zipVersion
+   paggupta    09/17/19 - Author: Pankaj Gupta
+                          adding-project-versions
+   paggupta    09/11/19 - Author: Pankaj Gupta
+                          changing-the-name-of-zip-file-created
+   paggupta    08/30/19 - Author: Pankaj Gupta
+                          adding-swagger-zip
+   paggupta    08/29/19 - Author: Pankaj Gupta
+                          changing-generated-file-names
+   paggupta    08/22/19 - Author: Pankaj Gupta
+                          formatting-pom-and-changing-README
+   paggupta    08/14/19 - Author: Pankaj Gupta
+                          Initial-check-in-for-sdk-files
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.oracle.oda</groupId>
+    <artifactId>oda-java-sdk</artifactId>
+    <version>${dcs.version}</version>
+    <name>oda/oda-java-sdk</name>
+   
+    <description>This project is for ODA Java SDK samples being provided to the customer.</description>
+    <properties>
+        <dcs.version>19.29.0.0.0</dcs.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+
+        <!-- Maven plugins versions -->
+        <compiler-plugin.version>3.8.1</compiler-plugin.version>
+        <jar-plugin.version>2.5</jar-plugin.version>
+        <assembly-plugin.version>2.4.1</assembly-plugin.version>
+
+        <!-- Bug 30676785 - UPDATE REFRESHED 3RD PARTY IN POM.XML, FOR 18.8  -->
+        <!-- BUG 30869667 - UPDATE 3RD PARTY COMPONENT JACKSON-DATABIND TO 2.9.10.2 -->
+        <!-- Bug 31018128: upgrading 3rd party libraries for 19.6  --> 
+	<!-- Bug 32445652 : upgrading 3rd party libraries for 19.11 --> 
+        <!-- Bug 33999782 - REFRESH JACKSON-ANNOTATIONS AND JACKSON-CORE TO 
+             LATEST 2.13.2 -->
+        <!-- Bug 34644518 - Refresh jackson-* to 2.14.0-rc1 -->
+        <!-- Bug 35503307: Update jackson-* to latest 2.15.2 to address memory
+             leak due to jackson databind issue #3665 and fix for this jackson
+             issue is available in jackson 2.14.1 or higher -->        
+        <jackson.version>2.17.2</jackson.version>
+        <!-- Bug 33999782 - REFRESH JACKSON-DATABIND TO LATEST 2.13.2.2 -->
+        <!-- Bug 34644518 - Refresh jackson-* to 2.14.0-rc1 -->
+        <!-- Bug 33999782 - Existing jackson-jaxrs-json-provider is 
+        compatible with jackson-databind 2.13.2.2. Also compatible with
+        jackson-core 2.13.2 and jackson-annotations 2.13.2.
+        Existing jackson-jaxrs-json-provider 2.12.1 is retained in 19.15 -->
+        <!-- Bug 34644518 - Refresh jackson-* to 2.14.0-rc1 -->    
+        <!-- Bug 32345051: upgrading 3rd party libraries for 19.10 -->
+        <!-- 33401145 - Uptake slf4j 1.7.32 in 19.13 -->
+        <!-- Bug 35482765: Upgrade 3rd party slf4j-* libraries from
+             1.7.32 to 2.0.7 in 19.20 -->
+        <!-- Bug 36906121: Upgrade 3rd party slf4j-* libraries from
+             2.0.7 to 2.0.16 in 19.26 -->
+        <slf4j.version>2.0.16</slf4j.version>
+        <validation.api.version>2.0.1.Final</validation.api.version>
+        <request.id.version>0.1.1</request.id.version>
+        <java.rest.client.version>1.0.3</java.rest.client.version>
+        <jersey.client.version>2.25.1</jersey.client.version>
+        <javax.ws.rs.api.version>2.0.1</javax.ws.rs.api.version>
+        <shade.maven.plugin.version>1.6</shade.maven.plugin.version>       
+        <!-- Bug:32197861 Updated latest oraclepki jars. 
+             It is used to access SSO Wallet.
+        -->
+        <oraclepki.version>21.0.0.0.0</oraclepki.version>
+        
+        
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>javax.ws.rs-api</artifactId>
+            <version>${javax.ws.rs.api.version}</version>
+        </dependency>
+        <!-- Bug 33999782 - REFRESH JACKSON-ANNOTATIONS AND JACKSON-CORE TO 
+             LATEST 2.13.2 -->        
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <!-- Bug 33999782 - REFRESH JACKSON-DATABIND TO LATEST 2.13.2.2 -->        
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.bytebuddy</groupId>
+                    <artifactId>byte-buddy</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-client</artifactId>
+            <version>${jersey.client.version}</version>
+        </dependency>
+        <!-- Bug 33999782 - Existing jackson-jaxrs-json-provider is 
+        compatible with jackson-databind 2.13.2.2. Also compatible with
+        jackson-core 2.13.2 and jackson-annotations 2.13.2.
+        Existing jackson-jaxrs-json-provider 2.12.1 is retained in 19.15 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.jaxrs</groupId>
+            <artifactId>jackson-jaxrs-json-provider</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <!-- For 19.6 : Bug 31160501 - Use slf4j-api 1.7.26 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>        
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-common</artifactId>
+            <version>${jersey.client.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.oda</groupId>
+            <artifactId>dcs-commons</artifactId>
+            <version>${dcs.version}</version>
+            <exclusions>
+              <exclusion>
+                <groupId>*</groupId>
+                <artifactId>*</artifactId>
+              </exclusion>
+            </exclusions>            
+        </dependency>        
+        <dependency>
+            <groupId>com.oracle.oda</groupId>
+            <artifactId>dcs-agent-java-client-sdk</artifactId>
+            <version>${dcs.version}</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.oda</groupId>
+            <artifactId>dcs-agent-java-client-sdk</artifactId>
+            <version>${dcs.version}</version>
+            <classifier>javadoc</classifier>
+            <type>jar</type>
+        </dependency>
+        
+        <!-- Bug:32197861 Updated latest oraclepki jars. 
+             It is used to access SSO Wallet.
+        -->
+        <dependency>
+            <groupId>com.oracle.entsec</groupId>
+            <artifactId>oraclepki</artifactId>
+            <version>${oraclepki.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.entsec</groupId>
+            <artifactId>osdt_cert</artifactId>
+            <version>${oraclepki.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.entsec</groupId>
+            <artifactId>osdt_core</artifactId>
+            <version>${oraclepki.version}</version>
+        </dependency>
+        
+        
+    </dependencies>
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>oda-java-sdk-readme-template.txt</include>
+                </includes>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${compiler-plugin.version}</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/.ade_path/**</exclude>
+                    </excludes>
+                    <testExcludes>
+                        <exclude>**/.ade_path/**</exclude>
+                    </testExcludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${jar-plugin.version}</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/samples/</exclude>
+                        <exclude>**/logback.xml</exclude>
+                        <exclude>**/.ade_path/**</exclude>
+                        <exclude>sdk-readme-template.txt</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${assembly-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>create-jar-with-dependencies</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <finalName>oda-java-sdk-${dcs.version}</finalName>
+                            <descriptors>
+                                <descriptor>jar-with-dependencies.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make-assembly</id>
+                        <!-- bind to the packaging phase -->
+                        <phase>package</phase> 
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>oda-java-sdk-${dcs.version}</finalName>
+                            <descriptors>
+                                <descriptor>assembly.xml</descriptor>
+                            </descriptors>
+                            <appendAssemblyId>false</appendAssemblyId>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- YEAR property (required in the sdk-readme-template.txt)-->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                    <id>timestamp-property</id>
+                    <phase>initialize</phase>
+                    <goals>
+                        <goal>timestamp-property</goal>
+                    </goals>
+                    <configuration>
+                        <name>year</name>
+                        <pattern>yyyy</pattern>
+                    </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
