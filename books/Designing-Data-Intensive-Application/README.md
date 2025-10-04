@@ -51,6 +51,9 @@
       - [Single-object writes](#single-object-writes)
       - [The need for multi-object transactions](#the-need-for-multi-object-transactions)
       - [Handling errors and aborts](#handling-errors-and-aborts)
+    - [Weak Isolation Levels](#weak-isolation-levels)
+    - [Read Committed](#read-committed)
+      - [Implementing read committed](#implementing-read-committed)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
@@ -791,7 +794,7 @@ CREATE
 
 ### Single-Object and Multi-Object Operations
 - Multi-object transactions require some way of determining which read and write operations belong to the same transaction
-- In relational databases, that is typically done based on the client’s TCP connection to the database server: on any particular connection, everything between a BEGIN TRANSACTION and a COMMIT statement is considered to be part of the same transaction
+- In relational databases, that is typically done based on the client’s TCP connection to the database server: on any particular connection, everything between a `BEGIN TRANSACTION` and a `COMMIT` statement is considered to be part of the same transaction
 - If the TCP connection is interrupted, the transaction must be aborted.
 - On the other hand, many nonrelational databases don’t have such a way of grouping operations together. Even if there is a multi-object API (for example, a key-value store may have a multi-put operation that updates several keys in one operation), that doesn’t necessarily mean it has transaction semantics
 
@@ -822,13 +825,35 @@ CREATE
   - If you want to make sure that several different systems either commit or abort together, two-phase commit can help
 
 
+### Weak Isolation Levels
+- If two transactions don’t access the same data, or if both are read-only, they can safely be run in parallel, because neither depends on the other. 
+- Concurrency issues (race conditions) only come into play when one transaction reads data that is concurrently modified by another transaction, or when the two transactions try to modify the same data.
+- Concurrency bugs are hard to find by testing, because such bugs are only triggered when you get unlucky with the timing. 
+- For that reason, databases have long tried to hide concurrency issues from application developers by providing *transaction isolation*
+  - In theory, isolation should make your life easier by letting you pretend that no concurrency is happening
+  - serializable isolation means that the database guarantees that transactions have the same effect as if they ran serially (i.e., one at a time, without any concurrency).
+- In practice, isolation is unfortunately not that simple.
+- Serializable isolation has a performance cost, and many databases don’t want to pay that price 
+- In practice several weak isolation levels that are used
+
+### Read Committed
+- The most basic level of transaction isolation is read committed. Two gurantees
+  - When reading from the database, you will only see data that has been committed (no dirty reads).
+  - When writing to the database, you will only overwrite data that has been committed (no dirty writes).
+- Some databases support an even weaker isolation level called read uncommitted. It prevents dirty writes, but does not prevent dirty reads. Let’s discuss these two guarantees in more detail
+
+#### Implementing read committed
+- Read committed is a very popular isolation level. It is the default setting in Oracle Database, PostgreSQL, SQL Server, and many other databases
+- Most commonly, databases prevent dirty writes by using row-level locks: when a transaction wants to modify a particular row (or document or some other object), it must first acquire a lock on that row. 
+-  It must then hold that lock until the transaction is committed or aborted.
+-  Only one transaction can hold the lock for any given row; if another transaction wants to write to the same row, it must wait until the first transaction is committed or aborted before it can acquire the lock and continue.
+- This locking is done automatically by databases in read committed mode (or stronger isolation levels).
+- However, the approach of requiring read locks does not work well in practice, because one long-running write transaction can force many other transactions to wait until the long-running transaction has completed, even if the other transactions only read and do not write anything to the database (harms response time)
+- A more commonly used approach to preventing dirty reads is the one  for every row that is written, the database remembers both the old committed value and the new value set by the transaction that currently holds the write lock.
+- While the transaction is ongoing, any other transactions that read the row are simply given the old value
+- Only when the new value is committed do transactions switch over to reading the new value  (MVCC)
 
 ## Chapter 8. The Trouble with Distributed Systems 
-*Hey I just met you*
-*The network's laggy*
-*But here's my data*
-*So store it maybe*
-![alt text](./images/ddia/ch08-map-ebook.png)
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
 
 
