@@ -65,6 +65,11 @@
       - [What is Write Skew?](#what-is-write-skew)
       - [Why it is tricky to prevent](#why-it-is-tricky-to-prevent)
       - [Possible Solutions](#possible-solutions)
+    - [Phantoms(काल्पनिक) Causing Write Skew](#phantomsकाल्पनिक-causing-write-skew)
+      - [General Pattern of These Anomalies](#general-pattern-of-these-anomalies)
+      - [Phantoms Explained](#phantoms-explained)
+      - [ORMs \& Phantoms](#orms--phantoms)
+    - [Materializing Conflicts (Workaround)](#materializing-conflicts-workaround)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
@@ -1026,6 +1031,58 @@ CREATE
   - Multiplayer Game
   - Username Claiming
   - Preventing Double-Spending
+
+### Phantoms(काल्पनिक) Causing Write Skew
+
+#### General Pattern of These Anomalies
+- Across doctor shifts, meeting bookings, usernames, money accounts, multiplayer games:
+  - **Step 1**: A transaction does a SELECT to check some requirement/precondition.
+    - Examples:
+      - ≥ 2 doctors on call
+      - No booking for this room/time.
+      - Position not occupied.
+      - Username not taken.
+      - Balance not negative.
+  - **Step 2**: Based on the check, application decides to proceed or abort
+  - **Step 3**: Transaction performs a write (`INSERT`, `UPDATE`, `DELETE`).
+  - **Step 4**: That write changes the precondition of step 1.
+- This is a race condition
+
+#### Phantoms Explained
+- A phantom = a situation where one transaction’s write changes the result set of another transaction’s query.
+- Not just overwriting an existing row, but creating or deleting rows that match the query condition.
+- Example:
+  - T1 checks “any booking for noon?” → sees none.
+  - T2 concurrently inserts a booking at noon.
+  - Now T1’s original query result is invalid – a phantom row appeared.
+- Key difference with doctors example:
+  - Doctors: locking rows (`SELECT … FOR UPDATE`) can protect the rows read.
+  - Phantoms: when query checks for absence of rows, there may be nothing to lock.
+    - E.g., “is username X taken?” If the result is empty, `SELECT FOR UPDATE` has nothing to attach to.
+  - That’s why phantoms are harder to prevent than write skew involving existing rows.
+
+#### ORMs & Phantoms
+- ORM-generated SQL often follows the check-then-insert/update pattern.
+- This makes ORM-based code especially vulnerable to phantom-induced write skew.
+
+### Materializing Conflicts (Workaround)
+- Problem: When no rows match the condition, there’s nothing to lock and thus phantom risk.
+- Solution: Introduce artificial lockable rows.
+- Example: Meeting Room Booking
+  - Create a table `room_slots(room_id, time_slot)` ahead of time.
+  - Rows represent all possible room+time combinations (say for next 6 months, broken into 15 min slots).
+  - Now, before booking a room:
+    - Transaction locks (`SELECT … FOR UPDATE`) the relevant slot rows.
+    - Checks for overlapping bookings.
+    - Inserts booking if clear.
+  - These rows aren’t actual booking data, they’re just lock objects.
+- Why it works ?
+  - By “materializing” phantom rows into pre-existing rows, conflicts are converted into standard row-lock conflicts.
+  - This forces txns to wait/abort rather than silently overlap.
+- Downsides ?
+  - Requires careful schema design.
+  - Adds maintenance burden
+  - Mixes concurrency control into the data model
 
 ## Chapter 8. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
