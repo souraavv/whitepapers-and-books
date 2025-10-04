@@ -54,6 +54,17 @@
     - [Weak Isolation Levels](#weak-isolation-levels)
     - [Read Committed](#read-committed)
       - [Implementing read committed](#implementing-read-committed)
+    - [Snapshot Isolation, repeatable read, and naming confusion](#snapshot-isolation-repeatable-read-and-naming-confusion)
+    - [Preventing Lost Updates](#preventing-lost-updates)
+      - [Atomic Write Operation](#atomic-write-operation)
+      - [Explicity Locking](#explicity-locking)
+      - [Automatically detecting lost updates](#automatically-detecting-lost-updates)
+      - [Conditional writes (compare-and-set) CAS](#conditional-writes-compare-and-set-cas)
+        - [How Replication Handles Lost Updates](#how-replication-handles-lost-updates)
+    - [Write Skew and Phantoms](#write-skew-and-phantoms)
+      - [What is Write Skew?](#what-is-write-skew)
+      - [Why it is tricky to prevent](#why-it-is-tricky-to-prevent)
+      - [Possible Solutions](#possible-solutions)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
@@ -852,6 +863,169 @@ CREATE
 - A more commonly used approach to preventing dirty reads is the one  for every row that is written, the database remembers both the old committed value and the new value set by the transaction that currently holds the write lock.
 - While the transaction is ongoing, any other transactions that read the row are simply given the old value
 - Only when the new value is committed do transactions switch over to reading the new value  (MVCC)
+
+### Snapshot Isolation, repeatable read, and naming confusion
+- MVCC is a commonly used implementation technique for databases, and often it is used to implement snapshot isolation
+- . However, different databases sometimes use different terms to refer to the same thing: for example, snapshot isolation is called "repeatable read" in PostgreSQL, and "serializable" in oracle
+- Unfortunately, the SQL standard’s definition of isolation levels is flawed—it is ambiguous, imprecise, and not as implementation-independent as a standard should be
+
+### Preventing Lost Updates
+- Happens in read-modify-write cycles
+- If two transactions do this concurrently, one modification may be lost (later write overwrites earlier one).
+
+#### Atomic Write Operation 
+- Database provide this feature atomic update operations
+- Best solution if the update can be expressed as an atomic operation.
+- But sometimes operation is not as straight forward, think of scnearios where concurrent writes are happening on Google doc, two user are editing page concurrently, we need CRDT (Conflict-Free Replicated Data Type)
+- Atomic operations are usually implemented by taking an exclusive lock on the object when it read so that no other txn can read it until the update has been applied
+  - Another option is to simply force all atomic operation to be executed on single thread (this can be trick interview question)
+- Unfortunately, ORM (object-relation model) frameworks make it easy to accidently write code that performs unsafe read-modify-write cycles instead of using atomic operation provided by database
+
+#### Explicity Locking
+- Another simple option to prevent lost updates
+- But remember there are changes of getting into deadlock if multiple object are attempted to lock, although database automatically detect deadlocks, and abort one of the involved txn so that system can make progress
+
+#### Automatically detecting lost updates
+- Atomic operations and locks are ways of preventing lost updates by forcing the read-modify-write cycles to happen sequentially.
+- An alternative is to allow them to execute in parallel and, if the transaction manager detects a lost update, abort the transaction and force it to retry its read-modify-write cycle.
+- Lost update detection is a great feature, because it doesn’t require application code to use any special database features—you may forget to use a lock or an atomic operation and thus introduce a bug, but lost update detection happens automatically and is thus less error-prone. However, you also have to retry aborted transactions at the application level.
+  - Something like watch in Redis
+
+#### Conditional writes (compare-and-set) CAS
+- Some databases (without full transactions) provide conditional writes.
+- Prevents lost updates by allowing update only if value hasn’t changed since last read
+- Equivalent to atomic compare-and-set (CAS) at the CPU level.
+    ```sql
+    UPDATE wiki_pages 
+    SET content = 'new content'
+    WHERE id = 1234 AND content = 'old content';
+    ```
+- Must check if update succeeded; if not, retry **read-modify-write** cycle.
+- Alternative approach:
+  - Use a version number column (incremented on every update).
+  - Update applies only if version matches the one you last read.
+  - This is known as **optimistic** locking.
+
+>[!IMPORTANT]
+> Important MVCC note:
+> 
+> Under MVCC (Multi-Version Concurrency Control), normally you only see values visible to your snapshot.
+> But many implementations make an exception:
+> Writes from other concurrent transactions are visible in the WHERE clause of UPDATE/DELETE.
+> Otherwise, CAS-style checks would not work.
+>
+
+- CAS doesn't work in case of replicated systems
+  - Multiple replica may accept write concurrently
+
+##### How Replication Handles Lost Updates
+- Allow concurrent writes to create conflicting versions
+- Use application logic or special data structures to resolve/merge later.
+- If updates are commutative:
+  - Order of applying doesn’t matter → safe merge.
+  - Examples:
+    - Increment counter.
+    - Add element to a set.
+  - Basis of CRDTs (Conflict-Free Replicated Data Types).
+  - Note both of the above operation are monotonic (also called G-SET) in nature i.e., if you allow negation or removal of element of set (also called U-SET) then that will not straight-forward
+- Other simplest is LWW (Last Write Win)
+  - But prone to lost update
+  - But most replicated database implement this 
+
+### Write Skew and Phantoms
+- We have already seen dirty write and lost updates (both involves multiple txns updating the same object)
+  - Dirty write become serious problem in case if uncommited work by txn which is over-wrote can abort
+  - Lost update can misses out the update of one of the writer
+- But more subtle anomalies exist when *different objects* are *updated concurrently*
+- Example
+  - Doctor On-Call Example (Write Skew)
+    - Rule: Hospital must always have at least one doctor on call.
+    - Doctors A and B are both on call.
+    - Both fall sick and independently request leave at the same time.
+  - Transaction logic:
+    - Each transaction checks: "≥ 2 doctors are on call" → true (both see 2).
+    - Each removes themselves.
+    - Both commit → result: 0 doctors on call, violating the rule.
+
+#### What is Write Skew?
+- Not a dirty write, Not a lost update
+- Conflict arises only under concurrency – if run sequentially, second transaction would be blocked.
+
+#### Why it is tricky to prevent
+- Atomic single-object ops don’t help (multiple objects involved).
+- Requires true serializable isolation to be automatically prevented.
+
+#### Possible Solutions
+- Serializable isolation: strongest guarantee, prevents write skew.
+- Database constraints:
+  - Useful if you can express the rule
+  - Or Workarounds: triggers, materialized views
+    - Like you can write a rule function `check_on_call`, before update, delete on doctors table (directly validate the invariant on each update.) 
+        ```sql
+        CREATE OR REPLACE FUNCTION check_on_call()
+        RETURNS trigger AS $$
+        DECLARE
+        cnt INTEGER;
+        BEGIN
+        -- Count how many doctors would still be on call after this change
+        SELECT COUNT(*) INTO cnt
+        FROM doctors
+        WHERE shift_id = NEW.shift_id
+            AND on_call = true
+            AND doctor_id <> NEW.doctor_id;
+
+        -- If no one else is left on call, reject this update
+        IF cnt = 0 AND NEW.on_call = false THEN
+            RAISE EXCEPTION 'Cannot take last doctor off call for shift %', NEW.shift_id;
+        END IF;
+
+        RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER enforce_on_call
+        BEFORE UPDATE ON doctors
+        FOR EACH ROW
+        WHEN (OLD.on_call = true AND NEW.on_call = false)
+        EXECUTE FUNCTION check_on_call();
+        ```
+    - Under weaker isolation levels, race conditions can still slip through unless the trigger’s internal query locks rows or forces serialization
+    - A materialized view is a stored query result (like a snapshot table) that can be refreshed automatically or transactionally (tracks the invariant explicitly)
+        ```sql
+        CREATE MATERIALIZED VIEW shift_on_call_counts AS
+        SELECT shift_id, COUNT(*) AS num_on_call
+        FROM doctors
+        WHERE on_call = true
+        GROUP BY shift_id;
+        ```
+    - Then, you enforce a CHECK constraint on this view or on a companion summary table:
+        ```sql
+        ALTER TABLE shift_on_call_counts
+        ADD CONSTRAINT at_least_one_on_call CHECK (num_on_call >= 1);
+        ```
+- Explicity locking
+  - Manually lock all rows your transaction depends on.
+  - FOR UPDATE locks rows → ensures no concurrent modification
+    ```sql
+    BEGIN TRANSACTION;
+
+    SELECT * FROM DOCTORS
+    WHERE ON_CALL=TRUE
+    AND SHIFT_ID=1234 FOR UPDATE;
+
+    UPDATE DOCTORS
+    SET ON_CALL=FALSE
+    WHERE NAME='A'
+    AND SHIFT_ID=1234
+
+    COMMIT;
+
+    ```
+- More example
+  - Meeting Room Booking
+  - Multiplayer Game
+  - Username Claiming
+  - Preventing Double-Spending
 
 ## Chapter 8. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
