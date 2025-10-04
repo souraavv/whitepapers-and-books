@@ -47,6 +47,10 @@
       - [Consistency](#consistency)
       - [Isolation](#isolation)
       - [Durability](#durability)
+    - [Single-Object and Multi-Object Operations](#single-object-and-multi-object-operations)
+      - [Single-object writes](#single-object-writes)
+      - [The need for multi-object transactions](#the-need-for-multi-object-transactions)
+      - [Handling errors and aborts](#handling-errors-and-aborts)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
@@ -784,6 +788,38 @@ CREATE
 - Many databases therefore use the fsync() system call to ensure the data really has been written to disk. 
 - Databases usually also have a write-ahead log or similar, which allows them to recover in the event that a crash occurs part way through a write. [See more](https://github.com/souraavv/whitepapers-and-books/discussions/5#discussioncomment-14540651)
 - Perfect durability does not exist: if all your hard disks and all your backups are destroyed at the same time, there’s obviously nothing your database can do to save you.
+
+### Single-Object and Multi-Object Operations
+- Multi-object transactions require some way of determining which read and write operations belong to the same transaction
+- In relational databases, that is typically done based on the client’s TCP connection to the database server: on any particular connection, everything between a BEGIN TRANSACTION and a COMMIT statement is considered to be part of the same transaction
+- If the TCP connection is interrupted, the transaction must be aborted.
+- On the other hand, many nonrelational databases don’t have such a way of grouping operations together. Even if there is a multi-object API (for example, a key-value store may have a multi-put operation that updates several keys in one operation), that doesn’t necessarily mean it has transaction semantics
+
+#### Single-object writes
+- Atomicity and isolation also apply when a single object is being changed. For example, imagine you are writing a 20 KB JSON document to a database:
+  - If network connection abort ?
+  - Power failure where database is running ?
+  - Another client read the data ?
+- Those issues would be incredibly confusing, so storage engines almost universally aim to provide atomicity and isolation on the level of a single object 
+- Atomicity can be implemented using a log for crash recovery 
+- And isolation can be implemented using a lock on each object 
+- Similarly popular is a conditional write operation, which allows a write to happen only if the value has not been concurrently changed by someone else (compare-and-set)
+- Strictly speaking, the term atomic increment uses the word atomic in the sense of multi-threaded programming. In the context of ACID, it should actually be called an isolated or serializable increment, but that’s not the usual term.
+- These single-object operations are useful, as they can prevent lost updates when several clients try to write to the same object concurrently (preventing lost updates)
+
+#### The need for multi-object transactions
+- There are some use cases in which single-object inserts, updates, and deletes are sufficient. However, in many other cases writes to several different objects need to be coordinated:
+  - In a relational data model, a row in one table often has a foreign key reference to a row in another table. 
+  - Similarly, in a graph-like data model, a vertex has edges to other vertices. 
+  - In databases with secondary indexes (almost everything except pure key-value stores), the indexes also need to be updated every time you change a value. These indexes are different database objects from a transaction point of view: 
+
+#### Handling errors and aborts
+- A key feature of a transaction is that it can be aborted and safely retried if an error occurred
+- If the transaction actually succeeded, but the network was interrupted while the server tried to acknowledge the successful commit to the client (so it timed out from the client’s point of view), then retrying the transaction causes it to be performed twice—unless you have an additional application-level deduplication mechanism in place.
+- If the error is due to overload or high contention between concurrent transactions, retrying the transaction will make the problem worse, not better
+  - It is only worth retrying after transient errors (for example due to deadlock, isolation violation, temporary network interruptions, and failover); after a permanent error (e.g., constraint violation) a retry would be pointless.
+- If the transaction also has side effects outside of the database, those side effects may happen even if the transaction is aborted. For example, if you’re sending an email, you wouldn’t want to send the email again every time you retry the transaction. 
+  - If you want to make sure that several different systems either commit or abort together, two-phase commit can help
 
 
 
