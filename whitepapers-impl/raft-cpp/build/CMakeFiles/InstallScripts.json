@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/build/cmake_install.cmake",
+		"/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/build/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

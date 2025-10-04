@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/build",
+  "command": "/usr/bin/clang++ -DRAFT_DEBUG=1 -I/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/src -g -std=gnu++20 -arch arm64 -o src/CMakeFiles/raft_core.dir/raft/log.cpp.o -c /Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/src/raft/log.cpp",
+  "file": "/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/src/raft/log.cpp",
+  "output": "/Users/sourav/sourav_repo/whitepapers-and-books/whitepapers-impl/raft-cpp/build/src/CMakeFiles/raft_core.dir/raft/log.cpp.o"
+}
+]

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libraft_core.a CMakeFiles/raft_core.dir/raft/log.cpp.o
+/usr/bin/ranlib libraft_core.a
