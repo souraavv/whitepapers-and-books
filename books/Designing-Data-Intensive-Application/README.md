@@ -72,6 +72,8 @@
     - [Materializing Conflicts (Workaround)](#materializing-conflicts-workaround)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
+    - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
+    - [Distributed Transactions and Consensus](#distributed-transactions-and-consensus)
   - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
   - [Chapter 11. Stream Processing](#chapter-11-stream-processing)
 
@@ -1089,6 +1091,58 @@ CREATE
 
 
 ## Chapter 9. Consistency and Consensus 
+- Faults are inevitable in distributed systems :
+  - What can go wrong ?
+    - packets can be lost, reordered, duplicated or arbitrarily delayed in the network
+    - clocks are approximate at best
+    - nodes can pause (GC the one-and-only Garbage Collection) or crash at any time
+  - So how to deal with them ?
+    1. Straight forward solution : Let the entire service fail, and show the error message to the user
+    2. Or, Keeping the service functioning correctly by tolerating faults i.e __fault tolerant distributed systems__
+- Building fault tolerant systems :
+  - Find some general purpose abstractions with useful guarantees.
+  - Implement them once and let applications rely on those guarantees. This will allow applications to ignore some of the problems with distributed systems.
+- Consensus : one of the most important abstractions for distributed systems
+  - Getting all of the nodes to agree on something.
+  - What's the catch ? There might be n/w faults or, process failures and this hides 🫣 it from the application
+- We need to explore the range of guarantees and abstractions that can be provided in a distributed system in order to understand the scope of what can and cannot be done
+
+### Consistency Guarantees / Distributed Consistency Models
+- Timing issues in replicated database (let it be single-leader / multi-leader or leaderless replication)
+  - If we look at two db nodes at the same moment in time we are likely to see different data on the two nodes because write requests arrive on different nodes at different times.
+- Distributed consistency is all about coordinating the state of the replicas in the face of delays and faults.
+1. Eventual Consistency / Convergence
+  - If we stop writing to a db and wait for some __unspecified__ length of time, then eventually all read requests will return the same value.
+  - Why it's not sufficient ? / Issues 🤔
+    - This is a very weak guarantee, it doesn't say anything about when the replicas will converge. Until the time of convergence, read could return anything or nothing.
+    - Hard for application developers to adapt, so different from behaviour of variables in a single-threaded program. If we write a value and then immediately read it again, there is no guarantee that we will see the value we just wrote, because the read may be routed to a different replica.
+    - Bugs are too subtle and hard to find : Edge cases only become apparent when there is a fault in the system or at high concurrency.
+2. Strong Consistency
+  - Stronger guarantees with ease of use
+  - Not free :
+    - May have worse performance.
+    - Less fault tolerant than systems with weaker guarantees.
+  - Linearizability is one of the strongest consistency models
+
+### Distributed Transactions and Consensus
+- Situations in which it is important for the nodes to agree.
+1. Leader Election Problem
+  - In db with single-leader replication, all nodes need to agree on which node is the leader (consensus).
+  - If some of the nodes can't communicate with others due to network fault, split brain situation might arise when two nodes both believe themselves to be leader.
+  - If there are two leaders, they would both accept writes and their data would diverge, leading to inconsistency and data loss.
+2. Atomic Commit Problem
+  - Database that supports distributed transactions, i.e transactions spanning across several nodes or partitions.
+  - We have a problem that a transaction may fail on some nodes but succeed on others.
+  - We have to get all nodes to agree on the outcome of the transaction (consensus) : either they all abort / roll back or they all commit.
+> [!TIP]
+> **Controversy on FLP Result**
+> 
+> Named after authors Fischer, Lynch and Paterson which proves that there is no algorithm that is always able to reach consensus, if there 
+> is a risk that a node may crash.
+>
+> But it was proved in the async system model, a very restrictive model that assumes a deterministic algo that cannot use any clocks or timeouts.
+>
+> If the algo is allowed to use timeouts, or some other way of identifying suspected crashed nodes, then consensus becomes solvable.
 
 
 
