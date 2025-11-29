@@ -82,6 +82,12 @@
       - [Performance Problems](#performance-problems)
       - [Phantoms and Predicate Locks](#phantoms-and-predicate-locks)
     - [Serializable Snapshot Isolation (SSI)](#serializable-snapshot-isolation-ssi)
+    - [Distributed transactions](#distributed-transactions)
+      - [Big picture - what makes distributed transactions hard](#big-picture---what-makes-distributed-transactions-hard)
+      - [Two-Phase Commit (2PC) - essentials](#two-phase-commit-2pc---essentials)
+        - [Why 2PC can block](#why-2pc-can-block)
+        - [Operational consequences](#operational-consequences)
+      - [Practical fixes and improvements to vanilla XA/2PC](#practical-fixes-and-improvements-to-vanilla-xa2pc)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -1239,6 +1245,41 @@ CREATE
     | **Serializable Snapshot Isolation (SSI)** | No                          | Yes                | Near-MVCC speed with correctness | Modern databases            |
     | **Serial Execution**                      | Single-threaded             | Yes                | Fast if in-memory                | High-speed OLTP like VoltDB |
 
+
+### Distributed transactions
+#### Big picture - what makes distributed transactions hard
+- In a single-node DB, committing a transaction is a local, atomic event: write data, write a commit record to disk, done
+- In a distributed transaction the commit must be coordinated across multiple nodes (multiple shards, replicas, or even different systems).
+- The core difficulty is the atomic commitment problem - we want either all participants to commit or all to abort
+- If some nodes commit and others abort, the system becomes inconsistent and recovery is painful or impossible.
+- Practical failure modes you must handle:
+  - Nodes crash during the protocol and recover later with partial state.
+  - Network messages (prepare/commit) are lost or delayed.
+  - Some participants detect constraint violations while others do not.
+  - Coordinator crashes after participants have voted but before broadcasting the final decision.
+
+#### Two-Phase Commit (2PC) - essentials
+- 2PC guarantees atomic commit by splitting commit into two phases:
+  - Phase 1 - prepare: coordinator asks participants "can you commit?" Participants ensure they can commit (durably persist writes) and reply yes/no.
+  - Phase 2 - commit/abort: if all said yes, coordinator decides commit and tells everyone to commit; else it tells everyone to abort.
+- The safety comes from two promises:
+  - A participant voting "yes" promises it can commit later (it has made its local writes durable).
+  - The coordinator's final decision is durable and irrevocable once written to its log.
+
+##### Why 2PC can block
+- If the coordinator crashes after participants vote "yes" but before sending the final decision, participants are left "in doubt". They must wait for the coordinator to recover - they cannot unilaterally commit or abort without risking inconsistency.
+- During this in-doubt period locks and resources are typically held, blocking other transactions and potentially degrading the system.
+
+##### Operational consequences
+- Long-held locks while waiting for coordinator recovery can cause large parts of the app to stall.
+- Loss or corruption of the coordinator log can produce unrecoverable in-doubt transactions requiring manual intervention.
+- These failure modes explain why 2PC is considered "blocking" and operationally expensive.
+
+#### Practical fixes and improvements to vanilla XA/2PC
+- If you must use distributed commit, design choices can reduce the pain:
+  - Replicate the coordinator using a fault-tolerant consensus protocol (Raft/Paxos) so the coordinator itself is highly available and its log is durable across failures.
+  - Replicate participants and coordinate with their replication protocols to reduce single-shard faults causing aborts.
+  - Integrate atomic commit with the database's concurrency control so deadlocks and conflict detection work across shards.
 
 
 ## Chapter 8. The Trouble with Distributed Systems 
