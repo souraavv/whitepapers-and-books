@@ -70,6 +70,12 @@
       - [Phantoms Explained](#phantoms-explained)
       - [ORMs \& Phantoms](#orms--phantoms)
     - [Materializing Conflicts (Workaround)](#materializing-conflicts-workaround)
+    - [Serializability](#serializability)
+      - [Why it matters ?](#why-it-matters-)
+      - [What is Serializability?](#what-is-serializability)
+      - [Why Not Always Use It?](#why-not-always-use-it)
+    - [Actual Serial Execution](#actual-serial-execution)
+      - [Summary of serial execution](#summary-of-serial-execution)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -803,6 +809,9 @@ CREATE
 - The database ensures that when the transactions have committed, the result is the same as if they had run serially (one after another), even though in reality they may have run concurrently 
 - However, serializability has a performance cost. In practice, many databases use forms of isolation that are weaker than serializability: that is, they allow concurrent transactions to interfere with each other in limited ways.
 -  Oracle, don’t even implement it (Oracle has an isolation level called “serializable,” but it actually implements snapshot isolation, which is a weaker guarantee than serializability)
+   - Imagine har transaction ko database ka snapshot milta hai jab wo start hoti hai.
+   - Us transaction ke saare reads usi snapshot ke according honge
+   - Snapshot Isolation phantoms aur write skew ko nahi pakadta (In later section we will see what is Phantom and write skew issue)
 
 #### Durability
 - Durability is the promise that once a transaction has committed successfully, any data it has written will not be forgotten, even if there is a hardware fault or the database crashes
@@ -1085,6 +1094,65 @@ CREATE
   - Requires careful schema design.
   - Adds maintenance burden
   - Mixes concurrency control into the data model
+
+### Serializability
+
+#### Why it matters ?
+- We've seen race conditions - dirty writes, lost updates, write skew, and phantoms
+- Lower isolation levels (read committed, snapshot isolation, repeatable read) prevent some, but not all
+
+#### What is Serializability?
+- Strongest isolation level.
+- Guarantees: Even though transactions may run in parallel, the result is as if they had run one by one, serially.
+
+#### Why Not Always Use It?
+- Historically, serializability was too expensive (locks, waiting, deadlocks).
+- Newer techniques improved feasibility.
+- Today, 3 approaches:
+  - Actual Serial Execution (remove concurrency entirely)
+    - cons: limits throughput, only for small txns, 
+  - Two-Phase Locking (2PL).
+  - Optimistic Concurrency Control (e.g., Serializable Snapshot Isolation, SSI)
+
+### Actual Serial Execution
+- The simplest way of avoiding concurrency problems is to remove the concurrency entirely: to execute only one transaction at a time, in serial order, on a single thread
+  -  If multi-threaded concurrency was considered essential for getting good performance during the previous 30 years, what changed to make single-threaded execution possible?
+  -  Two developments caused this rethink:
+     -  RAM became cheap enough that for many use cases it is now feasible to keep the entire active dataset in memory
+     -  Database designers realized that OLTP transactions are usually short and only make a small number of reads and writes 
+     -  By contrast, long-running analytic queries are typically read-only, so they can be run on a consistent snapshot (using snapshot isolation) outside of the serial execution loop.
+-  Implemented by Redis, H-Store, VoltDB, Datomic 
+-  Limitations ?
+   -  Yes, limited to a single CPU core
+- Does I need to make any changes to the txn structure so that I can utilize single thread as much possible ? 
+  - Yes
+  - Encapsulating transaction in stored procedure
+    - In the early days of databases, the intention was that a database transaction could encompass an entire flow of user activity.  For example, booking an airline ticket is a multi-stage process (searching for routes, fares, and available seats; deciding on an itinerary; booking seats on each of the flights of the itinerary; entering passenger details; making payment)
+    - Database designers thought that it would be neat if that entire process was one transaction so that it could be committed atomically.
+    - Unfortunately, humans are very slow to make up their minds and respond. If a database transaction needs to wait for input from a user... Most of the txns will be idle
+    - Most databases cannot do that efficiently, and so almost all OLTP applications keep transactions short by avoiding interactively waiting for a user within a transaction.
+      - On the web, this means that a transaction is committed within the same HTTP request—​a transaction does not span multiple requests
+      - A new HTTP request starts a new transaction.
+      - Drawbacks ?
+        - Yes, a lot of time spent in network communication between application and the database 
+    - For this reason, systems with single-threaded serial transaction processing don’t allow interactive multi-statement transactions. 
+    - Instead, the application must either limit itself to transactions containing a single statement, or submit the entire transaction code to the database ahead of time, as a stored procedure
+    - ![](./images/ddia/interactive-stored.png)
+  - Pros and cons of stored procedures
+    - Each database vendor had its own language for stored procedures
+    - Code running in a database is difficult to manage: compared to an application server, it’s harder to debug, more awkward to keep in version control and deploy, trickier to test, and difficult to integrate with a metrics collection system for monitoring.
+  - Sharding
+    - Executing all transactions serially makes concurrency control much simpler, but limits the transaction throughput of the database to the speed of a single CPU core on a single machine
+    -  Read-only transactions may execute elsewhere, using snapshot isolation, but for applications with high write throughput, the single-threaded transaction processor can become a serious bottleneck.
+    -  In order to scale to multiple CPU cores, and multiple nodes, you can shard your data 
+    -  Design shard such that each txn only needs to read/write within a single shard
+    -  If required to reach multiple shards, then db must coordinate the txn across all the shards it touches
+    -   The stored procedure needs to be performed in lock-step across all shards to ensure serializability across the whole system.
+#### Summary of serial execution
+- Every transaction must be small and fast
+- It is most appropriate in situations where the active dataset can fit in memory. 
+- Write throughput must be low enough to be handled on a single CPU core, or else transactions need to be sharded without requiring cross-shard coordination.
+
 
 ## Chapter 8. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
