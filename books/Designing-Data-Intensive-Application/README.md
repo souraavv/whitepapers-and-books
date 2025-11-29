@@ -76,6 +76,12 @@
       - [Why Not Always Use It?](#why-not-always-use-it)
     - [Actual Serial Execution](#actual-serial-execution)
       - [Summary of serial execution](#summary-of-serial-execution)
+    - [Two-Phase Locking (2PL)](#two-phase-locking-2pl)
+      - [2PL is NOT 2PC(ommit)](#2pl-is-not-2pcommit)
+      - [Core Idea: Readers and Writers Block Each Other](#core-idea-readers-and-writers-block-each-other)
+      - [Performance Problems](#performance-problems)
+      - [Phantoms and Predicate Locks](#phantoms-and-predicate-locks)
+    - [Serializable Snapshot Isolation (SSI)](#serializable-snapshot-isolation-ssi)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -1152,6 +1158,87 @@ CREATE
 - Every transaction must be small and fast
 - It is most appropriate in situations where the active dataset can fit in memory. 
 - Write throughput must be low enough to be handled on a single CPU core, or else transactions need to be sharded without requiring cross-shard coordination.
+
+### Two-Phase Locking (2PL)
+- For ~30 years, the primary way to achieve serializability (strongest isolation) was Two-Phase Locking (2PL), especially the Strong Strict 2PL (SS2PL) variant.
+  - It relies heavily on locks on database objects.
+
+#### 2PL is NOT 2PC(ommit)
+- 2PL = concurrency control for isolation
+- 2PC = a protocol for atomic commit in distributed systems
+
+#### Core Idea: Readers and Writers Block Each Other
+- 2PL heavily strengthens lock rules:
+  - Reads need Shared locks
+    - Multiple readers can share the same lock.
+    - If a writer holds an exclusive lock, readers must wait.
+  - Writes need Exclusive locks
+    - A writer must wait for all readers of the object to finish.
+    - Writer blocks readers and other writers.
+- Key differences vs Snapshot Isolation (MVCC)
+  - 2PL: readers block writers, writers block readers.
+  - MVCC: readers never block writers, writers never block readers.
+- Because 2PL blocks aggressively, it prevents:
+  - Lost updates
+  - Phantoms
+  - Write skew
+
+- Implementation
+  - Used in: MySQL InnoDB (serializable)
+- Two phases:
+  - Growing phase: acquires locks
+  - Shrinking phase: release locks at commit/abort
+
+- Deadlocks
+  - Two txn waiting for each others
+    - DB detects deadlock cycles
+    - Abort one txn
+    - Application must retry
+  - Deadlock are much more commons under 2PL 
+
+#### Performance Problems
+- This is why 2PL is not popular for modern high-throughput systems.
+  - High lock overhead
+  - Reduced concurrency
+  - Readers blocking writers
+  - Deadlock retries waste work
+
+#### Phantoms and Predicate Locks
+- The phantom problem
+  - A transaction reads a set of rows. Another transaction inserts a new row that matches the same condition.
+  - This can break serializability (isolation)
+- Too complex and many locks, too slow
+
+### Serializable Snapshot Isolation (SSI)
+- 2PL don't perform well and serial execution don't scale well
+- On other hand we have weak isolation levels that have good performance, but are prone to various race conditions (lost updates, write skew)
+- A newer alternative to 2PL that provides:
+  - Full serializability
+  - Without blocking reads/writes
+  - Without single-thread bottlenecks
+- Used by
+  - PostgreSQL (serializable)
+  - CockroachDB
+  - FoundationDB
+- Pessimistic vs Optimistic Concurrency
+  - 2PL = Pessimistic
+    - Block as soon as a conflict might happen
+    - Safe but kills throughput
+  - SSI = Optimistic
+    - Let transactions run without blocking
+    - Validate at commit
+    - Abort if conflicts detected
+  - Trade-offs:
+    - If contention is high → many aborts → bad performance
+    - If contention is moderate → performs better than 2PL
+
+    | Model                                     | Blocking?                   | Phantom protection | Performance                      | Best use                    |
+    | ----------------------------------------- | --------------------------- | ------------------ | -------------------------------- | --------------------------- |
+    | **2PL**                                   | Heavy blocking (read-write) | Yes                | Poor under load                  | Old-school OLTP             |
+    | **Snapshot Isolation (MVCC)**             | None                        | No                 | Fast                             | General workloads           |
+    | **Serializable Snapshot Isolation (SSI)** | No                          | Yes                | Near-MVCC speed with correctness | Modern databases            |
+    | **Serial Execution**                      | Single-threaded             | Yes                | Fast if in-memory                | High-speed OLTP like VoltDB |
+
 
 
 ## Chapter 8. The Trouble with Distributed Systems 
