@@ -87,7 +87,14 @@
       - [Two-Phase Commit (2PC) - essentials](#two-phase-commit-2pc---essentials)
         - [Why 2PC can block](#why-2pc-can-block)
         - [Operational consequences](#operational-consequences)
+      - [Three-phase commit](#three-phase-commit)
       - [Practical fixes and improvements to vanilla XA/2PC](#practical-fixes-and-improvements-to-vanilla-xa2pc)
+    - [Distributed Transactions Across Different Systems](#distributed-transactions-across-different-systems)
+      - [Why distributed transactions are controversial ?](#why-distributed-transactions-are-controversial-)
+      - [Where the performance cost actually comes from ?](#where-the-performance-cost-actually-comes-from-)
+      - [Why we should not dismiss distributed transactions outright ?](#why-we-should-not-dismiss-distributed-transactions-outright-)
+      - [Critical distinction - two very different meanings of “distributed transaction”](#critical-distinction---two-very-different-meanings-of-distributed-transaction)
+    - [Exactly-once Message Processing - Distributed Transactions](#exactly-once-message-processing---distributed-transactions)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -159,7 +166,7 @@
 - Online [Transaction|Analytics] Processing
 - Both have different pattern of data access. Trasactional queries are more like read, update, delete whereas analytics queries are like aggregation stats rather than individual records
 
-    <img src="./images/oltpvsolap.png" alt="description" width="800" height="500">
+    <img src="./images/ddia/oltpvsolap.png" alt="description" width="800" height="500">
 
 - Initially both OLTP and OLAP were carried out through SQL. Later the term *data warehouse* got coined, which means that analytics data will go on a different kind of storage which is optimal for the analytics queries. 
   - A *data warehouse* is a separate database that analysts can query to their hearts’ content, without affecting OLTP operations
@@ -1259,6 +1266,8 @@ CREATE
   - Coordinator crashes after participants have voted but before broadcasting the final decision.
 
 #### Two-Phase Commit (2PC) - essentials
+
+![2PC](./images/ddia/ddi2_0813.png)
 - 2PC guarantees atomic commit by splitting commit into two phases:
   - Phase 1 - prepare: coordinator asks participants "can you commit?" Participants ensure they can commit (durably persist writes) and reply yes/no.
   - Phase 2 - commit/abort: if all said yes, coordinator decides commit and tells everyone to commit; else it tells everyone to abort.
@@ -1267,6 +1276,9 @@ CREATE
   - The coordinator's final decision is durable and irrevocable once written to its log.
 
 ##### Why 2PC can block
+
+![2pc-crash](./images/ddia/2pccrash.png)
+
 - If the coordinator crashes after participants vote "yes" but before sending the final decision, participants are left "in doubt". They must wait for the coordinator to recover - they cannot unilaterally commit or abort without risking inconsistency.
 - During this in-doubt period locks and resources are typically held, blocking other transactions and potentially degrading the system.
 
@@ -1275,12 +1287,119 @@ CREATE
 - Loss or corruption of the coordinator log can produce unrecoverable in-doubt transactions requiring manual intervention.
 - These failure modes explain why 2PC is considered "blocking" and operationally expensive.
 
+#### Three-phase commit
+- Two-phase commit is called a blocking atomic commit protocol due to the fact that 2PC can become stuck waiting for the coordinator to recover.
+- As an alternative to 2PC, an algorithm called three-phase commit (3PC) has been proposed
+- However, 3PC assumes a network with bounded delay and nodes with bounded response times; in most practical systems with unbounded network delay 
+- A better solution in practice is to replace the single-node coordinator with a fault-tolerant consensus protocol (Chapter 10)
+
 #### Practical fixes and improvements to vanilla XA/2PC
 - If you must use distributed commit, design choices can reduce the pain:
   - Replicate the coordinator using a fault-tolerant consensus protocol (Raft/Paxos) so the coordinator itself is highly available and its log is durable across failures.
   - Replicate participants and coordinate with their replication protocols to reduce single-shard faults causing aborts.
   - Integrate atomic commit with the database's concurrency control so deadlocks and conflict detection work across shards.
 
+### Distributed Transactions Across Different Systems
+#### Why distributed transactions are controversial ?
+- Distributed transactions, especially those implemented using two-phase commit (2PC), have a mixed reputation:
+  - Pros
+    - Provide strong safety guarantees (notably atomic commit)
+    - Enable correctness across multiple systems when partial failure is possible
+  - Cons
+    - Cause significant operational complexity
+    - Often degrade performance
+
+#### Where the performance cost actually comes from ?
+- Disk forcing (fsync)
+  - Required to ensure crash recovery correctness
+  - Forces synchronous, durable writes on the critical path
+- Additional network round-trips
+  - Coordinator <-> participants communication
+  - Latency multiplies with number of participants
+
+#### Why we should not dismiss distributed transactions outright ?
+- Despite the drawbacks:
+  - Distributed transactions encode important correctness lessons
+  - They formalize how to reason about atomicity under partial failure
+  - Understanding them helps evaluate alternatives (sagas, compensation, idempotency)
+- Rejecting 2PC without understanding it leads to re-inventing weaker, often unsafe mechanisms.
+
+#### Critical distinction - two very different meanings of “distributed transaction”
+- A common mistake is conflating two fundamentally different scenarios.
+  - Type 1 - Database-internal distributed transactions
+    - Def. Transactions that span multiple nodes of the same distributed database
+    - Characteristics
+      - All participants run the same database software
+      - The system controls:
+        - Replication
+        - Sharding
+        - Failure detection
+        - Recovery semantics
+      - Examples
+        - YugabyteDB
+        - FoundationDB
+        - Spanner
+        - Cassandra
+        - MySQL Cluster (NDB engine)
+    - Why these often work well ?
+      - Can apply database-specific optimizations that are impossible in general 2PC
+      - These systems are not using “generic” distributed transactions. They are using bespoke, tightly integrated protocols.
+      - Database-internal distributed transactions can be efficient and practical because the system controls the entire stack.
+  - Type 2 - Heterogeneous distributed transactions
+    - Def. Transactions spanning multiple, different systems, such as:
+      - Databases from different vendors
+      - Databases + message brokers
+      - Databases + other stateful services
+    - Requirements
+      - Must ensure atomic commit across systems
+      - Participants may have:
+        - Different failure models
+        - Different durability guarantees
+        - Different transaction semantics
+      - Why this is hard
+        - No shared implementation assumptions
+        - Limited optimization opportunities
+        - Failures are harder to reason about and recover from
+      - This is where most real-world pain with distributed transactions comes from.
+      - Heterogeneous distributed transactions are fundamentally more complex and fragile due to lack of shared assumptions.
+      - Criticism of distributed transactions usually applies to the heterogeneous case, but is often (incorrectly) generalized to all distributed transactions.
+- Summary
+  - Distributed transactions are not inherently broken - they work best inside a single distributed database, and become risky and expensive when forced across heterogeneous systems.
+
+### Exactly-once Message Processing - Distributed Transactions
+- In heterogeneous systems, message processing often involves:
+  - Consuming a message from a message broker
+  - Performing side effects (typically database writes)
+- The correctness requirement:
+  - A message should be acknowledged if and only if its processing side effects are durably committed
+- This avoids:
+  - Message loss
+  - Duplicate processing
+  - Partial side effects
+
+- How distributed transactions enable exactly-once semantics ?
+  - Using a heterogeneous distributed transaction, we can:
+    - Atomically commit:
+      - Message acknowledgment (or offset advance)
+      - Database updates
+    - Abort both if either fails
+  - Outcome:
+    - If processing fails → transaction aborts → message is safely redelivered
+    - If processing succeeds → both message ack and side effects commit together
+  - This creates the illusion of exactly-once processing, even if retries occur internally.
+    - Retries are allowed; duplicate effects are not.
+- Meaning of “exactly-once semantics”
+  - Externally visible side effects occur once
+  - Internal retries may happen
+  - Partial effects are discarded on abort
+- This is stronger than at-least-once, and safer than at-most-once, but relies on strict assumptions.
+- Safe retry condition
+  - A processing step can be safely retried only if:
+    - All side effects are either:
+      - Rolled back on abort, or
+      - Idempotent
+  - If this holds:
+    - Retries are indistinguishable from a single execution
 
 ## Chapter 8. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
