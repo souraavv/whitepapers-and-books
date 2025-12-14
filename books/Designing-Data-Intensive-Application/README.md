@@ -95,6 +95,8 @@
       - [Why we should not dismiss distributed transactions outright ?](#why-we-should-not-dismiss-distributed-transactions-outright-)
       - [Critical distinction - two very different meanings of “distributed transaction”](#critical-distinction---two-very-different-meanings-of-distributed-transaction)
     - [Exactly-once Message Processing - Distributed Transactions](#exactly-once-message-processing---distributed-transactions)
+    - [XA Transaction](#xa-transaction)
+    - [Summary](#summary-1)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -1400,6 +1402,66 @@ CREATE
       - Idempotent
   - If this holds:
     - Retries are indistinguishable from a single execution
+
+### XA Transaction
+- XA (X/Open XA) is a standard for two-phase commit (2PC) across heterogeneous systems
+- Widely supported by:
+  - Databases: PostgreSQL, MySQL, Oracle, SQL Server, Db2
+  - Message brokers: ActiveMQ, IBM MQ, MSMQ, HornetQ
+- It is a C API specification (not a network protocol)
+- Architecture
+  - Application code starts a transaction
+  - Drivers (JDBC/JMS) decide whether calls belong to an XA transaction
+  - Drivers expose callbacks:
+    - prepare
+    - commit
+    - rollback
+  - Transaction coordinator:
+    - Tracks participants
+    - Collects prepare responses
+    - Decides commit or abort
+    - Persists decision in a local log
+  - Where the coordinator lives
+    - Typically not a separate service
+    - Usually a library loaded inside the application process
+    - Uses local disk for logging transaction decisions
+- Failure behavior
+  - If the application process crashes or the machine dies:
+    - The coordinator dies with it
+    - Participants that already prepared are left in-doubt
+    - Databases cannot contact the coordinator directly
+    - Recovery requires:
+      - Restarting the application server
+
+### Summary 
+
+| Isolation level        | Dirty reads | Read skew | Phantom reads | Lost updates | Write skew |
+|------------------------|-------------|-----------|---------------|--------------|------------|
+| Read uncommitted       |  Possible  |  Possible|  Possible    |  Possible   |  Possible |
+| Read committed         |  Prevented |  Possible|  Possible    |  Possible   |  Possible |
+| Snapshot isolation     |  Prevented |  Prevented|  Prevented   | ? Depends    |  Possible |
+| Serializable           |  Prevented |  Prevented|  Prevented   |  Prevented  |  Prevented |
+
+- Dirty reads
+  - One client reads another client’s writes before they have been committed. The read committed isolation level and stronger levels prevent dirty reads.
+
+- Dirty writes
+  - One client overwrites data that another client has written, but not yet committed. Almost all transaction implementations prevent dirty writes.
+
+- Read skew
+  - A client sees different parts of the database at different points in time. Some cases of read skew are also known as nonrepeatable reads. This issue is most commonly prevented with snapshot isolation, which allows a transaction to read from a consistent snapshot corresponding to one particular point in time. It is usually implemented with multi-version concurrency control (MVCC).
+
+- Lost updates
+  - Two clients concurrently perform a read-modify-write cycle. One overwrites the other’s write without incorporating its changes, so data is lost. Some implementations of snapshot isolation prevent this anomaly automatically, while others require a manual lock (SELECT FOR UPDATE).
+
+- Write skew
+  - A transaction reads something, makes a decision based on the value it saw, and writes the decision to the database. However, by the time the write is made, the premise of the decision is no longer true. Only serializable isolation prevents this anomaly.
+
+- Phantom reads
+  - A transaction reads objects that match some search condition. Another client makes a write that affects the results of that search. Snapshot isolation prevents straightforward phantom reads, but phantoms in the context of write skew require special treatment, such as index-range locks.
+
+
+
 
 ## Chapter 8. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
