@@ -67,6 +67,17 @@
         - [Manual Conflict Resolution](#manual-conflict-resolution)
         - [Automatic conflict resolution](#automatic-conflict-resolution)
       - [CRDTs and Operational Transformation](#crdts-and-operational-transformation)
+    - [Leaderless Replication](#leaderless-replication)
+      - [Writing to the Database When a Node Is Down](#writing-to-the-database-when-a-node-is-down)
+        - [Catching up on missed writes](#catching-up-on-missed-writes)
+        - [Quorums for reading and writing](#quorums-for-reading-and-writing)
+      - [Limitations of Quorum Consistency](#limitations-of-quorum-consistency)
+        - [Monitoring staleness](#monitoring-staleness)
+      - [Single-Leader Versus Leaderless Replication Performance](#single-leader-versus-leaderless-replication-performance)
+      - [Detecting Concurrent Writes](#detecting-concurrent-writes)
+        - [The “happens-before” relation and concurrency](#the-happens-before-relation-and-concurrency)
+        - [Capturing the happens-before relationship](#capturing-the-happens-before-relationship)
+    - [Summary](#summary-1)
   - [Chapter 6. Partitioning](#chapter-6-partitioning)
   - [Chapter 7. Transaction](#chapter-7-transaction)
     - [Introduction](#introduction)
@@ -124,7 +135,7 @@
       - [Critical distinction - two very different meanings of “distributed transaction”](#critical-distinction---two-very-different-meanings-of-distributed-transaction)
     - [Exactly-once Message Processing - Distributed Transactions](#exactly-once-message-processing---distributed-transactions)
     - [XA Transaction](#xa-transaction)
-    - [Summary](#summary-1)
+    - [Summary](#summary-2)
   - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
   - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -1246,6 +1257,174 @@ How does leader-based replication work under the hood?
   - Concurrent insertions at the same position are ordered by the IDs of the characters. This ensures that replicas converge without performing any transformation.
 - OT is most often used for real-time collaborative editing of text, e.g. in Google Docs
 - CRDTs can be found in distributed databases such as Redis Enterprise, Riak, and Azure Cosmos DB
+
+### Leaderless Replication
+- So far we have seen leader (sinlge or multi) determines the order in which writes should be processed, and followers apply the leader’s writes in the same order.
+- Some data storage systems take a different approach, abandoning the concept of a leader and allowing any replica to directly accept writes from clients. 
+- This was not that popular until - Amazon used it for its in-house Dynamo system in 2007
+
+#### Writing to the Database When a Node Is Down
+- If one replica is unavailable, writes still succeed as long as a quorum (e.g., 2 out of 3 replicas) acknowledges the write.
+- There is no failover - unavailable replicas simply miss those writes temporarily.
+- Handling missing writes
+  - When the down replica comes back, it may return stale data.
+  - To handle this, reads are also sent to multiple replicas, and responses may differ.
+  - Each value carries a timestamp or version. The client keeps the latest version (highest timestamp), even if only one replica has it.
+- Leaderless replication trades strict ordering for availability and fault tolerance, using quorum writes, versioning, and multi-replica reads to cope with failures and temporary inconsistency.
+
+##### Catching up on missed writes
+- The replication system should ensure that eventually all the data is copied to every replica
+- Several mechanisms are used in Dynamo-style datastores:
+- Read repair
+  - When a client makes a read from several nodes in parallel, it can detect any stale responses
+  - The client sees that replica x has a stale value and writes the newer value back to that replica. 
+  - This approach works well for values that are frequently read.
+- Hinted handoff
+  - If one replica is unavailable, another replica may store writes on its behalf in the form of hints.
+  - When the replica that was supposed to receive those writes comes back, the replica storing the hints sends them to the recovered replica, and then deletes the hints.
+  -  This handoff process helps bring replicas up-to-date even for values that are never read, and therefore not handled by read repair.
+-  Anti-entropy
+   -  Anti-entropy (A process that reduces disorder) is a background repair process that:
+      -  Periodically compares data between replicas
+      -  Detects differences
+      -  Copies missing or outdated data from one replica to another
+   -  Unlike the replication log in leader-based replication, this anti-entropy process does not copy writes in any particular order, and there may be a significant delay before data is copied.
+      -  Leaderless systems don’t track a global write order
+      -  Replicas only care about latest versions per key
+      -  Writes may have arrived in different orders at different replicas
+
+##### Quorums for reading and writing
+- If there are n replicas, every write must be confirmed by w nodes to be considered successful, and we must query at least r nodes for each read. 
+  - w + r > n
+- Reads and writes that obey these r and w values are called quorum reads and writes 
+- The quorum condition, w + r > n, allows the system to tolerate unavailable nodes as follows:
+  - If w < n, we can still process writes if a node is unavailable.
+  - If r < n, we can still process reads if a node is unavailable.
+  - With n = 3, w = 2, r = 2 we can tolerate one unavailable node
+  - With n = 5, w = 3, r = 3 we can tolerate two unavailable nodes
+- Normally, reads and writes are always sent to all n replicas in parallel. The parameters w and r determine how many nodes we wait for
+- If fewer than the required w or r nodes are available, writes or reads return an error.
+
+#### Limitations of Quorum Consistency
+- If you have n replicas, and you choose w and r such that w + r > n, you can generally expect every read to return the most recent value written for a key
+- This is the case because the set of nodes to which you’ve written and the set of nodes from which you’ve read must overlap
+- But quorums are not necessarily majorities—it only matters that the sets of nodes used by the read and write operations overlap in at least one node.
+- You may also set w and r to smaller numbers, so that w + r ≤ n (i.e., the quorum condition is not satisfied). In this case, reads and writes will still be sent to n nodes, but a smaller number of successful responses is required for the operation to succeed.
+- With a smaller w and r you are more likely to read stale values, because it’s more likely that your read didn’t include the node with the latest value.
+- On the upside, this configuration allows lower latency
+- This setup is also more highly available
+- However, even with w + r > n, there are edge cases in which the consistency properties can be confusing. Some scenarios include:
+  - If a node carrying a new value fails, and its data is restored from a replica carrying an old value, the number of replicas storing the new value may fall below w, breaking the quorum condition.
+  - If a read is concurrent with a write operation, the read may or may not see the concurrently written value. In particular, it’s possible for one read to see the new value, and a subsequent read to see the old value, as we shall see in “Linearizability and quorums”.
+  - If a write succeeded on some replicas but failed on others (for example because the disks on some nodes are full), and overall succeeded on fewer than w replicas, it is not rolled back on the replicas where it succeeded. This means that if a write was reported as failed, subsequent reads may or may not return the value from that write
+  - If the database uses timestamps from a real-time clock to determine which write is newer (as Cassandra and ScyllaDB do, for example), writes might be silently dropped if another node with a faster clock has written to the same key
+  - If two writes occur concurrently, one of them might be processed first on one replica, and the other might be processed first on another replica. This leads to a conflict, similarly to what we saw for multi-leader replication 
+- Dynamo-style databases are generally optimized for use cases that can tolerate eventual consistency. 
+  - The parameters w and r allow you to adjust the probability of stale values being read but it’s wise to not take them as absolute guarantees.
+
+##### Monitoring staleness
+- From an operational perspective
+- Even if your application can tolerate stale reads, you need to be aware of the health of your replication. 
+-  If it falls behind significantly, it should alert you so that you can investigate the cause 
+-  For leader-based replication, the database typically exposes metrics for the replication lag, which you can feed into a monitoring system. 
+   -  This is possible because writes are applied to the leader and to followers in the same order, and each node has a position in the replication log
+   -  By subtracting a follower’s current position from the leader’s current position, you can measure the amount of replication lag.
+-  However, in systems with leaderless replication, there is no fixed order in which writes are applied, which makes monitoring more difficult.
+   -  The number of hints that a replica stores for handoff can be one measure of system health, but it’s difficult to interpret usefully
+   -  Eventual consistency is a deliberately vague guarantee, but for operability it’s important to be able to quantify “eventual.”
+
+#### Single-Leader Versus Leaderless Replication Performance
+- A replication system based on a single leader can provide strong consistency guarantees that are difficult or impossible to achieve in a leaderless system.
+- However, reads in a leader-based replicated system can also return stale values if you make them on an asynchronously updated follower.
+- Reading from the leader ensures up-to-date responses, but it suffers from performance problems:
+  - Read throughput is limited by the leader’s capacity to handle requests 
+  - If the leader fails, you have to wait for the fault to be detected, and for the failover to complete before you can continue handling requests. 
+  - The system is very sensitive to performance problems on the leader
+- A big advantage of a leaderless architecture is that it is more resilient against such issues.
+  - Because there is no failover, and requests go to multiple replicas in parallel anyway, one replica becoming slow or unavailable has very little impact on response times:
+- At its core, the resilience of a leaderless system comes from the fact that it doesn’t distinguish between the normal case and the failure case.
+- This is especially helpful when handling so-called gray failures, in which a node isn’t completely down, but running in a degraded state where it is unusually slow to handle requests, or when a node is simply overloaded
+- That said, leaderless systems can have performance problems as well:
+  - Even though the system doesn’t need to perform failover, one replica does need to detect when another replica is unavailable so that it can store hints about writes that the unavailable replica missed.
+  - When the unavailable replica comes back, the handoff process needs to send it those hints. This puts additional load on the replicas at a time when the system is already under strain
+  - The more replicas you have, the bigger the size of your quorums, and the more responses you have to wait for before a request can complete
+  - A large-scale network interruption that disconnects a client from a large number of replicas can make it impossible to form a quorum.
+
+#### Detecting Concurrent Writes
+- Like with multi-leader replication, leaderless databases allow concurrent writes to the same key, resulting in conflicts that need to be resolved. 
+- Such conflicts may occur as the writes happen, but not always: they could also be detected later during read repair, hinted handoff, or anti-entropy.
+- The problem is that events may arrive in a different order at different nodes, due to variable network delays and partial failures. 
+  - Node 1 receives the write from A, but never receives the write from B due to a transient outage.
+  - Node 2 first receives the write from A, then the write from B.
+  - Node 3 first receives the write from B, then the write from A.
+- If each node simply overwrote the value for a key whenever it received a write request from a client, the nodes would become permanently inconsistent
+- In order to become eventually consistent, the replicas should converge toward the same value. 
+  - LWW, CRDT, OT
+  - LWW is easy to implement
+    - However, a timestamp doesn’t tell you whether two values are actually conflicting  (i.e., they were written concurrently) or not (they were written one after another).
+    -  If you want to resolve conflicts explicitly, the system needs to take more care to detect concurrent writes.
+
+##### The “happens-before” relation and concurrency
+- How do we decide whether two operations are concurrent or not? To develop an intuition, let’s look at some examples:
+
+![With multi-leader replication, writes may arrive in the wrong order at some replicas](./images/ddia/a-b.png)
+
+  - In figure, the two writes are not concurrent: A’s insert happens before B’s increment, because the value incremented by B is the value inserted by A
+  - In other words, B’s operation builds upon A’s operation, so B’s operation must have happened later. We also say that B is causally dependent on A.
+
+![Concurrent writes in a Dynamo-style datastore: there is no well-defined ordering.](./images/ddia/last-sec.png)
+
+  - In above, On the other hand, the two writes are concurrent:  when each client starts the operation, it does not know that another client is also performing an operation on the same key. 
+  - Thus, there is no causal dependency between the operations.
+
+- An operation A happens before another operation B if B knows about A, or depends on A, or builds upon A in some way
+- Whether one operation happens before another operation is the key to defining what concurrency means. 
+  - In fact, we can simply say that two operations are concurrent if neither happens before the other 
+- Thus, whenever you have two operations A and B, there are three possibilities: either A happened before B, or B happened before A, or A and B are concurrent.
+- If one operation happened before another, the later operation should overwrite the earlier operation, but if the operations are concurrent, we have a conflict that needs to be resolved.
+- For defining concurrency, exact time doesn’t matter: we simply call two operations concurrent if they are both unaware of each other, regardless of the physical time at which they occurred.
+
+##### Capturing the happens-before relationship
+- The algorithm works as follows: (we will generalize this later, for now consider simple case - single replica)
+  - The server maintains a version number for every key, increments the version number every time that key is written, and stores the new version number along with the value written.
+  - When a client reads a key, the server returns all siblings, i.e., all values that have not been overwritten, as well as the latest version number. A client must read a key before writing.
+  - When a client writes a key, it must include the version number from the prior read, and it must merge together all values that it received in the prior read, e.g. using a CRDT or by asking the user. The response from a write request is like a read, returning all siblings, which allows us to chain several writes like in the shopping cart example.
+  - When the server receives a write with a particular version number, it can overwrite all values with that version number or below (since it knows that they have been merged into the new value), but it must keep all values with a higher version number (because those values are concurrent with the incoming write).
+
+- Note that the server can determine whether two operations are concurrent by looking at the version numbers—it does not need to interpret the value itself (so the value could be any data structure).
+
+![Shopping cart](./images/ddia/shopping-cart.png)
+- In this example, two clients are concurrently adding items to the same shopping cart
+
+![Casual dependency](./images/ddia/casual-dependency.png)
+-  In this example, the clients are never fully up to date with the data on the server, since there is always another operation going on concurrently. But old versions of the value do get overwritten eventually, and no writes are lost.
+
+### Summary
+- High availability
+  - Keeping the system running, even when one machine (or several machines, a zone, or even an entire region) goes down
+- Durability
+  - Ensuring you don’t lose data, even if a whole machine (or even an entire region) fails permanently
+- Disconnected operation
+  - Allowing an application to continue working when there is a network interruption
+- Latency
+  - Placing data geographically close to users, so that users can interact with it faster
+- Scalability
+  - Being able to handle a higher volume of reads than a single machine could handle, by performing reads on replicas
+- Despite being a simple goal—keeping a copy of the same data on several machines—replication turns out to be a remarkably tricky problem
+- We discussed three main approaches to replication:
+  - Single-leader replication
+  - Multi-leader replication
+  - Leaderless replication
+- Replication can be synchronous or asynchronous, which has a profound effect on the system behavior when there is a fault. 
+- We looked at some strange effects that can be caused by replication lag, and we discussed a few consistency models which are helpful for deciding how an application should behave under replication lag
+  - Read-after-write consistency
+    - Users should always see data that they submitted themselves.
+  - Monotonic reads
+    - After users have seen the data at one point in time, they shouldn’t later see the data from some earlier point in time.
+  - Consistent prefix reads
+    - Users should see the data in a state that makes causal sense: for example, seeing a question and its reply in the correct order.
+- Finally, we discussed how multi-leader and leaderless replication ensure that all replicas eventually converge to a consistent state: by using a version vector or similar algorithm to detect which writes are concurrent, and by using a conflict resolution algorithm such as a CRDT to merge the concurrently written values
+- This chapter has assumed that every replica stores a full copy of the whole database, which is unrealistic for large datasets. In the next chapter we will look at sharding, which allows each machine to store only a subset of the data.
 
 
 ## Chapter 6. Partitioning
