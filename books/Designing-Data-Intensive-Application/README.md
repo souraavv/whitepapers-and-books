@@ -16,12 +16,13 @@
       - [Serverless](#serverless)
     - [Cloud Computing versus Supercomputing](#cloud-computing-versus-supercomputing)
     - [Data Systems, Law, and Society](#data-systems-law-and-society)
-  - [Chapter 1 : Reliable, Scalable, and Maintainable Applications](#chapter-1--reliable-scalable-and-maintainable-applications)
+  - [Chapter 1 : Trade-Offs in Data system Architecture](#chapter-1--trade-offs-in-data-system-architecture)
     - [Reliability](#reliability)
     - [Scalability](#scalability)
     - [Performance](#performance)
     - [Maintainability](#maintainability)
-  - [Chapter 2. Data Models and Query Language](#chapter-2-data-models-and-query-language)
+  - [Chapter 2. Defining NonFunctional Requirements](#chapter-2-defining-nonfunctional-requirements)
+  - [Chapter 3. Data Models and Query Language](#chapter-3-data-models-and-query-language)
     - [Data models](#data-models)
     - [The Object-Relational Mismatch](#the-object-relational-mismatch)
     - [Many-to-One and Many-To-Many relationships](#many-to-one-and-many-to-many-relationships)
@@ -33,11 +34,11 @@
     - [Graph Queries in SQL](#graph-queries-in-sql)
     - [Triple-Store and SPARQL](#triple-store-and-sparql)
     - [Summary](#summary)
-  - [Chapter 3. Storage and Retrievals](#chapter-3-storage-and-retrievals)
+  - [Chapter 4. Storage and Retrievals](#chapter-4-storage-and-retrievals)
     - [Hash Indexes](#hash-indexes)
-  - [Chapter 4. Encoding and Evolution](#chapter-4-encoding-and-evolution)
+  - [Chapter 5. Encoding and Evolution](#chapter-5-encoding-and-evolution)
 - [Part 2. Distributed Data](#part-2-distributed-data)
-  - [Chapter 5. Replication](#chapter-5-replication)
+  - [Chapter 6. Replication](#chapter-6-replication)
     - [Single-Leader Replication](#single-leader-replication)
     - [Sync vs Async Replication](#sync-vs-async-replication)
     - [Setting Up New Followers](#setting-up-new-followers)
@@ -78,8 +79,8 @@
         - [The “happens-before” relation and concurrency](#the-happens-before-relation-and-concurrency)
         - [Capturing the happens-before relationship](#capturing-the-happens-before-relationship)
     - [Summary](#summary-1)
-  - [Chapter 6. Partitioning](#chapter-6-partitioning)
-  - [Chapter 7. Transaction](#chapter-7-transaction)
+  - [Chapter 7. Partitioning](#chapter-7-partitioning)
+  - [Chapter 8. Transaction](#chapter-8-transaction)
     - [Introduction](#introduction)
     - [The meaning of ACID](#the-meaning-of-acid)
       - [Atomicity](#atomicity)
@@ -136,8 +137,8 @@
     - [Exactly-once Message Processing - Distributed Transactions](#exactly-once-message-processing---distributed-transactions)
     - [XA Transaction](#xa-transaction)
     - [Summary](#summary-2)
-  - [Chapter 8. The Trouble with Distributed Systems](#chapter-8-the-trouble-with-distributed-systems)
-  - [Chapter 9. Consistency and Consensus](#chapter-9-consistency-and-consensus)
+  - [Chapter 9. The Trouble with Distributed Systems](#chapter-9-the-trouble-with-distributed-systems)
+  - [Chapter 10. Consistency and Consensus](#chapter-10-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
     - [Linearizability](#linearizability)
       - [What makes a system linearizable ?](#what-makes-a-system-linearizable-)
@@ -145,8 +146,8 @@
       - [Implementing Linearizable Systems](#implementing-linearizable-systems)
       - [Cost of Linearizability](#cost-of-linearizability)
     - [Distributed Transactions and Consensus](#distributed-transactions-and-consensus)
-  - [Chapter 10. Batch Processing](#chapter-10-batch-processing)
-  - [Chapter 11. Stream Processing](#chapter-11-stream-processing)
+  - [Chapter 11. Batch Processing](#chapter-11-batch-processing)
+  - [Chapter 12. Stream Processing](#chapter-12-stream-processing)
 
 # Designing Data Intensive Applications
 
@@ -302,7 +303,7 @@
   - Answering these questions creates new engineering challenges.
 
 
-## Chapter 1 : Reliable, Scalable, and Maintainable Applications
+## Chapter 1 : Trade-Offs in Data system Architecture
 > No such hard boundary b/w databases, queues, caches, etc. because now most tools are coming up with multiple features. Thus we will keep these three under single umbrella
 ### Reliability
 - Tolerating hardware & software faults
@@ -474,7 +475,9 @@
   - goal is to find ways of increasing agility of larger data systems
   - agility of system dependent on its simplicity and its abstractions
 
-## Chapter 2. Data Models and Query Language
+## Chapter 2. Defining NonFunctional Requirements
+
+## Chapter 3. Data Models and Query Language
 
 ### Data models
 - Data models decides
@@ -749,7 +752,7 @@ CREATE
   - Full-text search
 
 
-## Chapter 3. Storage and Retrievals
+## Chapter 4. Storage and Retrievals
 
 - One of the most fundamental 
   - A database do 2 things - when you give it data, it store; when you ask, it give the data back to you
@@ -777,7 +780,7 @@ CREATE
 
 
 
-## Chapter 4. Encoding and Evolution 
+## Chapter 5. Encoding and Evolution 
 
 
 # Part 2. Distributed Data
@@ -803,7 +806,7 @@ CREATE
   
 - In part2 we will mostly discuss *Share Nothing Architecture* 
   
-## Chapter 5. Replication
+## Chapter 6. Replication
 - Replication means keeping a copy of the same data on multiple machines that are connected via a network.
 - Why replication ?
   - Latency - Keep you data geographically closer to your users
@@ -1427,9 +1430,9 @@ How does leader-based replication work under the hood?
 - This chapter has assumed that every replica stores a full copy of the whole database, which is unrealistic for large datasets. In the next chapter we will look at sharding, which allows each machine to store only a subset of the data.
 
 
-## Chapter 6. Partitioning
+## Chapter 7. Partitioning
 
-## Chapter 7. Transaction 
+## Chapter 8. Transaction 
 
 ### Introduction
 - A transaction is a way for an application to group several reads and writes together into a logical unit.
@@ -2103,11 +2106,11 @@ How does leader-based replication work under the hood?
 
 
 
-## Chapter 8. The Trouble with Distributed Systems 
+## Chapter 9. The Trouble with Distributed Systems 
 - In this chapter we will turn our pessimism to the maximum and assume that any thing *can go wrong will go wrong*
 
 
-## Chapter 9. Consistency and Consensus 
+## Chapter 10. Consistency and Consensus 
 - Faults are inevitable in distributed systems :
   - What can go wrong ?
     - packets can be lost, reordered, duplicated or arbitrarily delayed in the network
@@ -2266,7 +2269,7 @@ Common approach to make system fault-tolerant is to use **replication** :
 
 
 
-## Chapter 10. Batch Processing
+## Chapter 11. Batch Processing
 
-## Chapter 11. Stream Processing
+## Chapter 12. Stream Processing
 
