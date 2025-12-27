@@ -1235,8 +1235,8 @@ How does leader-based replication work under the hood?
   -  Conflict-free replicated datatypes (CRDTs)
   -  Operational Transformation (OT)
 
-
 ![CRDT and OT](./images/ddia/ot-crdt.png)
+
 - OT 
   - We record the index at which characters are inserted or deleted: “n” is inserted at index 0, and “!” at index 3. 
   - Next, the replicas exchange their operations. The insertion of “n” at 0 can be applied as-is, but if the insertion of “!” at 3 were applied to the state “nice” we would get “nic!e”, which is incorrect. 
