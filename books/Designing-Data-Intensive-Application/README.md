@@ -80,6 +80,15 @@
     - [Summary](#summary-1)
   - [Chapter 7. Sharding](#chapter-7-sharding)
     - [Pros and Cons of Sharding](#pros-and-cons-of-sharding)
+      - [Sharding for Multitenancy](#sharding-for-multitenancy)
+    - [Sharding of Key-Value Data](#sharding-of-key-value-data)
+      - [Sharding by Key Range](#sharding-by-key-range)
+      - [Rebalancing key-range sharded data](#rebalancing-key-range-sharded-data)
+      - [Sharding by Hash of Key](#sharding-by-hash-of-key)
+      - [Hash modulo number of nodes](#hash-modulo-number-of-nodes)
+      - [Fixed number of shards](#fixed-number-of-shards)
+      - [Sharding by hash range](#sharding-by-hash-range)
+      - [Consistent hashing](#consistent-hashing)
   - [Chapter 8. Transaction](#chapter-8-transaction)
     - [Introduction](#introduction)
     - [The meaning of ACID](#the-meaning-of-acid)
@@ -1444,6 +1453,110 @@ How does leader-based replication work under the hood?
   - all records with the same partition key are placed in the same shard
   - This choice matters because accessing a record is fast if you know which shard it’s in, but if you don’t know the shard you have to do an inefficient search across all shards, and the sharding scheme is difficult to change.
 - Thus, sharding often works well for key-value data, where you can easily shard by key, but it’s harder with relational data where you may want to search by a secondary index, or join records that may be distributed across different shards
+
+#### Sharding for Multitenancy
+- Software as a service (SaaS)products and cloud services are often multitenant, where each tenant is a customer
+- Multiple users may have logins on the same tenant, but each tenant has a self-contained dataset that is separate from other tenants
+- Sometimes sharding is used to implement multitenant systems: either each tenant is given a separate shard, or multiple small tenants may be grouped together into a larger shard
+- Shards can be:
+  - Separate physical databases, or
+  - Independently managed parts of a larger logical database
+- Advantages of sharding for multitenancy
+  - Resource isolation
+    - Heavy workloads from one tenant are less likely to affect others
+  - Permission isolation
+    - Physical separation reduces blast radius of access-control bugs
+  - Cell-based architecture
+    - Group services and storage for a set of tenants into independent “cells”
+    - Improves fault isolation - failures stay within one cell
+  - Per-tenant backup and restore
+    - Enables restoring one tenant’s data without impacting others
+  - Regulatory compliance
+    - Easier data export and deletion
+  - Data residence
+    - Tenant shards can be placed in specific regions to satisfy data residency laws
+- Challenges of sharding for multitenancy
+    - Large tenants
+      - Assumes each tenant fits on one node
+    - Grouping tenants raises the problem of moving tenants as they grow
+    -Queries or joins across tenants become harder when data is split across shards
+- Sharding is a powerful way to implement multitenancy with strong isolation and operational benefits, but it assumes tenant sizes are manageable and makes cross-tenant operations and tenant growth more complex.
+
+### Sharding of Key-Value Data
+- Our goal with sharding is to spread the data and the query load evenly across nodes
+- If every node takes a fair share, then—in theory—10 nodes should be able to handle 10 times as much data and 10 times the read and write throughput of a single node
+-  Moreover, if we add or remove a node, we want to be able to rebalance the load so that it is evenly distributed across the 11 (when adding) or the remaining 9 (when removing) nodes.
+-  Unfair sharding, we call it skewed
+-  The presence of skew makes sharding less effective
+-  A shard with dis-proportionally high load is called a *hot shard* or *hot spot* 
+-  If there is a particular key with high load, we call it *hot key*
+-  Therefore we need an algorithm that takes as input the partition key of a record, and tells us which shard that record is in
+-  In a key-value store the partition key is usually the key, or the first part of the key
+
+#### Sharding by Key Range
+- One way of sharding is to assign a contiguous range of partition keys 
+  - The ranges of keys are not necessarily evenly spaced, because your data may not be evenly distributed.
+- The shard boundaries might be chosen manually by an administrator, or the database can choose them automatically. 
+- Within each shard, keys are stored in sorted order
+  - This has the advantage that range scans are easy
+- A downside of key range sharding is that you can easily get a hot shard if there are a lot of writes to nearby keys. 
+
+#### Rebalancing key-range sharded data
+- When you first set up your database, there are no key ranges to split into shards
+  - Some databases, such as HBase and MongoDB, allow you to configure an initial set of shards on an empty database, which is called pre-splitting.
+  - This requires that you already have some idea of what the key distribution is going to look like, so that you can choose appropriate key range boundaries
+- Splitting shard when they grow is an expensive operation, since it requires all of its data to be written into the new files 
+
+#### Sharding by Hash of Key
+- Key-range sharding is useful if you want records with nearby (but different) partition keys to be grouped into the same shard
+  - for example, this might be the case with timestamps
+- If you don’t care whether partition keys are near each other (e.g., if they are tenant IDs in a multitenant application), a common approach is to first hash the partition key before mapping it to a shard.
+- A good hash function takes skewed data and makes it uniformly distributed
+  -  Say you have a 32-bit hash function that takes a string
+  -  Whenever you give it a new string, it returns a seemingly random number between 0 and 2^32 − 1.
+  -  Even if the input strings are very similar, their hashes are evenly distributed across that range of numbers
+  -  For sharding purposes, the hash function need not be cryptographically strong
+
+#### Hash modulo number of nodes
+- Once you have hashed the key, how do you choose which shard to store it in? Maybe your first thought is to take the hash value modulo the number of nodes in the system 
+- The problem with the mod N approach is that if the number of nodes N changes, most of the keys have to be moved from one node to another
+    ![modn](./images/ddia/modn.png)
+- Before the rebalancing, node 0 stored the keys whose hashes are 0, 3, 6, 9, and so on. After adding the fourth node, the key with hash 3 has moved to node 3, the key with hash 6 has moved to node 2, the key with hash 9 has moved to node 1, and so on.
+- The mod N function is easy to compute, but it leads to very inefficient rebalancing because there is a lot of unnecessary movement of records from one node to another. 
+-  We need an approach that doesn’t move data around more than necessary.
+
+#### Fixed number of shards
+- One simple but widely-used solution is to create many more shards than there are nodes, and to assign several shards to each node.
+  - Or you can think other way - One node maps to many virtual nodes
+    ![manyshard](./images/ddia/manyshard.png)
+- For example, a database running on a cluster of 10 nodes may be split into 1,000 shards from the outset so that 100 shards are assigned to each node
+- A key is then stored in shard number hash(key) % 1,000, and the system separately keeps track of which shard is stored on which node.
+- Now, if a node is added to the cluster, the system can reassign some of the shards from existing nodes to the new node until they are fairly distributed once again.
+- In this model, only entire shards are moved between nodes, which is cheaper than splitting shards
+- The number of shards does not change, nor does the assignment of keys to shards.
+- The only thing that changes is the assignment of shards to nodes
+- It’s common to choose the number of shards to be a number that is divisible by many factors, so that the dataset can be evenly split across various different numbers of nodes
+- Choosing the right number of shards is difficult if the total size of the dataset is highly variable 
+
+#### Sharding by hash range
+- If the required number of shards can’t be predicted in advance
+  - it’s better to use a scheme in which the number of shards can adapt easily to the workload
+- key-range sharding  has a risk of hot spots when there are a lot of writes to nearby keys
+  - One solution is to combine key-range sharding with a hash function so that each shard contains a range of hash values rather than a range of keys. 
+    -  f: (k1, k2, k3, k4) -> { Shard 1:[h(k1), h(k2)], Shard 2: [h(k3)], Shard 3: [h(k4)] }
+    ![hashed-keyrange](./images/ddia/hashed-keyrange.png)
+- The downside compared to key-range sharding is that range queries over the partition key are not efficient, as keys in the range are now scattered across all the shards. 
+- However, if keys consist of two or more columns, and the partition key is only the first of these columns 
+  - Say if key is  (C1C2C3) and paritition key is C1. Then all entries with C1 will lands into the same shard. thus C2 and C3 will land into the same shard. Making range query on C2, C3.. efficient.
+  - You can still perform efficient range queries over the second and later columns: as long as all records in the range query have the same partition key, they will be in the same shard.
+
+#### Consistent hashing
+- A consistent hashing algorithm is a hash function that maps keys to a specified number of shards in a way that satisfies two properties:
+  1. the number of keys mapped to each shard is roughly equal, and
+  2. when the number of shards changes, as few keys as possible are moved from one shard to another.
+- Note that consistent here has nothing to do with replica consistency  or ACID consistency but rather describes the tendency of a key to stay in the same shard as much as possible
+
+
 
 ## Chapter 8. Transaction 
 
