@@ -89,6 +89,13 @@
       - [Fixed number of shards](#fixed-number-of-shards)
       - [Sharding by hash range](#sharding-by-hash-range)
       - [Consistent hashing](#consistent-hashing)
+      - [Skewed Workloads and Relieving Hot Spots](#skewed-workloads-and-relieving-hot-spots)
+      - [Operations: Automatic or Manual Rebalancing](#operations-automatic-or-manual-rebalancing)
+    - [Request Routing](#request-routing)
+    - [Sharding and Secondary Indexes](#sharding-and-secondary-indexes)
+      - [Local Secondary Indexes](#local-secondary-indexes)
+      - [Global Secondary Indexes](#global-secondary-indexes)
+    - [Summary](#summary-2)
   - [Chapter 8. Transaction](#chapter-8-transaction)
     - [Introduction](#introduction)
     - [The meaning of ACID](#the-meaning-of-acid)
@@ -145,7 +152,7 @@
       - [Critical distinction - two very different meanings of “distributed transaction”](#critical-distinction---two-very-different-meanings-of-distributed-transaction)
     - [Exactly-once Message Processing - Distributed Transactions](#exactly-once-message-processing---distributed-transactions)
     - [XA Transaction](#xa-transaction)
-    - [Summary](#summary-2)
+    - [Summary](#summary-3)
   - [Chapter 9. The Trouble with Distributed Systems](#chapter-9-the-trouble-with-distributed-systems)
   - [Chapter 10. Consistency and Consensus](#chapter-10-consistency-and-consensus)
     - [Consistency Guarantees / Distributed Consistency Models](#consistency-guarantees--distributed-consistency-models)
@@ -1556,7 +1563,117 @@ How does leader-based replication work under the hood?
   2. when the number of shards changes, as few keys as possible are moved from one shard to another.
 - Note that consistent here has nothing to do with replica consistency  or ACID consistency but rather describes the tendency of a key to stay in the same shard as much as possible
 
+#### Skewed Workloads and Relieving Hot Spots
+- Consistent hashing ensures that keys are uniformly distributed across nodes
+  -  but that doesn’t mean that the actual load is uniformly distributed. 
+-  If the workload is highly skewed—that is, the amount of data under some partition keys is much greater than other keys
+   - or if the rate of requests to some keys is much higher than to others
+   - you can still end up with some servers being overloaded while others sit almost idle.
+   - For example, on a social media site, a celebrity user with millions of followers may cause a storm of activity when they do something
+   - In such situations, a more flexible sharding policy is required   
+   -  A system that defines shards based on ranges of keys (or ranges of hashes) makes it possible to put an individual hot key in a shard by itself, and perhaps even assigning it a dedicated machine
+   -  The problem is further compounded by change of load over time: 
+      -  for example, a particular social media post that has gone viral may experience high load for a couple of days, but thereafter it’s likely to calm down again. 
 
+#### Operations: Automatic or Manual Rebalancing
+- Automatic shard is convenient and not-conveniet at the same time
+  - convenient: because there is less operational work to do for normal maintenance, and such systems can even auto-scale to adapt to changes in workload.
+  - not-convenient : Rebalancing is an expensive operation, because it requires rerouting requests and moving a large amount of data from one node to another. If it is not done carefully, this process can overload the network or the nodes, and it might harm the performance of other requests. 
+- For that reason, it can be a good thing to have a human in the loop for rebalancing
+
+### Request Routing
+
+![Request Route](./images/ddia/request-route.png)
+- We have discussed how to shard a dataset across multiple nodes and how to rebalance those shards as nodes are added or removed. 
+- Now let’s move on to the question: if you want to read or write a particular key, how do you know which node
+  -  which IP address and port number
+-  We call this problem request routing, and it’s very similar to service discovery
+   -  The biggest difference between the two is that with services running application code, each instance is usually stateless, and a load balancer can send a request to any of the instances
+   -  With sharded databases, a request for a key can only be handled by a node that is a replica for the shard containing that key.
+-  This means that request routing has to be aware of the assignment from keys to shards
+    1. Allow clients to contact any node. If that node coincidentally owns the shard to which the request applies, it can handle the request directly; Otherwise, it forwards the request to the appropriate node, receives the reply, and passes the reply along to the client.
+    2. Send all requests from clients to a routing tier first, which determines the node that should handle each request and forwards it accordingly.
+    3. Require that clients be aware of the sharding and the assignment of shards to nodes. In this case, a client can connect directly to the appropriate node, without any intermediary.
+- In all cases, there are some key problems:
+  - Who decides which shard should live on which node? It’s simplest to have a single coordinator making that decision, but in that case how do you make it fault-tolerant in case the node running the coordinator goes down? And if the coordinator role can failover to another node, how do you prevent a split-brain situation
+  - How does the component performing the routing (which may be one of the nodes, or the routing tier, or the client) learn about changes in the assignment of shards to nodes?
+  - While a shard is being moved from one node to another, there is a cutover period during which the new node has taken over, but requests to the old node may still be in flight. How do you handle those?
+- Many distributed data systems rely on a separate coordination service such as ZooKeeper or etcd to keep track of shard assignments,
+    ![Zk-etcd](./images/ddia/zk-etcd.png)
+- They use consensus algo - to provide fault tolerant and protection agains split-brain
+- Each node registers itself in ZooKeeper, and ZooKeeper maintains the authoritative mapping of shards to nodes.
+- Other actors, such as the routing tier or the sharding-aware client, can subscribe to this information in ZooKeeper. 
+- Whenever a shard changes ownership, or a node is added or removed, ZooKeeper notifies the routing tier so that it can keep its routing information up to date.
+   - Kubernetes uses etcd to keep track of which service instance is running where.
+   - Kafka, YugabyteDB, ScyllaDB use built-in implementations of the Raft consensus protocol to perform this coordination function.
+   - DynamoDB uses Gossip protocols
+- When using a routing tier or when sending requests to a random node, clients still need to find the IP addresses to connect to. These are not as fast-changing as the assignment of shards to nodes, so it is often sufficient to use DNS for this purpose.
+
+### Sharding and Secondary Indexes
+- The sharding schemes we have discussed so far rely on the client knowing the partition key for any record it wants to access
+- This is most easily done in a key-value data model, where the partition key is the first part of the primary key (or the entire primary key)
+- The situation becomes more complicated if secondary indexes are involved
+- A secondary index usually doesn’t identify a record uniquely but rather is a way of searching for occurrences of a particular value: 
+  - find all actions by user 123, find all articles containing the word hogwash, find all cars whose color is red, and so on.
+- Key-value stores often don’t have secondary indexes, but they are the bread and butter of relational databases
+- The problem with secondary indexes is that they don’t map neatly to shards. 
+- There are two main approaches to sharding a database with secondary indexes: local and global indexes.
+
+#### Local Secondary Indexes
+
+![Secondary Key](./images/ddia/secondary-key.png)
+
+- For example, imagine you are operating a website for selling used cars
+- Each listing has a unique ID, and you use that ID as partition key for sharding
+- If you want to let users search for cars, allowing them to filter by color and by make, you need a secondary index on color 
+-  If you have declared the index, the database can perform the indexing automatically
+   -   For example, whenever a red car is added to the database, the database shard automatically adds its ID to the list of IDs for the index entry `color:red`
+- In this indexing approach, each shard is completely separate: each shard maintains its own secondary indexes, covering only the records in that shard. It doesn’t care what data is stored in other shards. 
+  - Whenever you write to the database—to add, remove, or update a records—you only need to deal with the shard that contains the record that you are writing. 
+  - For that reason, this type of secondary index is known as a **local index**.
+- When reading from a local secondary index, if you already know the partition key of the record you’re looking for, you can just perform the search on the appropriate shard
+- . Moreover, if you only want some results, and you don’t need all, you can send the request to any shard.
+- However, if you want all the results and don’t know their partition key in advance, you need to send the query to all shards, and combine the results you get back, because the matching records might be scattered across all the shards.
+- This approach to querying a sharded database can make read queries on secondary indexes quite expensive
+  - Limits scalability
+- Nevertheless, secondary indexes are widely used 
+
+#### Global Secondary Indexes
+- Rather than each shard having its own, local secondary index, we can construct a global index that covers data in all shards. 
+    ![Global secondary index](./images/ddia/global-secondary-index.png)
+-  However, we can’t just store that index on one node, since it would likely become a bottleneck and defeat the purpose of sharding
+-  A global index must also be sharded, but it can be sharded differently from the primary key index.
+   -  Eg. colors starting with the letters a to r appear in shard 0 and colors starting with s to z appear in shard 1.
+- This kind of index is also called **term-partitioned**
+- Global indexes have the advantage that a query with a single condition (such as color = red)
+  - However, if you want to fetch records and not just IDs, you still have to read from all the shards that are responsible for those IDs.
+- If you have multiple search conditions or terms (e.g., searching for cars of a certain color and a certain make, or searching for multiple words occurring in the same text), it’s likely that those terms will be assigned to different shards.
+- Another challenge with global secondary indexes is that writes are more complicated than with local indexes, because writing a single record might affect multiple shards
+  - DynamoDB supports both local and global secondary indexes. 
+  - Global secondary indexes are used by CockroachDB, TiDB, and YugabyteDB
+  - In the case of DynamoDB, writes are asynchronously reflected in global indexes, so reads from a global index may be stale 
+- Nevertheless, global indexes are useful if read throughput is higher than write throughput, and if the postings lists are not too long.
+
+### Summary
+- The goal of sharding is to spread the data and query load evenly across multiple machines, avoiding hot spots 
+- This requires choosing a sharding scheme that is appropriate to your data, and rebalancing the shards when nodes are added to or removed from the cluster.
+- We discussed two main approaches to sharding:
+  - Key range sharding
+    - where keys are sorted, and a shard owns all the keys from some minimum up to some maximum
+    - Sorting has the advantage that efficient range queries are possible
+    -  but there is a risk of hot spots if the application often accesses keys that are close together in the sorted order.
+  - Hash sharding
+    - where a hash function is applied to each key
+    - a shard owns a range of hash values
+    - This method destroys the ordering of keys, making range queries inefficient, but it may distribute load more evenly.
+- It is common to use the first part of the key as the partition key 
+  - and to sort records within that shard by the rest of the key.
+  - That way you can still have efficient range queries among the records with the same partition key.
+- We also discussed the interaction between sharding and secondary indexes.
+  - Local secondary indexes
+    - where the secondary indexes are stored in the same shard as the primary key and value
+  - Global secondary indexes 
+    -  which are sharded separately based on the indexed values
 
 ## Chapter 8. Transaction 
 
