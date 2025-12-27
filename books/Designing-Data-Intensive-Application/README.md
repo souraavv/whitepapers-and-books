@@ -3,7 +3,7 @@
   - [Plethora of buzzwords relating to storage and processing of data](#plethora-of-buzzwords-relating-to-storage-and-processing-of-data)
   - [Preface](#preface)
 - [Part 1. Foundation of Data Systems \[Chapter 1 - Chapter 4\]](#part-1-foundation-of-data-systems-chapter-1---chapter-4)
-  - [Chapter 0: Trade-Offs in Data System Architecture](#chapter-0-trade-offs-in-data-system-architecture)
+  - [Chapter 1: Trade-Offs in Data System Architecture](#chapter-1-trade-offs-in-data-system-architecture)
     - [OLTP vs OLAP](#oltp-vs-olap)
       - [From data warehouse to data lake](#from-data-warehouse-to-data-lake)
     - [Cloud versus Self-Hosting](#cloud-versus-self-hosting)
@@ -16,12 +16,11 @@
       - [Serverless](#serverless)
     - [Cloud Computing versus Supercomputing](#cloud-computing-versus-supercomputing)
     - [Data Systems, Law, and Society](#data-systems-law-and-society)
-  - [Chapter 1 : Trade-Offs in Data system Architecture](#chapter-1--trade-offs-in-data-system-architecture)
+  - [Chapter 2 : Defining NonFunctional Requirements](#chapter-2--defining-nonfunctional-requirements)
     - [Reliability](#reliability)
     - [Scalability](#scalability)
     - [Performance](#performance)
     - [Maintainability](#maintainability)
-  - [Chapter 2. Defining NonFunctional Requirements](#chapter-2-defining-nonfunctional-requirements)
   - [Chapter 3. Data Models and Query Language](#chapter-3-data-models-and-query-language)
     - [Data models](#data-models)
     - [The Object-Relational Mismatch](#the-object-relational-mismatch)
@@ -199,7 +198,7 @@
 
 # Part 1. Foundation of Data Systems [Chapter 1 - Chapter 4]
 
-## Chapter 0: Trade-Offs in Data System Architecture 
+## Chapter 1: Trade-Offs in Data System Architecture 
 - Data is central to much application development today
 - We call an application data-intensive if data management is one of the primary challenge. While *compute-intensive* the challenge is parallelizing some very large computation
 - In DI we worry more about things like storing and processing the data 
@@ -303,8 +302,7 @@
   - However, as we shall see in this book, many data systems rely on immutable constructs such as append-only logs as part of their design; how can we ensure deletion of some data in the middle of a file that is supposed to be immutable? How do we handle deletion of data that has been incorporated into derived datasets such as training data for machine learning models? 
   - Answering these questions creates new engineering challenges.
 
-
-## Chapter 1 : Trade-Offs in Data system Architecture
+## Chapter 2 : Defining NonFunctional Requirements
 > No such hard boundary b/w databases, queues, caches, etc. because now most tools are coming up with multiple features. Thus we will keep these three under single umbrella
 ### Reliability
 - Tolerating hardware & software faults
@@ -475,8 +473,6 @@
   - agile systems : allows making change easier
   - goal is to find ways of increasing agility of larger data systems
   - agility of system dependent on its simplicity and its abstractions
-
-## Chapter 2. Defining NonFunctional Requirements
 
 ## Chapter 3. Data Models and Query Language
 
