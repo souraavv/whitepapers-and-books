@@ -79,7 +79,8 @@
         - [The “happens-before” relation and concurrency](#the-happens-before-relation-and-concurrency)
         - [Capturing the happens-before relationship](#capturing-the-happens-before-relationship)
     - [Summary](#summary-1)
-  - [Chapter 7. Partitioning](#chapter-7-partitioning)
+  - [Chapter 7. Sharding](#chapter-7-sharding)
+    - [Pros and Cons of Sharding](#pros-and-cons-of-sharding)
   - [Chapter 8. Transaction](#chapter-8-transaction)
     - [Introduction](#introduction)
     - [The meaning of ACID](#the-meaning-of-acid)
@@ -1430,7 +1431,23 @@ How does leader-based replication work under the hood?
 - This chapter has assumed that every replica stores a full copy of the whole database, which is unrealistic for large datasets. In the next chapter we will look at sharding, which allows each machine to store only a subset of the data.
 
 
-## Chapter 7. Partitioning
+## Chapter 7. Sharding
+
+![Shard](./images/ddia/shards.png)
+
+- A distributed database typically distributes data across nodes in two ways:
+  - Having a copy of the same data on multiple nodes: this is replication
+  - If we don’t want every node to store all the data, we can split up a large amount of data into smaller shards or partitions, and store different shards on different nodes. We’ll discuss sharding in this chapter.
+
+### Pros and Cons of Sharding
+- The primary reason for sharding a database is scalability: it’s a solution if the volume of data or the write throughput has become too great for a single node to handle, as it allows you to spread that data and those writes across multiple nodes. 
+- If read throughput is the problem, you don’t necessarily need sharding—you can use read scaling
+- Sharding is one of the main tools we have for achieving horizontal scaling (a scale-out architecture)
+- Sharding often adds complexity
+  - you typically have to decide which records to put in which shard by choosing a partition key; 
+  - all records with the same partition key are placed in the same shard
+  - This choice matters because accessing a record is fast if you know which shard it’s in, but if you don’t know the shard you have to do an inefficient search across all shards, and the sharding scheme is difficult to change.
+- Thus, sharding often works well for key-value data, where you can easily shard by key, but it’s harder with relational data where you may want to search by a secondary index, or join records that may be distributed across different shards
 
 ## Chapter 8. Transaction 
 
