@@ -54,6 +54,19 @@
       - [Monotonic Reads](#monotonic-reads)
       - [Consistent Prefix Reads](#consistent-prefix-reads)
       - [Solutions for Replication Lag](#solutions-for-replication-lag)
+    - [Multi-Leader Replication](#multi-leader-replication)
+      - [Geographically Distributed Operation](#geographically-distributed-operation)
+      - [Multi-leader replication topologies](#multi-leader-replication-topologies)
+        - [Problems with different topologies](#problems-with-different-topologies)
+      - [Sync Engines and Local-First Software](#sync-engines-and-local-first-software)
+      - [Real-time collaboration, offline-first, and local-first apps](#real-time-collaboration-offline-first-and-local-first-apps)
+        - [Pros and cons of sync engines](#pros-and-cons-of-sync-engines)
+      - [Dealing with Conflicting Writes](#dealing-with-conflicting-writes)
+        - [Conflict avoidance](#conflict-avoidance)
+        - [Last write wins (discarding concurrent writes)](#last-write-wins-discarding-concurrent-writes)
+        - [Manual Conflict Resolution](#manual-conflict-resolution)
+        - [Automatic conflict resolution](#automatic-conflict-resolution)
+      - [CRDTs and Operational Transformation](#crdts-and-operational-transformation)
   - [Chapter 6. Partitioning](#chapter-6-partitioning)
   - [Chapter 7. Transaction](#chapter-7-transaction)
     - [Introduction](#introduction)
@@ -1053,6 +1066,186 @@ How does leader-based replication work under the hood?
 > This setup does not protect against a full regional outage.
 >
 > To survive regional outages, systems must run across multiple regions, which increases latency, cost, and complexity.
+
+### Multi-Leader Replication
+- Single-leader replication has one major downside: all writes must go through the one leader
+- A natural extension of the single-leader replication model is to allow more than one node to accept writes. 
+- We call this a multi-leader configuration (also known as active/active or bidirectional replication).
+- In this setup, each leader simultaneously acts as a follower to the other leaders.
+- Synchronous replication practically yields no gain, thus we will not discuss that in the multi-leader replication 
+
+#### Geographically Distributed Operation
+- It rarely makes sense to use a multi-leader setup within a single region, because the benefits rarely outweigh the added complexity.
+- Imagine you have a database with replicas in several different regions
+  - This is known as a geographically distributed, geo-distributed or geo-replicated setup
+- With single-leader replication, the leader has to be in one of the regions, and all writes must go through that region.
+- In a multi-leader configuration, you can have a leader in each region
+    ![Multi leader](./images/ddia/multi-leader.png)
+- Let’s compare how the single-leader and multi-leader configurations fare in a multi-region deployment:
+  - Performance
+    - In a single-leader configuration, every write must go over the internet to the region with the leader. Adds significant latency
+    - In a multi-leader configuration, every write can be processed in the local region and is replicated asynchronously to the other regions
+  - Tolerance of regional outages
+    - In a single-leader configuration, if the region with the leader becomes unavailable, failover can promote a follower in another region to be leader.
+    -  In a multi-leader configuration, each region can continue operating independently of the others, and replication catches up when the offline region comes back online.
+ -  Tolerance of network problems
+    -  Even with dedicated connections, traffic between regions can be less reliable than traffic between zones in the same region or within a single zone
+    -  A multi-leader configuration with asynchronous replication can tolerate network problems better: during a temporary network interruption, each region’s leader can continue independently processing writes.
+ -  Consistency
+    -  A single-leader system can provide strong consistency guarantees, such as serializable transactions (form of isolation)
+    -  The biggest downside of multi-leader systems is that the consistency they can achieve is much weaker.
+       -  For example, you can’t guarantee that a bank account won’t go negative or that a username is unique
+       -  it’s always possible for different leaders to process writes that are individually fine
+    -  This is simply a fundamental limitation of distributed systems
+    -  If you need to enforce such constraints, you’re therefore better off with a single-leader system
+-  Multi-leader replication is less common than single-leader replication, but it is still supported by many databases, including MySQL, Oracle, SQL Server, and YugabyteDB
+-  As multi-leader replication is a somewhat retrofitted feature in many databases, there are often subtle configuration pitfalls and surprising interactions with other database features.
+   -  For example, autoincrementing keys, triggers, and integrity constraints can be problematic. 
+-  Multi-leader replication is often considered dangerous territory that should be avoided if possible
+
+#### Multi-leader replication topologies
+- A replication topology describes the communication paths along which writes are propagated from one node to another.
+- The most general topology is all-to-all
+  - every leader sends its writes to every other leader
+- However, more restricted topologies are also used: for example a circular topology in which each node receives writes from one node and forwards those writes (plus any writes of its own) to one other node. 
+- Another popular topology has the shape of a star: one designated root node forwards writes to all of the other nodes. The star topology can be generalized to a tree.
+- To prevent infinite replication loops, each node is given a unique identifier, and in the replication log, each write is tagged with the identifiers of all the nodes it has passed through
+
+##### Problems with different topologies
+- A problem with circular and star topologies is that if just one node fails, it can interrupt the flow of replication messages between other nodes, leaving them unable to communicate until the node is fixed.
+
+#### Sync Engines and Local-First Software
+- Another situation in which multi-leader replication is appropriate is if you have an application that needs to continue to work while it is disconnected from the internet.
+- The app must work even when there is no internet.
+  - You must be able to read data offline
+  - You must be able to write data offline
+  - Changes must sync later when connectivity returns
+- This is called local-first software.
+- Why single-leader replication does NOT work here
+  - In a classic single-leader database:
+  - All writes go to one leader
+  - If you cannot reach the leader, you can't write
+- Now think about your phone in airplane mode:
+  - No network, Leader unreachable
+  - So You cannot add a calendar event. This is unacceptable for offline apps.
+- The key idea: every device has its own local database
+  - Each device: Phone, laptop, Tablet
+  - Has: A local database, Stored on disk, Always available
+- So when you:
+  - Create a calendar event on your phone while offline
+    - it is written locally, immediately
+  - No server involved at that moment.
+- Why “every device is a leader”
+  - A leader is simply a node that accepts writes
+  - Since your phone accepts writes while offline… your phone must be leader
+  - This is multi-leader replication.
+- What happens when you go back online?
+  - Devices start syncing changes. Sync is asynchronous. No device blocks waiting for another
+- Example timeline:
+  - Phone (offline):
+    - Add meeting “Doctor at 5 PM”
+  - Laptop (online):
+    - Add meeting “Team sync at 3 PM”
+  - Later, phone connects to internet:
+    - Phone sends its changes
+    - Laptop/server send their changes
+  - Both merge updates
+- From an architectural point of view, this setup is very similar to multi-leader replication between regions, taken to the extreme: each device is a “region,” and the network connection between them is extremely unreliable.
+
+#### Real-time collaboration, offline-first, and local-first apps
+- Moreover, many modern web apps offer real-time collaboration features, such as Google Docs and Sheets for text documents and spreadsheets, Figma for graphics, and Linear for project management.
+- What makes these apps so responsive is that user input is immediately reflected in the user interface, without waiting for a network round-trip to the server, and edits by one user are shown to their collaborators with low latency
+- This again results in a multi-leader architecture: 
+  - each web browser tab that has opened the shared file is a replica, and any updates that you make to the file are asynchronously replicated to the devices of the other users who have opened the same file. 
+- Even if the app does not allow you to continue editing a file while offline, the fact that multiple users can make edits without waiting for a response from the server already makes it multi-leader
+- Both offline editing and real-time collaboration require a similar replication infrastructure: 
+  - the application needs to capture any changes that the user makes to a file, and either send them to collaborators immediately (if online), or store them locally for sending later (if offline)
+- Additionally, the application needs to receive changes from collaborators, merge them into the user’s local copy of the file, and update the user interface to reflect the latest version
+-  If multiple users have changed the file concurrently, conflict resolution logic may be needed to merge those changes.
+-  A software library that supports this process is called a sync engine. 
+-  An application that allows a user to continue editing a file while offline is called offline-first
+-  For example, Git is a local-first collaboration system since you can sync via GitHub, or any other repository hosting service.
+
+##### Pros and cons of sync engines
+- The dominant way of building web apps today is to keep very little persistent state on the client. In contrast sync engine, you have to persistent state on the client
+- Having the data locally means the user interface can be much faster to respond than if it had to wait for a service call to fetch some data.
+  - Some apps aim to respond to user input in the next frame of the graphics system, which means rendering within 16 ms on a display with a 60 Hz refresh rate.
+- Allowing users to continue working while offline is valuable, especially on mobile devices with intermittent connectivity. 
+- A sync engine simplifies the programming model for frontend apps, compared to performing explicit service calls in application code. 
+
+#### Dealing with Conflicting Writes
+- A conflict happens when: 
+  - Two leaders accept writes independently
+  - Both writes modify the same piece of data
+  - Neither write knows about the other at the time it is made
+- Both writes are valid locally, but incompatible globally.
+- This problem exists only in multi-leader systems
+- For now we will assume that we can detect conflicts, and we want to figure out the best way of resolving them.
+
+##### Conflict avoidance
+- One strategy for conflicts is to avoid them occurring in the first place
+-  If the application can ensure that all writes for a particular record go through the same leader, then conflicts cannot occur, even if the database as a whole is multi-leader
+   -  This approach is not possible in the case of a sync engine client being updated offline (as leader can write independent and that's the design), but it is sometimes possible in geo-replicated server systems
+- Conflict avoidance can fail if the designated leader for a record changes, because a write during the transition can create conflicts.
+- Leader changes may happen due to region failures or users moving closer to another region.
+- Conflict avoidance works only while leader ownership is stable.
+- Another example of conflict avoidance: imagine you want to insert new records and generate unique IDs for them based on an auto-incrementing counter
+  - Another way to avoid conflicts is partitioning responsibility, such as having two leaders generate IDs from disjoint ranges (e.g., one uses odd numbers, the other even), ensuring no duplicate IDs are created concurrently.
+
+##### Last write wins (discarding concurrent writes)
+- When conflicts cannot be avoided, the simplest resolution strategy is last write wins (LWW).
+  - Each write is assigned a timestamp, and when replicas detect a conflict, they keep the value with the largest timestamp and discard the others.
+- The name last write wins is misleading. In the case of concurrent writes, there is no well-defined “last” write in real time
+  - The ordering is effectively arbitrary, so LWW really means that one of the concurrent writes is chosen at random and the others are silently dropped
+- LWW guarantees that replicas eventually reach a consistent state, but it does so by losing data
+  - This is acceptable only when conflicts are impossible or harmless
+- A further problem with LWW arises when physical clocks are used
+  -  If one node’s clock is ahead of others, its writes may permanently dominate, causing later writes from other nodes to be ignored even though they occurred later in real time.
+  -  This clock-sensitivity can be mitigated by using logical clocks, which avoid reliance on synchronized wall-clock time.
+
+> LWW resolves conflicts by arbitrarily choosing one concurrent write and discarding the rest, ensuring convergence at the cost of potential data loss and sensitivity to clock skew.
+
+
+##### Manual Conflict Resolution 
+- If losing writes (as in last-write-wins) is unacceptable, conflicts can be resolved manually, similar to how version control systems like Git handle merge conflicts.
+  - When concurrent updates modify the same data, the conflict must be resolved explicitly.
+- In databases, replication cannot pause waiting for a human.
+- Instead, the database stores all concurrent versions of a record (called siblings) and returns them together on reads.
+- The application then resolves the conflict, either automatically (for example, merging values) or by asking the user, and writes back a single resolved value.
+- This approach is used in systems such as CouchDB, but it has several drawbacks:
+  - API complexity: a field that was previously a single value now becomes a set of values, which complicates application code.
+  - User burden: manual resolution requires extra UI and can confuse users; automatic merging is often preferable.
+  - Risky automatic merges: naive merging can cause incorrect behavior. For example, Amazon once merged shopping carts by taking the union of items, which caused removed items to reappear when concurrent updates occurred.
+  - Resolution conflicts: if multiple nodes resolve the same conflict independently, their resolutions may differ, creating new conflicts (e.g., merging into “B/C” vs “C/B”), which can cascade into even more confusing results.
+- Manual conflict resolution preserves data but increases complexity, can confuse users, and may itself create new conflicts if not handled carefully.
+
+
+##### Automatic conflict resolution
+- The goal is convergence: all replicas that process the same set of writes end up in the same state, regardless of the order in which the writes arrive.
+  -  Eventual consistency combined with this guarantee is called strong eventual consistency.
+- Text data (e.g., wiki pages): insertions and deletions are tracked and merged so that all edits are preserved. Concurrent inserts at the same position are ordered deterministically.
+- Collections (e.g., to-do lists or shopping carts): insertions and deletions are tracked explicitly, so removed items stay removed and do not reappear after merging.
+- Counters (e.g., likes): increments and decrements from all replicas are combined correctly, avoiding lost or double-counted updates.
+- Key-value maps: conflicts are resolved per key, applying appropriate merge logic to each value independently.
+- Nevertheless, automatic conflict resolution is sufficient to build many useful apps. 
+  - And if you start from the requirement of wanting to build a collaborative offline-first or local-first app, then conflict resolution is inevitable, and automating it is often the best approach.
+
+#### CRDTs and Operational Transformation
+- Two families of algorithms are commonly used to implement automatic conflict resolution
+  -  Conflict-free replicated datatypes (CRDTs)
+  -  Operational Transformation (OT)
+
+
+![CRDT and OT](./images/ddia/ot-crdt.png)
+- OT 
+  - We record the index at which characters are inserted or deleted: “n” is inserted at index 0, and “!” at index 3. 
+  - Next, the replicas exchange their operations. The insertion of “n” at 0 can be applied as-is, but if the insertion of “!” at 3 were applied to the state “nice” we would get “nic!e”, which is incorrect. 
+  - We therefore need to transform the index of each operation to account for concurrent operations that have already been applied; in this case, the insertion of “!” is transformed to index 4 to account for the insertion of “n” at an earlier index.
+- CRDT
+  - Most CRDTs give each character a unique, immutable ID and use those to determine the positions of insertions/deletions, instead of indexes.
+  - Concurrent insertions at the same position are ordered by the IDs of the characters. This ensures that replicas converge without performing any transformation.
+- OT is most often used for real-time collaborative editing of text, e.g. in Google Docs
+- CRDTs can be found in distributed databases such as Redis Enterprise, Riak, and Azure Cosmos DB
 
 
 ## Chapter 6. Partitioning
