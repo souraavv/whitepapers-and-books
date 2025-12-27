@@ -45,6 +45,10 @@
     - [Handling Node Outages](#handling-node-outages)
       - [Follower failure: Catch-up recovery](#follower-failure-catch-up-recovery)
       - [Leader failure: Failover](#leader-failure-failover)
+    - [Implementation of Replication Logs](#implementation-of-replication-logs)
+      - [Statement-based replication](#statement-based-replication)
+      - [Write-ahead log (WAL) shipping](#write-ahead-log-wal-shipping)
+      - [Logical (row-based) log replication](#logical-row-based-log-replication)
   - [Chapter 6. Partitioning](#chapter-6-partitioning)
   - [Chapter 7. Transaction](#chapter-7-transaction)
     - [Introduction](#introduction)
@@ -932,6 +936,45 @@ CREATE
   -  For example, a temporary load spike could cause a node’s response time to increase above the timeout, or a network glitch could cause delayed packets. If the system is already struggling with high load or network problems, an unnecessary failover is likely to make the situation worse, not better.
 - There are no easy solutions to these problems. For this reason, some operations teams prefer to perform failovers manually, even if the software supports automatic failover.
 
+### Implementation of Replication Logs
+How does leader-based replication work under the hood? 
+#### Statement-based replication
+- In the simplest case, the leader logs every write request (statement) that it executes and sends that statement log to its followers. 
+- For a relational database, this means that every `INSERT`, `UPDATE`, or `DELETE` statement is forwarded to followers, and each follower parses and executes that SQL statement as if it had been received from a client.
+- Although this may sound reasonable, there are various ways in which this approach to replication can break down:
+  - Any statement that calls a nondeterministic function, such as `NOW()` to get the current date and time or `RAND()` to get a random number, is likely to generate a different value on each replica.
+  - If statements use an autoincrementing column, or if they depend on the existing data in the database (e.g., `UPDATE` …​ `WHERE` <some condition>), they must be executed in exactly the same order on each replica, or else they may have a different effect. This can be limiting when there are multiple concurrently executing transactions.
+  - Statements that have side effects (e.g., triggers, stored procedures, user-defined functions) may result in different side effects occurring on each replica, unless the side effects are absolutely deterministic.
+- It is possible to work around those issues—for example, the leader can replace any nondeterministic function calls with a fixed return value when the statement is logged so that the followers all get the same value.
+- The idea of executing deterministic statements in a fixed order is also known as state machine replication
+
+#### Write-ahead log (WAL) shipping
+- Idea of WAL is simple yet powerful - *Never modify a data page on disk until you have written a description of that change to the WAL*. 
+- So that in case if database crash happen, the first thing database will do is to open WAL. Scan from the last checkpoint. Replays changes (apply x to page y). This will make the on-disk data structure B-Tree into a consistent state.
+  - This is called **redo** logs
+- WAL can re-build the entire database after a crash. Therefore it must contain all information to construct the data
+- We can use the exact same log to build replica on another node: beside writing the log to the disk, the leader can also send it to the network to its followers.
+  - When the follower processes this log, it builds a copy of exact same file as found on the leader
+- This method of replication is used in PostGres, Oracle
+- The main disadvantage is the log describe the data on very low-level: a WAL contains details of which byte were changed on the disk on which block. 
+- This makes **replication tighly coupled to the storage engine**.
+- If the database changes its storage format from one version to another, it is typically not possible to run different version of the database software on the leader and followers
+- That may seem like a minor implementation detail, but it can have a big operational impact.
+
+#### Logical (row-based) log replication
+- An alternative is to use different log formats for replication and for the storage engine, which allows the replication log to be **decoupled from the storage engine internals**.
+- This kind of replication log is called a logical log, to distinguish it from the storage engine’s (physical) data representation.
+- A logical log for a relational database is usually a sequence of records describing writes to database tables at the granularity of a row:
+  - For an inserted row, the log contains the new values of all columns.
+  - For a deleted row, the log contains enough information to uniquely identify the row that was deleted. Typically this would be the primary key, but if there is no primary key on the table, the old values of all columns need to be logged.
+  - For an updated row, the log contains enough information to uniquely identify the updated row, and the new values of all columns (or at least the new values of all columns that changed).
+- A transaction that modifies several rows generates several such log records, followed by a record indicating that the transaction was committed. 
+- MySQL keeps a separate logical replication log, called the binlog, in addition to the WAL (when configured to use row-based replication).
+-  PostgreSQL implements logical replication by decoding the physical WAL into row insertion/update/delete events
+-  Since a logical log is decoupled from the storage engine internals, it can more easily be kept backward compatible, allowing the leader and the follower to run different versions of the database software.
+   -  This in turn enables upgrading to a new version with minimal downtime
+- A logical log format is also easier for external applications to parse.
+- This aspect is useful if you want to send the contents of a database to an external system, such as a data warehouse for offline analysis, or for building custom indexes and caches (more in chapter 12 - stream processing)
 
 ## Chapter 6. Partitioning
 
